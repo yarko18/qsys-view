@@ -1,9 +1,12 @@
 {
-  "name": "qsys-viewer",
-  "displayName": "Qsys Viewer",
+  "name": "qsys-view",
+  "displayName": "Qsys View",
   "description": "Explore Intel Platform Designer (.qsys) systems as readable layered graphs.",
   "version": "0.3.0",
-  "publisher": "yarko-fpga",
+  "publisher": "YaroslavMariukha",
+  "author": {
+    "name": "Mariukha Yaroslav"
+  },
   "license": "MIT",
   "engines": {
     "vscode": "^1.90.0"
@@ -13,35 +16,35 @@
   "icon": "media/icon.png",
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onCustomEditor:qsysViewer.graph",
-    "onCommand:qsysViewer.openGraph"
+    "onCustomEditor:qsysView.graph",
+    "onCommand:qsysView.openGraph"
   ],
   "contributes": {
     "commands": [
       {
-        "command": "qsysViewer.openGraph",
+        "command": "qsysView.openGraph",
         "title": "Open Qsys Graph",
-        "category": "Qsys Viewer"
+        "category": "Qsys View"
       }
     ],
     "customEditors": [
       {
-        "viewType": "qsysViewer.graph",
+        "viewType": "qsysView.graph",
         "displayName": "Qsys Graph",
         "selector": [{ "filenamePattern": "*.qsys" }],
         "priority": "default"
       }
     ],
     "configuration": {
-      "title": "Qsys Viewer",
+      "title": "Qsys View",
       "properties": {
-        "qsysViewer.quartusPath": {
+        "qsysView.quartusPath": {
           "type": "string",
           "default": "",
           "scope": "resource",
           "description": "Path to a Quartus installation directory or directly to qsys-script. Leave empty to use QUARTUS_ROOTDIR, conventional install locations, or PATH."
         },
-        "qsysViewer.ipSearchPaths": {
+        "qsysView.ipSearchPaths": {
           "type": "array",
           "items": { "type": "string" },
           "default": [],
@@ -53,14 +56,14 @@
     "menus": {
       "explorer/context": [
         {
-          "command": "qsysViewer.openGraph",
+          "command": "qsysView.openGraph",
           "when": "resourceExtname == .qsys",
           "group": "navigation@8"
         }
       ],
       "editor/title": [
         {
-          "command": "qsysViewer.openGraph",
+          "command": "qsysView.openGraph",
           "when": "resourceExtname == .qsys",
           "group": "navigation"
         }
@@ -92,10 +95,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://gitlab.com/yarko-fpga/qsys-viewer.git"
+    "url": "https://gitlab.com/yarko-fpga/qsys-view.git"
   },
   "bugs": {
-    "url": "https://gitlab.com/yarko-fpga/qsys-viewer/-/issues"
+    "url": "https://gitlab.com/yarko-fpga/qsys-view/-/issues"
   },
-  "homepage": "https://gitlab.com/yarko-fpga/qsys-viewer"
+  "homepage": "https://gitlab.com/yarko-fpga/qsys-view"
 }

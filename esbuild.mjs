@@ -35,7 +35,7 @@ const contexts = await Promise.all([
 
 if (watch) {
   await Promise.all(contexts.map((context) => context.watch()));
-  console.log('Watching Qsys Viewer sources…');
+  console.log('Watching Qsys View sources…');
 } else {
   await Promise.all(contexts.map((context) => context.rebuild()));
   await Promise.all(contexts.map((context) => context.dispose()));

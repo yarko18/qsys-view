@@ -3,18 +3,18 @@ Copyright 2026 Yaroslav Mariukha
 SPDX-License-Identifier: MIT
 -->
 
-# Qsys Viewer
+# Qsys View
 
-Qsys Viewer turns Intel Platform Designer (`.qsys`) files into readable, layered system diagrams directly in Visual Studio Code. Layout is calculated with ELK's Sugiyama-style layered algorithm.
+Qsys View turns Intel Platform Designer (`.qsys`) files into readable, layered system diagrams directly in Visual Studio Code. Layout is calculated with ELK's Sugiyama-style layered algorithm.
 
-![Qsys Viewer icon](media/icon.png)
+![Qsys View icon](media/icon.png)
 
 ## Installation
 
-Until Qsys Viewer is available in the VS Code Marketplace, install a packaged `.vsix` file:
+Until Qsys View is available in the VS Code Marketplace, install a packaged `.vsix` file:
 
 ```bash
-code --install-extension qsys-viewer-x.y.z.vsix
+code --install-extension qsys-view-x.y.z.vsix
 ```
 
 Alternatively, open the Extensions view in VS Code, select **Views and More Actions… → Install from VSIX…**, and choose the package.
@@ -43,7 +43,7 @@ Qsys graph viewing only requires VS Code 1.90 or newer. Intel Quartus Prime is o
 
 By default only Avalon-ST links and their connected modules are shown. Enable **All IP** or more connection types from the toolbar to explore the complete system.
 
-When a system contains Avalon-ST links, they are the structural layer for the graph. Qsys Viewer calculates that pipeline independently and places non-streaming-only IP in a separate stable area. Avalon-MM, clock, reset, and IRQ filters add interactive hubs without adding graph edges or changing node positions. Interface filter changes therefore preserve both Avalon-ST node coordinates and the current pan/zoom position.
+When a system contains Avalon-ST links, they are the structural layer for the graph. Qsys View calculates that pipeline independently and places non-streaming-only IP in a separate stable area. Avalon-MM, clock, reset, and IRQ filters add interactive hubs without adding graph edges or changing node positions. Interface filter changes therefore preserve both Avalon-ST node coordinates and the current pan/zoom position.
 
 ## Interface visualization
 
@@ -59,19 +59,19 @@ When a system contains Avalon-ST links, they are the structural layer for the gr
 
 ## Usage
 
-1. Open a `.qsys` file in VS Code. Qsys Viewer is the default custom editor for this file type.
+1. Open a `.qsys` file in VS Code. Qsys View is the default custom editor for this file type.
 2. Alternatively, right-click a `.qsys` file and select **Open Qsys Graph**.
 3. To inspect raw XML, use **Reopen Editor With… → Text Editor**.
 4. Click **Read interfaces…** to read exact interface ports. The extension asks before running IP Tcl, uses a disposable copy in the OS temporary directory, and does not write to the source project.
 
-Qsys Viewer finds `qsys-script` through `QUARTUS_ROOTDIR`, conventional Intel FPGA installation folders, or `PATH`. If necessary, set **Qsys Viewer: Quartus Path**. Local `ip/*/component.ipx`, composition dependencies under `ip/common/**/*_hw.tcl`, the standard Quartus catalog, and paths from **Qsys Viewer: IP Search Paths** are passed to Platform Designer. Relative search paths are resolved from the `.qsys` directory.
+Qsys View finds `qsys-script` through `QUARTUS_ROOTDIR`, conventional Intel FPGA installation folders, or `PATH`. If necessary, set **Qsys View: Quartus Path**. Local `ip/*/component.ipx`, composition dependencies under `ip/common/**/*_hw.tcl`, the standard Quartus catalog, and paths from **Qsys View: IP Search Paths** are passed to Platform Designer. Relative search paths are resolved from the `.qsys` directory.
 
 ## Settings
 
 | Setting | Description |
 | --- | --- |
-| `qsysViewer.quartusPath` | Quartus installation directory or direct path to `qsys-script` |
-| `qsysViewer.ipSearchPaths` | Additional Platform Designer IP search paths; `${qsysDir}` and `${workspaceFolder}` are supported |
+| `qsysView.quartusPath` | Quartus installation directory or direct path to `qsys-script` |
+| `qsysView.ipSearchPaths` | Additional Platform Designer IP search paths; `${qsysDir}` and `${workspaceFolder}` are supported |
 
 ## Development
 
@@ -90,11 +90,11 @@ To build an installable package:
 npm run package
 ```
 
-The extension is published under the `yarko-fpga` Marketplace publisher. See the [VS Code Marketplace publishing guide](https://code.visualstudio.com/api/working-with-extensions/publishing-extension) for release instructions.
+The extension is published under Marketplace publisher ID `YaroslavMariukha` (display name **Mariukha Yaroslav**). See the [VS Code Marketplace publishing guide](https://code.visualstudio.com/api/working-with-extensions/publishing-extension) for release instructions.
 
 ## Current scope
 
-Qsys Viewer never writes to `.qsys` files or the project directory. Basic graph data comes from XML. Exact interface properties come only from a fresh, user-triggered `qsys-script` elaboration of a temporary copy; `.sopcinfo` is not read and metadata is not cached. If Quartus or an IP definition cannot be resolved, no waveform is shown. Waveforms are illustrative protocol examples, not simulation output.
+Qsys View never writes to `.qsys` files or the project directory. Basic graph data comes from XML. Exact interface properties come only from a fresh, user-triggered `qsys-script` elaboration of a temporary copy; `.sopcinfo` is not read and metadata is not cached. If Quartus or an IP definition cannot be resolved, no waveform is shown. Waveforms are illustrative protocol examples, not simulation output.
 
 ## License
 

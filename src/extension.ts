@@ -66,7 +66,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     const key = uri.toString();
     if (this.activeMetadataLoads.has(key)) return;
     const choice = await vscode.window.showWarningMessage(
-      'Qsys Viewer will run qsys-script on a temporary copy. Quartus loads the IP Tcl files referenced by this system.',
+      'Qsys View will run qsys-script on a temporary copy. Quartus loads the IP Tcl files referenced by this system.',
       { modal: true, detail: 'The original .qsys file and its project directory are not modified.' },
       'Read interfaces',
     );
@@ -78,7 +78,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     await webview.postMessage({ type: 'metadataLoading' });
     try {
       await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: 'Qsys Viewer: reading interfaces with Quartus…' },
+        { location: vscode.ProgressLocation.Notification, title: 'Qsys View: reading interfaces with Quartus…' },
         () => this.sendGraph(uri, webview, true),
       );
     } finally {
@@ -106,7 +106,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
             warnings: [...graph.warnings, `Quartus metadata unavailable: ${message}`],
             metadata: { source: 'qsys-only', label: `Quartus metadata unavailable: ${message}` },
           };
-          void vscode.window.showErrorMessage(`Qsys Viewer: ${message}`);
+          void vscode.window.showErrorMessage(`Qsys View: ${message}`);
         }
       }
       await webview.postMessage({ type: 'graph', graph });
@@ -128,7 +128,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     const executable = await this.findQsysScript(uri);
     const projectDirectory = path.dirname(uri.fsPath);
     const searchPath = this.ipSearchPath(uri, projectDirectory);
-    const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'qsys-viewer-'));
+    const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'qsys-view-'));
     const temporaryQsys = path.join(temporaryDirectory, `${systemName}.qsys`);
     const inspector = path.join(this.context.extensionUri.fsPath, 'quartus', 'inspect-interfaces.tcl');
     try {
@@ -145,7 +145,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
   }
 
   private ipSearchPath(uri: vscode.Uri, projectDirectory: string): string {
-    const configuration = vscode.workspace.getConfiguration('qsysViewer', uri);
+    const configuration = vscode.workspace.getConfiguration('qsysView', uri);
     const configured = configuration.get<string[]>('ipSearchPaths', []);
     const workspaceDirectory = vscode.workspace.getWorkspaceFolder(uri)?.uri.fsPath ?? projectDirectory;
     const expand = (value: string) => {
@@ -164,7 +164,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
   }
 
   private async findQsysScript(uri: vscode.Uri): Promise<string> {
-    const configured = vscode.workspace.getConfiguration('qsysViewer', uri).get<string>('quartusPath', '').trim();
+    const configured = vscode.workspace.getConfiguration('qsysView', uri).get<string>('quartusPath', '').trim();
     const roots = [
       configured,
       process.env.QUARTUS_ROOTDIR,
@@ -204,7 +204,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
   <link rel="stylesheet" href="${styleUri}">
-  <title>Qsys Viewer</title>
+  <title>Qsys View</title>
 </head>
 <body>
   <div id="app"><div class="initial-loading">Loading Qsys graph…</div></div>
@@ -240,7 +240,7 @@ function runQsysScript(executable: string, args: string[], cwd: string): Promise
         return;
       }
       const cause = (error as NodeJS.ErrnoException).code === 'ENOENT'
-        ? 'qsys-script was not found. Set “Qsys Viewer: Quartus Path” in VS Code settings.'
+        ? 'qsys-script was not found. Set “Qsys View: Quartus Path” in VS Code settings.'
         : `qsys-script failed: ${lastLines(output, 12) || error.message}`;
       reject(new Error(cause));
     });
@@ -259,16 +259,16 @@ function randomNonce(): string {
 export function activate(context: vscode.ExtensionContext): void {
   const provider = new QsysEditorProvider(context);
   context.subscriptions.push(
-    vscode.window.registerCustomEditorProvider('qsysViewer.graph', provider, {
+    vscode.window.registerCustomEditorProvider('qsysView.graph', provider, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
-    vscode.commands.registerCommand('qsysViewer.openGraph', async (uri?: vscode.Uri) => {
+    vscode.commands.registerCommand('qsysView.openGraph', async (uri?: vscode.Uri) => {
       const target = uri ?? vscode.window.activeTextEditor?.document.uri;
       if (!target || target.path.toLowerCase().endsWith('.qsys') === false) {
         void vscode.window.showWarningMessage('Select a .qsys file to open its graph.');
         return;
       }
-      await vscode.commands.executeCommand('vscode.openWith', target, 'qsysViewer.graph');
+      await vscode.commands.executeCommand('vscode.openWith', target, 'qsysView.graph');
     }),
   );
 }

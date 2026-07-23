@@ -51,10 +51,10 @@ let transform = { x: 20, y: 20, scale: 1 };
 let didInitialFit = false;
 
 const app = document.querySelector<HTMLDivElement>('#app');
-if (!app) throw new Error('Qsys Viewer root element is missing.');
+if (!app) throw new Error('Qsys View root element is missing.');
 app.innerHTML = `
   <header class="toolbar">
-    <div class="brand"><strong id="system-name">Qsys Viewer</strong><span id="summary"></span></div>
+    <div class="brand"><strong id="system-name">Qsys View</strong><span id="summary"></span></div>
     <div id="kind-filters" class="filters"></div>
     <label class="option"><input id="show-disconnected" type="checkbox"> All IP</label>
     <label class="option"><input id="show-disabled" type="checkbox"> Disabled IP</label>
@@ -466,7 +466,7 @@ function showConnectionDetails(connection: QsysConnection): void {
     } else {
       const unavailable = document.createElement('p');
       unavailable.className = 'metadata-unavailable';
-      unavailable.textContent = 'Waveform unavailable until qsys-script elaborates both interfaces. Qsys Viewer does not infer missing signals from module parameters.';
+      unavailable.textContent = 'Waveform unavailable until qsys-script elaborates both interfaces. Qsys View does not infer missing signals from module parameters.';
       const load = document.createElement('button');
       load.textContent = 'Read interfaces with Quartus…';
       load.addEventListener('click', () => quartusMetadata.click());
