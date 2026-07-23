@@ -90,7 +90,7 @@ To build an installable package:
 npm run package
 ```
 
-The manifest currently uses `fpga8683920` as its Marketplace publisher ID, matching the GitLab namespace. If your Marketplace publisher has a different ID, update `publisher` in `package.json` before following the [VS Code Marketplace publishing guide](https://code.visualstudio.com/api/working-with-extensions/publishing-extension).
+The extension is published under the `yarko-fpga` Marketplace publisher. See the [VS Code Marketplace publishing guide](https://code.visualstudio.com/api/working-with-extensions/publishing-extension) for release instructions.
 
 ## Current scope
 

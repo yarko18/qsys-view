@@ -3,7 +3,7 @@
   "displayName": "Qsys Viewer",
   "description": "Explore Intel Platform Designer (.qsys) systems as readable layered graphs.",
   "version": "0.3.0",
-  "publisher": "fpga8683920",
+  "publisher": "yarko-fpga",
   "license": "MIT",
   "engines": {
     "vscode": "^1.90.0"
@@ -92,10 +92,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://gitlab.com/fpga8683920/qsys-viewer.git"
+    "url": "https://gitlab.com/yarko-fpga/qsys-viewer.git"
   },
   "bugs": {
-    "url": "https://gitlab.com/fpga8683920/qsys-viewer/-/issues"
+    "url": "https://gitlab.com/yarko-fpga/qsys-viewer/-/issues"
   },
-  "homepage": "https://gitlab.com/fpga8683920/qsys-viewer"
+  "homepage": "https://gitlab.com/yarko-fpga/qsys-viewer"
 }
