@@ -89,6 +89,54 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
   pointer-events: none;
 }
 
+.interface-hubs {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: min(310px, calc(100% - 20px));
+  max-height: calc(100% - 20px);
+  padding: 10px;
+  overflow: auto;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--vscode-editorWidget-background) 94%, transparent);
+  box-shadow: 0 3px 14px var(--vscode-widget-shadow);
+}
+.hub-group { display: flex; flex-direction: column; gap: 5px; }
+.hub-group h3 {
+  margin: 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.interface-hub {
+  --hub-color: var(--vscode-focusBorder);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 7px 9px;
+  overflow: hidden;
+  border: 1px solid var(--hub-color);
+  border-left-width: 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--hub-color) 13%, var(--vscode-editorWidget-background));
+  text-align: left;
+}
+.interface-hub:hover, .interface-hub:focus, .interface-hub.selected {
+  outline: none;
+  background: color-mix(in srgb, var(--hub-color) 25%, var(--vscode-editorWidget-background));
+  box-shadow: inset 0 0 0 1px var(--hub-color);
+}
+.interface-hub strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; }
+.interface-hub span { color: var(--vscode-descriptionForeground); font-size: 10px; }
+
 .node { cursor: pointer; outline: none; transition: opacity .15s; }
 .node rect {
   fill: var(--vscode-editorWidget-background);
@@ -101,6 +149,9 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .node.disabled rect { stroke-dasharray: 5 4; }
 .node.match rect { stroke: var(--vscode-charts-yellow); stroke-width: 4; }
 .node.dimmed { opacity: .18; }
+.node.hub-dimmed { opacity: .12; }
+.node.hub-related rect { stroke: var(--active-hub-color); stroke-width: 4; filter: brightness(1.12); }
+.node.hub-origin rect { stroke: var(--active-hub-color); stroke-dasharray: 3 2; stroke-width: 3; }
 .node-name { fill: var(--vscode-editor-foreground); font-size: 15px; font-weight: 600; }
 .node-kind { fill: var(--vscode-descriptionForeground); font-size: 10px; }
 .edge { --edge-color: var(--vscode-descriptionForeground); color: var(--edge-color); cursor: pointer; outline: none; }
@@ -132,9 +183,23 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .kind-interrupt, .edge-interrupt { --edge-color: var(--vscode-charts-purple, #a77bd9); }
 .kind-conduit, .edge-conduit { --edge-color: var(--vscode-charts-yellow, #c8ad45); }
 .kind-other, .edge-other { --edge-color: var(--vscode-descriptionForeground, #999); }
+.address-badges { --hub-color: var(--vscode-focusBorder); pointer-events: none; }
+.address-badge rect {
+  fill: color-mix(in srgb, var(--hub-color) 24%, var(--vscode-editorWidget-background));
+  stroke: var(--hub-color);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+.address-badge text {
+  fill: var(--vscode-editor-foreground);
+  font-size: 10px;
+  font-weight: 600;
+  text-anchor: middle;
+}
 
 .details {
   position: absolute;
+  z-index: 3;
   top: 10px;
   right: 10px;
   bottom: 10px;

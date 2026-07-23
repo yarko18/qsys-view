@@ -5,6 +5,15 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 0.3.0
+
+- Draw directed graph edges only for Avalon-ST and conduit connections.
+- Replace Avalon-MM, clock, reset, and interrupt edges with interactive interface hubs.
+- Highlight every IP related to a hovered or selected hub.
+- Show per-slave base-address badges for a selected Avalon-MM master.
+- Show known source frequencies on clock hubs and group interrupts by their receiver.
+- Hide unknown/other interfaces completely.
+
 ## 0.2.2
 
 - Anchor node placement exclusively to the complete Avalon-ST topology when streaming links exist.

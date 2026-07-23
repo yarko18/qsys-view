@@ -5,6 +5,7 @@ import { connectionKinds, type ConnectionKind, type QsysConnection, type QsysGra
 import { streamParameters } from '../parser/streamMetadata';
 import { createInterfaceWaveform } from '../parser/waveform';
 import { layoutAnchoredGraph, projectVisibleLayout, type LayoutPoint, type LayoutResult } from '../layout/elk';
+import { connectionAddress, createInterfaceHubs, type HubKind, type InterfaceHub } from './interfaceHubs';
 import './styles.css';
 
 const vscode = acquireVsCodeApi();
@@ -17,6 +18,14 @@ const labels: Record<ConnectionKind, string> = {
   conduit: 'Conduit',
   other: 'Other',
 };
+const filterKinds = connectionKinds.filter((kind) => kind !== 'other');
+const directedKinds = new Set<ConnectionKind>(['avalon_streaming', 'conduit']);
+const hubLabels: Record<HubKind, string> = {
+  avalon_memory_mapped: 'Avalon-MM masters',
+  clock: 'Clock sources',
+  reset: 'Reset sources',
+  interrupt: 'IRQ receivers',
+};
 
 interface ViewState {
   selectedKinds: ConnectionKind[];
@@ -26,7 +35,7 @@ interface ViewState {
 
 const saved = (vscode.getState() ?? {}) as Partial<ViewState>;
 const state: ViewState = {
-  selectedKinds: saved.selectedKinds ?? ['avalon_streaming'],
+  selectedKinds: (saved.selectedKinds ?? ['avalon_streaming']).filter((kind) => kind !== 'other'),
   showDisconnected: saved.showDisconnected ?? false,
   showDisabled: saved.showDisabled ?? true,
 };
@@ -35,6 +44,8 @@ let graph: QsysGraph | undefined;
 let layout: LayoutResult | undefined;
 let masterLayout: LayoutResult | undefined;
 let masterLayoutKey = '';
+let activeHubId: string | undefined;
+let visibleHubs: InterfaceHub[] = [];
 let renderVersion = 0;
 let transform = { x: 20, y: 20, scale: 1 };
 let didInitialFit = false;
@@ -56,6 +67,7 @@ app.innerHTML = `
       <defs id="definitions"></defs>
       <g id="scene"></g>
     </svg>
+    <div id="interface-hubs" class="interface-hubs hidden"></div>
     <div id="status" class="status">Loading Qsys graph…</div>
     <aside id="details" class="details hidden"></aside>
     <div class="legend">Drag to pan · Wheel to zoom · Click an IP for details</div>
@@ -69,8 +81,9 @@ const details = required<HTMLElement>('details');
 const search = required<HTMLInputElement>('search');
 const filters = required<HTMLElement>('kind-filters');
 const quartusMetadata = required<HTMLButtonElement>('quartus-metadata');
+const interfaceHubs = required<HTMLElement>('interface-hubs');
 
-for (const kind of connectionKinds) {
+for (const kind of filterKinds) {
   const label = document.createElement('label');
   label.className = `kind-filter kind-${kind}`;
   const checkbox = document.createElement('input');
@@ -168,25 +181,31 @@ async function render(): Promise<void> {
   const allowedModules = graph.modules.filter((module) => state.showDisabled || !module.disabled);
   const allowedIds = new Set(allowedModules.map((module) => module.id));
   const allowedConnections = graph.connections.filter((connection) =>
-    allowedIds.has(connection.source) && allowedIds.has(connection.target),
-  );
-  const connections = graph.connections.filter((connection) =>
-    state.selectedKinds.includes(connection.kind)
+    connection.kind !== 'other'
     && allowedIds.has(connection.source)
     && allowedIds.has(connection.target),
   );
+  const selectedConnections = allowedConnections.filter((connection) =>
+    state.selectedKinds.includes(connection.kind)
+  );
+  const connections = selectedConnections.filter((connection) => directedKinds.has(connection.kind));
+  const hubs = createInterfaceHubs(graph, state.selectedKinds, allowedIds);
   const connectedIds = new Set(connections.flatMap((connection) => [connection.source, connection.target]));
+  for (const hub of hubs) {
+    for (const moduleId of hub.relatedModuleIds) connectedIds.add(moduleId);
+  }
   const modules = state.showDisconnected
     ? allowedModules
     : allowedModules.filter((module) => connectedIds.has(module.id));
   try {
-    const nextLayoutKey = layoutKey(allowedModules, allowedConnections);
+    const structuralConnections = allowedConnections.filter((connection) => directedKinds.has(connection.kind));
+    const nextLayoutKey = layoutKey(allowedModules, structuralConnections);
     let nextMaster = masterLayoutKey === nextLayoutKey ? masterLayout : undefined;
     if (!nextMaster) {
-      showStatus(allowedConnections.some((connection) => connection.kind === 'avalon_streaming')
+      showStatus(structuralConnections.some((connection) => connection.kind === 'avalon_streaming')
         ? 'Calculating Avalon-ST anchored layout…'
         : 'Calculating layered layout…');
-      nextMaster = await layoutAnchoredGraph(allowedModules, allowedConnections);
+      nextMaster = await layoutAnchoredGraph(allowedModules, structuralConnections);
       if (version !== renderVersion) return;
       masterLayout = nextMaster;
       masterLayoutKey = nextLayoutKey;
@@ -195,7 +214,11 @@ async function render(): Promise<void> {
     const result = projectVisibleLayout(nextMaster, modules, connections);
     layout = result;
     draw(result);
-    required<HTMLElement>('summary').textContent = `${modules.length}/${graph.modules.length} IP · ${connections.length}/${graph.connections.length} links`;
+    visibleHubs = hubs;
+    if (activeHubId && !hubs.some((hub) => hub.id === activeHubId)) activeHubId = undefined;
+    drawInterfaceHubs(hubs);
+    const visibleConnectionCount = selectedConnections.length;
+    required<HTMLElement>('summary').textContent = `${modules.length}/${graph.modules.length} IP · ${visibleConnectionCount}/${allowedConnections.length} interfaces`;
     if (modules.length === 0) {
       showStatus('No graph elements match these filters. Enable another connection type or “All IP”.');
     } else {
@@ -263,6 +286,7 @@ function draw(result: LayoutResult): void {
     const group = svg('g', {
       class: `node${node.disabled ? ' disabled' : ''}`,
       transform: `translate(${node.x} ${node.y})`,
+      'data-module-id': node.id,
       'data-search': `${node.name} ${node.type}`.toLowerCase(),
       tabindex: '0',
       role: 'button',
@@ -285,6 +309,108 @@ function draw(result: LayoutResult): void {
   }
   createMarkers();
   applyTransform();
+}
+
+function drawInterfaceHubs(hubs: InterfaceHub[]): void {
+  interfaceHubs.replaceChildren();
+  interfaceHubs.classList.toggle('hidden', hubs.length === 0);
+  for (const kind of hubKindsIn(hubs)) {
+    const section = document.createElement('section');
+    section.className = `hub-group hub-group-${kind}`;
+    const heading = document.createElement('h3');
+    heading.textContent = hubLabels[kind];
+    section.append(heading);
+    for (const hub of hubs.filter((candidate) => candidate.kind === kind)) {
+      const card = document.createElement('button');
+      card.className = `interface-hub hub-${hub.kind}`;
+      card.dataset.hubId = hub.id;
+      card.style.setProperty('--hub-color', hubColor(hub));
+      card.title = `${hub.endpoint} · ${hub.relatedModuleIds.length} connected IP`;
+      const endpoint = document.createElement('strong');
+      endpoint.textContent = hub.endpoint;
+      const description = document.createElement('span');
+      description.textContent = `${labels[hub.kind]} · ${hub.relatedModuleIds.length} IP${hub.frequency ? ` · ${hub.frequency}` : ''}`;
+      card.append(endpoint, description);
+      card.addEventListener('mouseenter', () => applyHubHighlight(hub));
+      card.addEventListener('focus', () => applyHubHighlight(hub));
+      card.addEventListener('mouseleave', restoreActiveHub);
+      card.addEventListener('blur', restoreActiveHub);
+      card.addEventListener('click', () => {
+        activeHubId = activeHubId === hub.id ? undefined : hub.id;
+        updateHubSelection();
+      });
+      section.append(card);
+    }
+    interfaceHubs.append(section);
+  }
+  updateHubSelection();
+}
+
+function hubKindsIn(hubs: InterfaceHub[]): HubKind[] {
+  return ['avalon_memory_mapped', 'clock', 'reset', 'interrupt']
+    .filter((kind): kind is HubKind => hubs.some((hub) => hub.kind === kind));
+}
+
+function updateHubSelection(): void {
+  interfaceHubs.querySelectorAll<HTMLElement>('.interface-hub').forEach((card) => {
+    card.classList.toggle('selected', card.dataset.hubId === activeHubId);
+  });
+  const active = visibleHubs.find((hub) => hub.id === activeHubId);
+  applyHubHighlight(active);
+  drawAddressBadges(active?.kind === 'avalon_memory_mapped' ? active : undefined);
+}
+
+function restoreActiveHub(): void {
+  applyHubHighlight(visibleHubs.find((hub) => hub.id === activeHubId));
+}
+
+function applyHubHighlight(hub: InterfaceHub | undefined): void {
+  const related = new Set(hub?.relatedModuleIds ?? []);
+  scene.querySelectorAll<SVGGElement>('.node').forEach((node) => {
+    const moduleId = node.dataset.moduleId ?? '';
+    if (hub) node.style.setProperty('--active-hub-color', hubColor(hub));
+    else node.style.removeProperty('--active-hub-color');
+    node.classList.toggle('hub-related', Boolean(hub) && related.has(moduleId));
+    node.classList.toggle('hub-origin', Boolean(hub) && moduleId === hub?.moduleId);
+    node.classList.toggle('hub-dimmed', Boolean(hub) && !related.has(moduleId) && moduleId !== hub?.moduleId);
+  });
+}
+
+function drawAddressBadges(hub: InterfaceHub | undefined): void {
+  scene.querySelector('#address-badges')?.remove();
+  if (!hub || !layout) return;
+  const nodes = new Map(layout.nodes.map((node) => [node.id, node]));
+  const byModule = new Map<string, QsysConnection[]>();
+  for (const connection of hub.connections) {
+    const current = byModule.get(connection.target) ?? [];
+    current.push(connection);
+    byModule.set(connection.target, current);
+  }
+  const layer = svg('g', { id: 'address-badges', class: 'address-badges' });
+  layer.style.setProperty('--hub-color', hubColor(hub));
+  for (const [moduleId, connections] of byModule) {
+    const node = nodes.get(moduleId);
+    if (!node) continue;
+    for (const [index, connection] of connections.entries()) {
+      const badgeHeight = 22;
+      const y = node.y + node.height + 5 + index * (badgeHeight + 4);
+      const group = svg('g', { class: 'address-badge' });
+      group.append(svg('rect', { x: node.x, y, width: node.width, height: badgeHeight, rx: 4 }));
+      const value = svg('text', { x: node.x + node.width / 2, y: y + 15 });
+      value.textContent = connectionAddress(connection) ?? 'address unavailable';
+      const title = svg('title');
+      title.textContent = `${connection.source}.${connection.sourcePort} → ${connection.target}.${connection.targetPort}`;
+      group.append(value, title);
+      layer.append(group);
+    }
+  }
+  scene.append(layer);
+}
+
+function hubColor(hub: InterfaceHub): string {
+  let hash = 0;
+  for (const character of hub.id) hash = ((hash << 5) - hash + character.charCodeAt(0)) | 0;
+  return `hsl(${Math.abs(hash) % 360} 62% 55%)`;
 }
 
 function createMarkers(): void {

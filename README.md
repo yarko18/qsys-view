@@ -14,7 +14,11 @@ Qsys Viewer turns Intel Platform Designer (`.qsys`) files into readable, layered
 - Opens `.qsys` files as a read-only graph editor.
 - Layered left-to-right automatic layout with orthogonal edge routing.
 - Stable Avalon-ST topology: enabling Avalon-MM, clocks, resets, or other links never moves the streaming pipeline.
-- Separate filters for Avalon-ST, Avalon-MM, clock, reset, interrupt, conduit, and unknown links.
+- Directed edges only for Avalon-ST and conduit connections.
+- Interactive hubs for Avalon-MM masters, clock/reset sources, and IRQ receivers.
+- Hover a hub to highlight all connected IP; click an MM master to show each slave's relative base address.
+- Known clock frequencies are shown directly on their source hubs.
+- Separate filters for Avalon-ST, Avalon-MM, clock, reset, interrupt, and conduit interfaces; unknown interfaces are hidden.
 - Pan, zoom, and fit-to-window navigation.
 - Search by IP instance name or type.
 - Optional display of disconnected and disabled IP.
@@ -27,7 +31,7 @@ Qsys Viewer turns Intel Platform Designer (`.qsys`) files into readable, layered
 
 By default only Avalon-ST links and their connected modules are shown. Enable **All IP** or more connection types from the toolbar to explore the complete system.
 
-When a system contains Avalon-ST links, they are the structural layer for the graph. Qsys Viewer calculates that pipeline independently, places non-streaming-only IP in a separate stable area, and draws other connection types as overlays. Interface filter changes therefore preserve both Avalon-ST node coordinates and the current pan/zoom position.
+When a system contains Avalon-ST links, they are the structural layer for the graph. Qsys Viewer calculates that pipeline independently and places non-streaming-only IP in a separate stable area. Avalon-MM, clock, reset, and IRQ filters add interactive hubs without adding graph edges or changing node positions. Interface filter changes therefore preserve both Avalon-ST node coordinates and the current pan/zoom position.
 
 ## Usage
 
