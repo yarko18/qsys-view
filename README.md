@@ -18,6 +18,8 @@ Qsys Viewer turns Intel Platform Designer (`.qsys`) files into readable, layered
 - Search by IP instance name or type.
 - Optional display of disconnected and disabled IP.
 - Click an IP to inspect all parameters stored in the Qsys XML.
+- Click a connection or endpoint label to inspect connection and inferred interface parameters.
+- Avalon-ST details include an illustrative ready/valid/SOP/EOP/data transfer waveform.
 - Automatically refreshes after the source document changes.
 
 By default only Avalon-ST links and their connected modules are shown. Enable **All IP** or more connection types from the toolbar to explore the complete system.
@@ -49,7 +51,7 @@ The manifest currently uses `fpga8683920` as its Marketplace publisher ID, match
 
 ## Current scope
 
-Qsys Viewer never writes to `.qsys` files. It parses module and connection metadata that is present in the XML; interface port details not serialized by Platform Designer are shown using their connection endpoint names.
+Qsys Viewer never writes to `.qsys` files. It parses module and connection metadata that is present in the XML. Some interface properties live in the IP definition rather than the `.qsys` file; inferred values are labelled with the exact module parameter that supplied them, and missing values are not guessed. Waveforms are illustrative protocol examples, not simulation output.
 
 ## License
 

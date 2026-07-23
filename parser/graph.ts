@@ -37,6 +37,7 @@ export interface QsysConnection {
   targetPort: string;
   kind: ConnectionKind;
   rawKind: string;
+  parameters: Record<string, string>;
 }
 
 export interface QsysGraph {

@@ -30,6 +30,7 @@ describe('parseQsys', () => {
       'avalon_streaming',
       'avalon_memory_mapped',
     ]);
+    expect(graph.connections[1]?.parameters.baseAddress).toBe('0x1000');
     expect(graph.warnings[0]).toContain('module not found');
   });
 

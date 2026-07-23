@@ -1,7 +1,8 @@
 // Copyright 2026 Yaroslav Mariukha
 // SPDX-License-Identifier: MIT
 
-import { connectionKinds, type ConnectionKind, type QsysGraph, type QsysModule } from '../parser/graph';
+import { connectionKinds, type ConnectionKind, type QsysConnection, type QsysGraph, type QsysModule } from '../parser/graph';
+import { inferStreamMetadata, streamParameters, type StreamMetadata } from '../parser/streamMetadata';
 import { layoutGraph, type LayoutPoint, type LayoutResult } from '../layout/elk';
 import './styles.css';
 
@@ -112,6 +113,7 @@ window.addEventListener('message', (event: MessageEvent) => {
 
 let pointer: { id: number; startX: number; startY: number; originX: number; originY: number } | undefined;
 canvas.addEventListener('pointerdown', (event) => {
+  if ((event.target as Element).closest('.node, .edge')) return;
   pointer = { id: event.pointerId, startX: event.clientX, startY: event.clientY, originX: transform.x, originY: transform.y };
   canvas.setPointerCapture(event.pointerId);
   canvas.classList.add('panning');
@@ -178,7 +180,11 @@ async function render(): Promise<void> {
 function draw(result: LayoutResult): void {
   scene.replaceChildren();
   for (const edge of result.edges) {
-    const group = svg('g', { class: `edge edge-${edge.kind}` });
+    const group = svg('g', {
+      class: `edge edge-${edge.kind}`,
+      tabindex: '0',
+      role: 'button',
+    });
     for (const points of edge.paths) {
       group.append(svg('path', {
         d: pathData(points),
@@ -197,6 +203,14 @@ function draw(result: LayoutResult): void {
     const title = svg('title');
     title.textContent = `${edge.source}.${edge.sourcePort} → ${edge.target}.${edge.targetPort}\n${labels[edge.kind]} (${edge.rawKind})`;
     group.append(title);
+    const openDetails = (event: Event) => {
+      event.stopPropagation();
+      showConnectionDetails(edge);
+    };
+    group.addEventListener('click', openDetails);
+    group.addEventListener('keydown', (event) => {
+      if ((event as KeyboardEvent).key === 'Enter') openDetails(event);
+    });
     scene.append(group);
   }
   for (const node of result.nodes) {
@@ -215,7 +229,7 @@ function draw(result: LayoutResult): void {
     group.append(name, kind);
     const openDetails = (event: Event) => {
       event.stopPropagation();
-      showDetails(node);
+      showModuleDetails(node);
     };
     group.addEventListener('click', openDetails);
     group.addEventListener('keydown', (event) => {
@@ -242,32 +256,159 @@ function createMarkers(): void {
   }
 }
 
-function showDetails(module: QsysModule): void {
+function showModuleDetails(module: QsysModule): void {
   details.replaceChildren();
-  const close = document.createElement('button');
-  close.className = 'details-close';
-  close.textContent = '×';
-  close.title = 'Close';
-  close.addEventListener('click', () => details.classList.add('hidden'));
+  const close = detailsCloseButton();
   const heading = document.createElement('h2');
   heading.textContent = module.name;
   const type = document.createElement('div');
   type.className = 'details-type';
   type.textContent = `${module.type}${module.disabled ? ' · disabled' : ''}`;
-  const title = document.createElement('h3');
-  title.textContent = 'Parameters';
-  const table = document.createElement('dl');
-  const entries = Object.entries(module.parameters);
-  for (const [name, value] of entries) {
-    const term = document.createElement('dt');
-    term.textContent = name;
-    const definition = document.createElement('dd');
-    definition.textContent = value;
-    table.append(term, definition);
-  }
-  if (entries.length === 0) table.textContent = 'No parameters in the Qsys XML.';
-  details.append(close, heading, type, title, table);
+  details.append(close, heading, type, parameterTable('Parameters', module.parameters));
   details.classList.remove('hidden');
+}
+
+function showConnectionDetails(connection: QsysConnection): void {
+  if (!graph) return;
+  const source = graph.modules.find((module) => module.id === connection.source);
+  const target = graph.modules.find((module) => module.id === connection.target);
+  details.replaceChildren();
+  const heading = document.createElement('h2');
+  heading.textContent = `${connection.source}.${connection.sourcePort} → ${connection.target}.${connection.targetPort}`;
+  const type = document.createElement('div');
+  type.className = 'details-type';
+  type.textContent = `${labels[connection.kind]} · ${connection.rawKind}`;
+  details.append(detailsCloseButton(), heading, type);
+
+  if (connection.kind === 'avalon_streaming' && source && target) {
+    const note = document.createElement('p');
+    note.className = 'details-note';
+    note.textContent = 'Interface properties below are inferred from serialized IP parameters. The .qsys file may omit properties held in the IP definition.';
+    details.append(
+      note,
+      metadataTable(`Source · ${source.name}.${connection.sourcePort}`, inferStreamMetadata(source, 'source')),
+      metadataTable(`Sink · ${target.name}.${connection.targetPort}`, inferStreamMetadata(target, 'target')),
+      waveformExample(),
+      parameterTable(`Source stream parameters · ${source.name}`, streamParameters(source)),
+      parameterTable(`Sink stream parameters · ${target.name}`, streamParameters(target)),
+    );
+  }
+  details.append(parameterTable('Connection parameters', connection.parameters));
+  details.classList.remove('hidden');
+}
+
+function detailsCloseButton(): HTMLButtonElement {
+  const close = document.createElement('button');
+  close.className = 'details-close';
+  close.textContent = '×';
+  close.title = 'Close';
+  close.addEventListener('click', () => details.classList.add('hidden'));
+  return close;
+}
+
+function parameterTable(titleText: string, parameters: Record<string, string>): HTMLElement {
+  const section = document.createElement('section');
+  const title = document.createElement('h3');
+  title.textContent = titleText;
+  const table = document.createElement('dl');
+  const entries = Object.entries(parameters);
+  for (const [name, value] of entries) appendDefinition(table, name, value);
+  if (entries.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-parameters';
+    empty.textContent = 'Not serialized in this Qsys file.';
+    table.append(empty);
+  }
+  section.append(title, table);
+  return section;
+}
+
+function metadataTable(titleText: string, metadata: StreamMetadata): HTMLElement {
+  const section = document.createElement('section');
+  const title = document.createElement('h3');
+  title.textContent = titleText;
+  const table = document.createElement('dl');
+  const rows: Array<[string, keyof StreamMetadata]> = [
+    ['Bits per symbol', 'bitsPerSymbol'],
+    ['Symbols per beat', 'symbolsPerBeat'],
+    ['Data width', 'dataWidth'],
+    ['Ready signal', 'ready'],
+    ['Ready latency', 'readyLatency'],
+    ['SOP / EOP packets', 'packets'],
+    ['Empty', 'empty'],
+    ['Channel', 'channel'],
+  ];
+  for (const [label, key] of rows) {
+    const item = metadata[key];
+    appendDefinition(table, label, item ? `${item.value}  ·  ${item.source}` : 'not serialized');
+  }
+  section.append(title, table);
+  return section;
+}
+
+function appendDefinition(table: HTMLDListElement, name: string, value: string): void {
+  const term = document.createElement('dt');
+  term.textContent = name;
+  const definition = document.createElement('dd');
+  definition.textContent = value;
+  table.append(term, definition);
+}
+
+function waveformExample(): HTMLElement {
+  const section = document.createElement('section');
+  const title = document.createElement('h3');
+  title.textContent = 'Example transfer waveform';
+  const note = document.createElement('p');
+  note.className = 'waveform-note';
+  note.textContent = 'Illustrative Avalon-ST handshake — not simulation output. D1 remains stable while ready is low.';
+  const wave = svg('svg', { class: 'waveform', viewBox: '0 0 420 190', role: 'img' });
+  const left = 64;
+  const cycle = 42;
+  for (let index = 0; index <= 8; index++) {
+    wave.append(svg('line', { x1: left + index * cycle, y1: 16, x2: left + index * cycle, y2: 178, class: 'wave-grid' }));
+    if (index < 8) {
+      const label = svg('text', { x: left + index * cycle + cycle / 2, y: 12, class: 'wave-cycle' });
+      label.textContent = String(index);
+      wave.append(label);
+    }
+  }
+  const signals: Array<[string, number[], number]> = [
+    ['valid', [0, 1, 1, 1, 1, 0, 0, 0], 38],
+    ['ready', [1, 1, 0, 0, 1, 1, 1, 1], 72],
+    ['sop',   [0, 1, 0, 0, 0, 0, 0, 0], 106],
+    ['eop',   [0, 0, 0, 0, 1, 0, 0, 0], 140],
+  ];
+  for (const [name, values, y] of signals) {
+    const label = svg('text', { x: 54, y: y + 4, class: 'wave-label' });
+    label.textContent = name;
+    wave.append(label, svg('path', { d: digitalPath(values, left, y, cycle), class: `wave-signal wave-${name}` }));
+  }
+  const dataLabel = svg('text', { x: 54, y: 174, class: 'wave-label' });
+  dataLabel.textContent = 'data';
+  wave.append(dataLabel);
+  const data = ['—', 'D0', 'D1', 'D1', 'D2', '—', '—', '—'];
+  for (const [index, value] of data.entries()) {
+    const box = svg('rect', { x: left + index * cycle, y: 153, width: cycle, height: 25, class: value === 'D1' ? 'wave-data stalled' : 'wave-data' });
+    const label = svg('text', { x: left + index * cycle + cycle / 2, y: 170, class: 'wave-data-label' });
+    label.textContent = value;
+    wave.append(box, label);
+  }
+  section.append(title, note, wave);
+  return section;
+}
+
+function digitalPath(values: number[], left: number, middle: number, cycle: number): string {
+  const high = middle - 9;
+  const low = middle + 9;
+  let path = `M ${left} ${values[0] ? high : low}`;
+  for (let index = 0; index < values.length; index++) {
+    const x2 = left + (index + 1) * cycle;
+    const y = values[index] ? high : low;
+    path += ` L ${x2} ${y}`;
+    const next = values[index + 1];
+    if (next !== undefined && next !== values[index]) path += ` L ${x2} ${next ? high : low}`;
+  }
+  return path;
 }
 
 function fitView(): void {

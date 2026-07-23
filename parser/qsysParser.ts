@@ -176,6 +176,7 @@ export function parseQsys(xml: string, fallbackName = 'Qsys system'): QsysGraph 
       targetPort,
       kind: classifyConnection(rawKind),
       rawKind: rawKind || 'unknown',
+      parameters: collectParameters(connection),
     });
   }
 

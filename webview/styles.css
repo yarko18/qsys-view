@@ -103,7 +103,7 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .node.dimmed { opacity: .18; }
 .node-name { fill: var(--vscode-editor-foreground); font-size: 15px; font-weight: 600; }
 .node-kind { fill: var(--vscode-descriptionForeground); font-size: 10px; }
-.edge { --edge-color: var(--vscode-descriptionForeground); color: var(--edge-color); }
+.edge { --edge-color: var(--vscode-descriptionForeground); color: var(--edge-color); cursor: pointer; outline: none; }
 .edge-line {
   fill: none;
   stroke: var(--edge-color);
@@ -111,13 +111,14 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
   vector-effect: non-scaling-stroke;
 }
 .edge-hit { fill: none; stroke: transparent; stroke-width: 12; }
-.edge:hover .edge-line { stroke-width: 3; }
+.edge:hover .edge-line, .edge:focus .edge-line { stroke-width: 3; }
 .arrow path { fill: var(--edge-color); }
 .port-label {
   fill: var(--vscode-descriptionForeground);
   font-size: 9px;
   opacity: 0;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
   paint-order: stroke;
   stroke: var(--vscode-editor-background);
   stroke-width: 3px;
@@ -137,7 +138,7 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
   top: 10px;
   right: 10px;
   bottom: 10px;
-  width: min(370px, calc(100% - 20px));
+  width: min(470px, calc(100% - 20px));
   padding: 16px;
   overflow: auto;
   border: 1px solid var(--vscode-panel-border);
@@ -149,8 +150,20 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .details h2 { margin: 0 30px 3px 0; font-size: 18px; overflow-wrap: anywhere; }
 .details h3 { margin: 20px 0 8px; font-size: 12px; text-transform: uppercase; opacity: .7; }
 .details-type { color: var(--vscode-descriptionForeground); }
+.details-note, .waveform-note { margin: 10px 0; color: var(--vscode-descriptionForeground); font-size: 11px; line-height: 1.45; }
 .details-close { position: absolute; right: 9px; top: 9px; padding: 1px 7px; font-size: 18px; }
 .details dl { display: grid; grid-template-columns: minmax(90px, 1fr) 1.2fr; gap: 1px 12px; margin: 0; font-size: 11px; }
 .details dt, .details dd { margin: 0; padding: 4px 0; overflow-wrap: anywhere; border-bottom: 1px solid var(--vscode-panel-border); }
 .details dt { color: var(--vscode-descriptionForeground); }
+.empty-parameters { grid-column: 1 / -1; color: var(--vscode-descriptionForeground); padding: 5px 0; }
+.waveform { display: block; width: 100%; height: auto; border: 1px solid var(--vscode-panel-border); background: var(--vscode-editor-background); }
+.wave-grid { stroke: var(--vscode-panel-border); stroke-width: 1; }
+.wave-cycle, .wave-label, .wave-data-label { fill: var(--vscode-descriptionForeground); font-size: 9px; }
+.wave-label { text-anchor: end; }
+.wave-data-label { text-anchor: middle; fill: var(--vscode-editor-foreground); }
+.wave-signal { fill: none; stroke: var(--vscode-charts-blue); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.wave-ready { stroke: var(--vscode-charts-green); }
+.wave-sop, .wave-eop { stroke: var(--vscode-charts-orange); }
+.wave-data { fill: color-mix(in srgb, var(--vscode-charts-blue) 12%, transparent); stroke: var(--vscode-charts-blue); }
+.wave-data.stalled { fill: color-mix(in srgb, var(--vscode-charts-yellow) 20%, transparent); }
 .initial-loading { padding: 20px; }
