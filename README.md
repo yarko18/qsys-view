@@ -7,11 +7,17 @@ SPDX-License-Identifier: MIT
 
 Qsys View turns Intel Platform Designer (`.qsys`) files into readable, layered system diagrams directly in Visual Studio Code. Layout is calculated with ELK's Sugiyama-style layered algorithm.
 
-![Qsys View icon](media/icon.png)
+![Qsys View icon](https://gitlab.com/yarko-fpga/qsys-view/-/raw/main/media/icon.png)
 
 ## Installation
 
-Until Qsys View is available in the VS Code Marketplace, install a packaged `.vsix` file:
+Install Qsys View from the Extensions view in Visual Studio Code by searching for `Qsys View`, or run:
+
+```bash
+code --install-extension YaroslavMariukha.qsys-view
+```
+
+To install a locally packaged `.vsix` file instead, run:
 
 ```bash
 code --install-extension qsys-view-x.y.z.vsix

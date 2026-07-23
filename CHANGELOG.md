@@ -5,6 +5,12 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 0.3.1
+
+- Rename the extension to Qsys View and publish it as `YaroslavMariukha.qsys-view`.
+- Update the GitLab project links and public command, editor, and setting namespaces.
+- Add Marketplace installation instructions and an absolute HTTPS icon URL.
+
 ## 0.3.0
 
 - Draw directed graph edges only for Avalon-ST and conduit connections.
