@@ -9,6 +9,18 @@ Qsys Viewer turns Intel Platform Designer (`.qsys`) files into readable, layered
 
 ![Qsys Viewer icon](media/icon.png)
 
+## Installation
+
+Until Qsys Viewer is available in the VS Code Marketplace, install a packaged `.vsix` file:
+
+```bash
+code --install-extension qsys-viewer-x.y.z.vsix
+```
+
+Alternatively, open the Extensions view in VS Code, select **Views and More Actions… → Install from VSIX…**, and choose the package.
+
+Qsys graph viewing only requires VS Code 1.90 or newer. Intel Quartus Prime is optional and is used only when you explicitly request exact elaborated interface metadata and Avalon-ST waveform examples.
+
 ## Features
 
 - Opens `.qsys` files as a read-only graph editor.
@@ -33,6 +45,18 @@ By default only Avalon-ST links and their connected modules are shown. Enable **
 
 When a system contains Avalon-ST links, they are the structural layer for the graph. Qsys Viewer calculates that pipeline independently and places non-streaming-only IP in a separate stable area. Avalon-MM, clock, reset, and IRQ filters add interactive hubs without adding graph edges or changing node positions. Interface filter changes therefore preserve both Avalon-ST node coordinates and the current pan/zoom position.
 
+## Interface visualization
+
+| Interface | Visualization | Interaction |
+| --- | --- | --- |
+| Avalon-ST | Directed, orthogonally routed edge | Click for elaborated parameters and an example transfer waveform |
+| Conduit | Directed edge | Click for connection parameters |
+| Avalon-MM | Master hub | Hover to highlight slaves; click to pin highlighting and show each slave's base address |
+| Clock | Source hub | Hover or click to highlight consumers; known source frequency is shown on the hub |
+| Reset | Source hub | Hover or click to highlight consumers |
+| Interrupt | Receiver hub | Hover or click to highlight interrupt sources |
+| Other/unknown | Hidden | Not included in the graph or filters |
+
 ## Usage
 
 1. Open a `.qsys` file in VS Code. Qsys Viewer is the default custom editor for this file type.
@@ -41,6 +65,13 @@ When a system contains Avalon-ST links, they are the structural layer for the gr
 4. Click **Read interfaces…** to read exact interface ports. The extension asks before running IP Tcl, uses a disposable copy in the OS temporary directory, and does not write to the source project.
 
 Qsys Viewer finds `qsys-script` through `QUARTUS_ROOTDIR`, conventional Intel FPGA installation folders, or `PATH`. If necessary, set **Qsys Viewer: Quartus Path**. Local `ip/*/component.ipx`, composition dependencies under `ip/common/**/*_hw.tcl`, the standard Quartus catalog, and paths from **Qsys Viewer: IP Search Paths** are passed to Platform Designer. Relative search paths are resolved from the `.qsys` directory.
+
+## Settings
+
+| Setting | Description |
+| --- | --- |
+| `qsysViewer.quartusPath` | Quartus installation directory or direct path to `qsys-script` |
+| `qsysViewer.ipSearchPaths` | Additional Platform Designer IP search paths; `${qsysDir}` and `${workspaceFolder}` are supported |
 
 ## Development
 
