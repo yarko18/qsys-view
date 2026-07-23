@@ -5,6 +5,12 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 0.2.2
+
+- Anchor node placement exclusively to the complete Avalon-ST topology when streaming links exist.
+- Keep Avalon-ST node coordinates and the current canvas transform unchanged while connection filters are toggled.
+- Lay out non-streaming-only modules in a separate stable area and overlay additional connection types without relaying out the stream pipeline.
+
 ## 0.2.1
 
 - Resolve project-internal composition dependencies from `ip/common/**/*_hw.tcl`.

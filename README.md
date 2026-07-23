@@ -13,6 +13,7 @@ Qsys Viewer turns Intel Platform Designer (`.qsys`) files into readable, layered
 
 - Opens `.qsys` files as a read-only graph editor.
 - Layered left-to-right automatic layout with orthogonal edge routing.
+- Stable Avalon-ST topology: enabling Avalon-MM, clocks, resets, or other links never moves the streaming pipeline.
 - Separate filters for Avalon-ST, Avalon-MM, clock, reset, interrupt, conduit, and unknown links.
 - Pan, zoom, and fit-to-window navigation.
 - Search by IP instance name or type.
@@ -25,6 +26,8 @@ Qsys Viewer turns Intel Platform Designer (`.qsys`) files into readable, layered
 - Automatically refreshes after the source document changes.
 
 By default only Avalon-ST links and their connected modules are shown. Enable **All IP** or more connection types from the toolbar to explore the complete system.
+
+When a system contains Avalon-ST links, they are the structural layer for the graph. Qsys Viewer calculates that pipeline independently, places non-streaming-only IP in a separate stable area, and draws other connection types as overlays. Interface filter changes therefore preserve both Avalon-ST node coordinates and the current pan/zoom position.
 
 ## Usage
 

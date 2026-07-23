@@ -4,7 +4,7 @@
 import { connectionKinds, type ConnectionKind, type QsysConnection, type QsysGraph, type QsysInterface, type QsysModule } from '../parser/graph';
 import { streamParameters } from '../parser/streamMetadata';
 import { createInterfaceWaveform } from '../parser/waveform';
-import { layoutGraph, type LayoutPoint, type LayoutResult } from '../layout/elk';
+import { layoutAnchoredGraph, projectVisibleLayout, type LayoutPoint, type LayoutResult } from '../layout/elk';
 import './styles.css';
 
 const vscode = acquireVsCodeApi();
@@ -33,6 +33,8 @@ const state: ViewState = {
 
 let graph: QsysGraph | undefined;
 let layout: LayoutResult | undefined;
+let masterLayout: LayoutResult | undefined;
+let masterLayoutKey = '';
 let renderVersion = 0;
 let transform = { x: 20, y: 20, scale: 1 };
 let didInitialFit = false;
@@ -162,10 +164,12 @@ canvas.addEventListener('wheel', (event) => {
 async function render(): Promise<void> {
   if (!graph) return;
   const version = ++renderVersion;
-  showStatus('Calculating layered layout…');
   details.classList.add('hidden');
   const allowedModules = graph.modules.filter((module) => state.showDisabled || !module.disabled);
   const allowedIds = new Set(allowedModules.map((module) => module.id));
+  const allowedConnections = graph.connections.filter((connection) =>
+    allowedIds.has(connection.source) && allowedIds.has(connection.target),
+  );
   const connections = graph.connections.filter((connection) =>
     state.selectedKinds.includes(connection.kind)
     && allowedIds.has(connection.source)
@@ -176,8 +180,19 @@ async function render(): Promise<void> {
     ? allowedModules
     : allowedModules.filter((module) => connectedIds.has(module.id));
   try {
-    const result = await layoutGraph(modules, connections);
+    const nextLayoutKey = layoutKey(allowedModules, allowedConnections);
+    let nextMaster = masterLayoutKey === nextLayoutKey ? masterLayout : undefined;
+    if (!nextMaster) {
+      showStatus(allowedConnections.some((connection) => connection.kind === 'avalon_streaming')
+        ? 'Calculating Avalon-ST anchored layout…'
+        : 'Calculating layered layout…');
+      nextMaster = await layoutAnchoredGraph(allowedModules, allowedConnections);
+      if (version !== renderVersion) return;
+      masterLayout = nextMaster;
+      masterLayoutKey = nextLayoutKey;
+    }
     if (version !== renderVersion) return;
+    const result = projectVisibleLayout(nextMaster, modules, connections);
     layout = result;
     draw(result);
     required<HTMLElement>('summary').textContent = `${modules.length}/${graph.modules.length} IP · ${connections.length}/${graph.connections.length} links`;
@@ -194,6 +209,18 @@ async function render(): Promise<void> {
   } catch (error) {
     showStatus(`Layout failed: ${error instanceof Error ? error.message : String(error)}`, true);
   }
+}
+
+function layoutKey(modules: QsysModule[], connections: QsysConnection[]): string {
+  return JSON.stringify({
+    modules: modules.map((module) => [module.id, module.name]),
+    connections: connections.map((connection) => [
+      connection.id,
+      connection.source,
+      connection.target,
+      connection.kind,
+    ]),
+  });
 }
 
 function draw(result: LayoutResult): void {
