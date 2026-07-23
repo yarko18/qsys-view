@@ -1,0 +1,83 @@
+{
+  "name": "qsys-viewer",
+  "displayName": "Qsys Viewer",
+  "description": "Explore Intel Platform Designer (.qsys) systems as readable layered graphs.",
+  "version": "0.1.0",
+  "publisher": "fpga8683920",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": ["Visualization", "Other"],
+  "keywords": ["fpga", "intel", "quartus", "qsys", "platform designer", "avalon"],
+  "icon": "media/icon.png",
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onCustomEditor:qsysViewer.graph",
+    "onCommand:qsysViewer.openGraph"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "qsysViewer.openGraph",
+        "title": "Open Qsys Graph",
+        "category": "Qsys Viewer"
+      }
+    ],
+    "customEditors": [
+      {
+        "viewType": "qsysViewer.graph",
+        "displayName": "Qsys Graph",
+        "selector": [{ "filenamePattern": "*.qsys" }],
+        "priority": "default"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "qsysViewer.openGraph",
+          "when": "resourceExtname == .qsys",
+          "group": "navigation@8"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "qsysViewer.openGraph",
+          "when": "resourceExtname == .qsys",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "check": "tsc --noEmit && eslint .",
+    "build": "node esbuild.mjs --production",
+    "watch": "node esbuild.mjs --watch",
+    "test": "vitest run",
+    "package": "npm run check && npm test && npm run build && vsce package --no-dependencies"
+  },
+  "dependencies": {
+    "elkjs": "^0.11.0",
+    "fast-xml-parser": "^5.2.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.31.0",
+    "@types/node": "^22.15.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.6.0",
+    "esbuild": "^0.25.6",
+    "eslint": "^9.31.0",
+    "globals": "^16.3.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.38.0",
+    "vitest": "^3.2.4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://gitlab.com/fpga8683920/qsys-viewer.git"
+  },
+  "bugs": {
+    "url": "https://gitlab.com/fpga8683920/qsys-viewer/-/issues"
+  },
+  "homepage": "https://gitlab.com/fpga8683920/qsys-viewer"
+}

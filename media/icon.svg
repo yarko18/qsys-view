@@ -1,0 +1,27 @@
+<!--
+Copyright 2026 Yaroslav Mariukha
+SPDX-License-Identifier: MIT
+-->
+
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="24" y1="20" x2="232" y2="236" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1769aa"/>
+      <stop offset="1" stop-color="#4731a2"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="52" fill="url(#bg)"/>
+  <g fill="none" stroke="#bce8ff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M77 76h39M140 76h39M77 128h102M77 180h39M140 180h39"/>
+  </g>
+  <g fill="#fff" stroke="#104f8a" stroke-width="6">
+    <rect x="34" y="56" width="48" height="40" rx="8"/>
+    <rect x="108" y="56" width="48" height="40" rx="8"/>
+    <rect x="174" y="56" width="48" height="40" rx="8"/>
+    <rect x="34" y="108" width="62" height="40" rx="8"/>
+    <rect x="160" y="108" width="62" height="40" rx="8"/>
+    <rect x="34" y="160" width="48" height="40" rx="8"/>
+    <rect x="108" y="160" width="48" height="40" rx="8"/>
+    <rect x="174" y="160" width="48" height="40" rx="8"/>
+  </g>
+</svg>
