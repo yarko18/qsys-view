@@ -15,37 +15,39 @@ function iface(parameters: Record<string, string>, ports: Array<[string, number]
 describe('elaborated Avalon-ST waveform', () => {
   it('uses exact ports, symbols per beat, widths and ready latency', () => {
     const waveform = createInterfaceWaveform(iface({
-      dataBitsPerSymbol: '8', symbolsPerBeat: '2', readyLatency: '2',
+      dataBitsPerSymbol: '8', symbolsPerBeat: '2', readyLatency: '1',
     }, [
       ['ready', 1], ['valid', 1], ['startofpacket', 1], ['endofpacket', 1],
       ['channel', 2], ['data', 16], ['empty', 1], ['error', 3],
     ]), iface({}, []));
-    expect(waveform.transferCycles).toEqual([3, 6]);
-    expect(waveform.signals.find((signal) => signal.name === 'ready')?.values).toEqual(['0', '1', '0', '0', '1', '0', '0', '0']);
-    expect(waveform.signals.find((signal) => signal.name === 'valid')?.values).toEqual(['0', '0', '0', '1', '0', '0', '1', '0']);
+    expect(waveform.transferCycles).toEqual([1, 2]);
+    expect(waveform.cycles).toBe(4);
+    expect(waveform.signals.find((signal) => signal.name === 'ready')?.values).toEqual(['1', '1', '0', '0']);
+    expect(waveform.signals.find((signal) => signal.name === 'valid')?.values).toEqual(['0', '1', '1', '0']);
     expect(waveform.signals.map((signal) => signal.name)).toEqual([
       'ready', 'valid', 'sop', 'eop', 'channel', 'data', 'data', 'empty', 'error',
     ]);
     expect(waveform.signals.filter((signal) => signal.name === 'data').map((signal) => signal.label)).toEqual([
-      'data.s0[8]', 'data.s1[8]',
+      'data[7:0] · symbol 1', 'data[15:8] · symbol 2',
     ]);
-    expect(waveform.signals.filter((signal) => signal.name === 'data').map((signal) => signal.values[3])).toEqual(['S0', 'S1']);
+    expect(waveform.signals.filter((signal) => signal.name === 'data').map((signal) => signal.values[1])).toEqual(['beat 1', 'beat 1']);
   });
 
   it('does not draw signals absent from the elaborated port list', () => {
     const waveform = createInterfaceWaveform(iface({ symbolsPerBeat: '1' }, [['valid', 1], ['data', 16]]), iface({}, []));
     expect(waveform.signals.map((signal) => signal.name)).toEqual(['valid', 'data']);
-    expect(waveform.signals[1]?.label).toBe('data[16]');
+    expect(waveform.signals[1]?.label).toBe('data[15:0]');
   });
 
-  it('holds valid, packet markers, and data stable while stalled at ready latency zero', () => {
+  it('uses a compact two-beat example at ready latency zero', () => {
     const waveform = createInterfaceWaveform(iface({ readyLatency: '0', symbolsPerBeat: '1' }, [
       ['ready', 1], ['valid', 1], ['startofpacket', 1], ['endofpacket', 1], ['data', 8],
     ]), iface({}, []));
-    expect(waveform.transferCycles).toEqual([1, 4]);
-    expect(waveform.signals.find((signal) => signal.name === 'valid')?.values.slice(0, 5)).toEqual(['1', '1', '1', '1', '1']);
-    expect(waveform.signals.find((signal) => signal.name === 'sop')?.values.slice(0, 5)).toEqual(['1', '1', '0', '0', '0']);
-    expect(waveform.signals.find((signal) => signal.name === 'eop')?.values.slice(0, 5)).toEqual(['0', '0', '1', '1', '1']);
-    expect(waveform.signals.find((signal) => signal.name === 'data')?.values.slice(0, 5)).toEqual(['S0', 'S0', 'S1', 'S1', 'S1']);
+    expect(waveform.transferCycles).toEqual([1, 2]);
+    expect(waveform.cycles).toBe(4);
+    expect(waveform.signals.find((signal) => signal.name === 'valid')?.values).toEqual(['0', '1', '1', '0']);
+    expect(waveform.signals.find((signal) => signal.name === 'sop')?.values).toEqual(['0', '1', '0', '0']);
+    expect(waveform.signals.find((signal) => signal.name === 'eop')?.values).toEqual(['0', '0', '1', '0']);
+    expect(waveform.signals.find((signal) => signal.name === 'data')?.values).toEqual(['—', 'beat 1', 'beat 2', '—']);
   });
 });

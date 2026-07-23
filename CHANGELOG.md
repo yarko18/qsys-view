@@ -5,6 +5,13 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 0.2.1
+
+- Resolve project-internal composition dependencies from `ip/common/**/*_hw.tcl`.
+- Render each symbol as a separate physical `data[high:low]` row.
+- Keep ready-latency examples compact with consecutive transfer cycles.
+- Add 50–400% waveform zoom controls and Ctrl+wheel zooming.
+
 ## 0.2.0
 
 - Read exact elaborated interface parameters and ports on demand with `qsys-script`, without generating the platform.

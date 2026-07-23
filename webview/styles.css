@@ -159,7 +159,11 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .details dt, .details dd { margin: 0; padding: 4px 0; overflow-wrap: anywhere; border-bottom: 1px solid var(--vscode-panel-border); }
 .details dt { color: var(--vscode-descriptionForeground); }
 .empty-parameters { grid-column: 1 / -1; color: var(--vscode-descriptionForeground); padding: 5px 0; }
-.waveform { display: block; width: 100%; height: auto; border: 1px solid var(--vscode-panel-border); background: var(--vscode-editor-background); }
+.waveform-controls { display: flex; align-items: center; gap: 4px; margin: 6px 0; }
+.waveform-controls button { min-width: 30px; padding: 2px 7px; }
+.waveform-controls span { margin-left: 4px; color: var(--vscode-descriptionForeground); font-size: 10px; }
+.waveform-viewport { width: 100%; overflow: auto; border: 1px solid var(--vscode-panel-border); background: var(--vscode-editor-background); }
+.waveform { display: block; max-width: none; height: auto; border: 0; background: var(--vscode-editor-background); }
 .wave-grid { stroke: var(--vscode-panel-border); stroke-width: 1; }
 .wave-transfer-line { stroke: var(--vscode-charts-green); stroke-width: 1; stroke-dasharray: 3 3; opacity: .65; }
 .wave-cycle, .wave-label, .wave-data-label { fill: var(--vscode-descriptionForeground); font-size: 9px; }

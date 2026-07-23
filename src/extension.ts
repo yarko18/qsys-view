@@ -157,6 +157,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     return [...new Set([
       ...configured.map(expand),
       path.join(projectDirectory, 'ip', '*', 'component.ipx'),
+      path.join(projectDirectory, 'ip', 'common', '**', '*_hw.tcl'),
       path.join(projectDirectory, '*', 'component.ipx'),
       '$',
     ].filter(Boolean))].join(',');

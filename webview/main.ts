@@ -394,7 +394,8 @@ function waveformExample(source: QsysInterface, target: QsysInterface): HTMLElem
     model.signals.some((signal) => signal.name === 'ready') ? `ready latency ${model.readyLatency}` : 'no ready port',
   ].filter(Boolean).join(' · ');
   note.textContent = `Illustrative Avalon-ST transfer — not simulation output. ${description}.`;
-  const left = 70;
+  const longestSignalLabel = Math.max(1, ...model.signals.map((signal) => signal.label.length));
+  const left = Math.max(70, Math.min(190, longestSignalLabel * 5.5 + 18));
   const longestValue = Math.max(1, ...model.signals.flatMap((signal) => signal.values.map((value) => value.length)));
   const cycle = Math.max(48, longestValue * 5.5 + 10);
   const rowHeight = 34;
@@ -447,7 +448,49 @@ function waveformExample(source: QsysInterface, target: QsysInterface): HTMLElem
       wave.append(box, valueLabel);
     }
   }
-  section.append(title, note, wave);
+  const controls = document.createElement('div');
+  controls.className = 'waveform-controls';
+  const zoomOut = document.createElement('button');
+  zoomOut.textContent = '−';
+  zoomOut.title = 'Zoom waveform out';
+  const zoomReset = document.createElement('button');
+  zoomReset.textContent = '100%';
+  zoomReset.title = 'Reset waveform zoom';
+  const zoomIn = document.createElement('button');
+  zoomIn.textContent = '+';
+  zoomIn.title = 'Zoom waveform in';
+  const zoomValue = document.createElement('span');
+  let zoom = 1;
+  const applyWaveformZoom = () => {
+    wave.style.width = `${Math.round(width * zoom)}px`;
+    zoomValue.textContent = `${Math.round(zoom * 100)}%`;
+    zoomOut.disabled = zoom <= 0.5;
+    zoomIn.disabled = zoom >= 4;
+  };
+  zoomOut.addEventListener('click', () => {
+    zoom = clamp(zoom - 0.25, 0.5, 4);
+    applyWaveformZoom();
+  });
+  zoomReset.addEventListener('click', () => {
+    zoom = 1;
+    applyWaveformZoom();
+  });
+  zoomIn.addEventListener('click', () => {
+    zoom = clamp(zoom + 0.25, 0.5, 4);
+    applyWaveformZoom();
+  });
+  controls.append(zoomOut, zoomReset, zoomIn, zoomValue);
+  const waveViewport = document.createElement('div');
+  waveViewport.className = 'waveform-viewport';
+  waveViewport.addEventListener('wheel', (event) => {
+    if (!event.ctrlKey) return;
+    event.preventDefault();
+    zoom = clamp(zoom + (event.deltaY < 0 ? 0.25 : -0.25), 0.5, 4);
+    applyWaveformZoom();
+  }, { passive: false });
+  waveViewport.append(wave);
+  applyWaveformZoom();
+  section.append(title, note, controls, waveViewport);
   return section;
 }
 

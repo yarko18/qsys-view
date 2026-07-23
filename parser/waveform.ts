@@ -50,23 +50,15 @@ export function createInterfaceWaveform(source: QsysInterface, target: QsysInter
   const readyLatency = readyPort
     ? Math.floor(numeric(parameter(source, target, 'readyLatency'), 0))
     : 0;
-  const firstReady = 1;
-  const secondReady = 4;
+  const firstReady = readyPort && readyLatency > 0 ? 0 : 1;
+  const secondReady = firstReady + 1;
   const firstTransfer = readyPort ? firstReady + readyLatency : 1;
   const secondTransfer = readyPort ? secondReady + readyLatency : 2;
-  const cycles = Math.max(7, secondTransfer + 2);
+  const cycles = secondTransfer + 2;
   const transferCycles = [firstTransfer, secondTransfer];
   const beatAtCycle = Array.from({ length: cycles }, (): number | undefined => undefined);
-  if (!readyPort) {
-    beatAtCycle[firstTransfer] = 0;
-    beatAtCycle[secondTransfer] = 1;
-  } else if (readyLatency === 0) {
-    for (let cycle = 0; cycle <= firstTransfer; cycle++) beatAtCycle[cycle] = 0;
-    for (let cycle = firstTransfer + 1; cycle <= secondTransfer; cycle++) beatAtCycle[cycle] = 1;
-  } else {
-    beatAtCycle[firstTransfer] = 0;
-    beatAtCycle[secondTransfer] = 1;
-  }
+  beatAtCycle[firstTransfer] = 0;
+  beatAtCycle[secondTransfer] = 1;
   const active = beatAtCycle.map((beat) => beat !== undefined);
   const packetMarker = (beat: number) => beatAtCycle.map((value) => value === beat ? '1' : '0');
   const signals: WaveformSignal[] = [];
@@ -87,30 +79,38 @@ export function createInterfaceWaveform(source: QsysInterface, target: QsysInter
   if (eopPort) signals.push({ name: 'eop', label: 'eop', kind: 'digital', width: eopPort.width, values: packetMarker(1) });
   const channelPort = port(source, target, 'channel');
   if (channelPort) {
-    signals.push({ name: 'channel', label: `channel[${channelPort.width}]`, kind: 'bus', width: channelPort.width, values: active.map((on) => on ? '0' : '—') });
+    signals.push({ name: 'channel', label: rangeLabel('channel', channelPort.width), kind: 'bus', width: channelPort.width, values: active.map((on) => on ? '0' : '—') });
   }
   if (dataPort) {
     for (let lane = 0; lane < symbolsPerBeat; lane++) {
+      const low = lane * bitsPerSymbol;
+      const high = Math.min(dataWidth - 1, low + bitsPerSymbol - 1);
       signals.push({
         name: 'data',
-        label: symbolsPerBeat === 1 ? `data[${dataWidth}]` : `data.s${lane}[${bitsPerSymbol}]`,
+        label: symbolsPerBeat === 1
+          ? rangeLabel('data', dataWidth)
+          : `data[${high}:${low}] · symbol ${lane + 1}`,
         kind: 'bus',
         width: bitsPerSymbol,
         lane,
         values: beatAtCycle.map((beat) => {
           if (beat === undefined) return '—';
-          return `S${beat * symbolsPerBeat + lane}`;
+          return `beat ${beat + 1}`;
         }),
       });
     }
   }
   const emptyPort = port(source, target, 'empty');
   if (emptyPort) {
-    signals.push({ name: 'empty', label: `empty[${emptyPort.width}]`, kind: 'bus', width: emptyPort.width, values: active.map((on) => on ? '0' : '—') });
+    signals.push({ name: 'empty', label: rangeLabel('empty', emptyPort.width), kind: 'bus', width: emptyPort.width, values: active.map((on) => on ? '0' : '—') });
   }
   const errorPort = port(source, target, 'error');
   if (errorPort) {
-    signals.push({ name: 'error', label: `error[${errorPort.width}]`, kind: 'bus', width: errorPort.width, values: active.map((on) => on ? '0' : '—') });
+    signals.push({ name: 'error', label: rangeLabel('error', errorPort.width), kind: 'bus', width: errorPort.width, values: active.map((on) => on ? '0' : '—') });
   }
   return { cycles, readyLatency, transferCycles, signals, bitsPerSymbol, symbolsPerBeat, dataWidth };
+}
+
+function rangeLabel(name: string, width: number): string {
+  return width <= 1 ? name : `${name}[${width - 1}:0]`;
 }

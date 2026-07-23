@@ -20,7 +20,8 @@ Qsys Viewer turns Intel Platform Designer (`.qsys`) files into readable, layered
 - Click an IP to inspect all parameters stored in the Qsys XML.
 - Click a connection or endpoint label to inspect connection and exact elaborated interface parameters.
 - Read interface ports and parameters on demand with the installed Quartus `qsys-script`; full platform generation is not required.
-- Avalon-ST details include an illustrative transfer waveform based only on the ports and properties returned by Quartus. Unavailable and zero-width signals are omitted.
+- Avalon-ST details include an illustrative transfer waveform based only on the ports and properties returned by Quartus. Multiple symbols use separate physical `data[high:low]` rows; unavailable and zero-width signals are omitted.
+- Waveforms can be enlarged from 50% to 400% with buttons or Ctrl+mouse-wheel.
 - Automatically refreshes after the source document changes.
 
 By default only Avalon-ST links and their connected modules are shown. Enable **All IP** or more connection types from the toolbar to explore the complete system.
@@ -32,7 +33,7 @@ By default only Avalon-ST links and their connected modules are shown. Enable **
 3. To inspect raw XML, use **Reopen Editor With… → Text Editor**.
 4. Click **Read interfaces…** to read exact interface ports. The extension asks before running IP Tcl, uses a disposable copy in the OS temporary directory, and does not write to the source project.
 
-Qsys Viewer finds `qsys-script` through `QUARTUS_ROOTDIR`, conventional Intel FPGA installation folders, or `PATH`. If necessary, set **Qsys Viewer: Quartus Path**. Local `ip/*/component.ipx`, the standard Quartus catalog, and paths from **Qsys Viewer: IP Search Paths** are passed to Platform Designer. Relative search paths are resolved from the `.qsys` directory.
+Qsys Viewer finds `qsys-script` through `QUARTUS_ROOTDIR`, conventional Intel FPGA installation folders, or `PATH`. If necessary, set **Qsys Viewer: Quartus Path**. Local `ip/*/component.ipx`, composition dependencies under `ip/common/**/*_hw.tcl`, the standard Quartus catalog, and paths from **Qsys Viewer: IP Search Paths** are passed to Platform Designer. Relative search paths are resolved from the `.qsys` directory.
 
 ## Development
 

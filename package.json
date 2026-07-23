@@ -2,7 +2,7 @@
   "name": "qsys-viewer",
   "displayName": "Qsys Viewer",
   "description": "Explore Intel Platform Designer (.qsys) systems as readable layered graphs.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "fpga8683920",
   "license": "MIT",
   "engines": {
