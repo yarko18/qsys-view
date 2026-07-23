@@ -20,6 +20,28 @@ export interface QsysPort {
   role?: string;
 }
 
+export interface QsysInterfacePort {
+  name: string;
+  role: string;
+  direction: string;
+  width: number;
+}
+
+export interface QsysInterface {
+  module: string;
+  name: string;
+  kind: string;
+  parameters: Record<string, string>;
+  ports: QsysInterfacePort[];
+  source: 'quartus';
+}
+
+export interface QsysMetadataStatus {
+  source: 'quartus' | 'qsys-only';
+  label: string;
+  path?: string;
+}
+
 export interface QsysModule {
   id: string;
   name: string;
@@ -44,5 +66,7 @@ export interface QsysGraph {
   name: string;
   modules: QsysModule[];
   connections: QsysConnection[];
+  interfaces: Record<string, QsysInterface>;
+  metadata: QsysMetadataStatus;
   warnings: string[];
 }

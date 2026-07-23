@@ -18,8 +18,9 @@ Qsys Viewer turns Intel Platform Designer (`.qsys`) files into readable, layered
 - Search by IP instance name or type.
 - Optional display of disconnected and disabled IP.
 - Click an IP to inspect all parameters stored in the Qsys XML.
-- Click a connection or endpoint label to inspect connection and inferred interface parameters.
-- Avalon-ST details include an illustrative ready/valid/SOP/EOP/data transfer waveform.
+- Click a connection or endpoint label to inspect connection and exact elaborated interface parameters.
+- Read interface ports and parameters on demand with the installed Quartus `qsys-script`; full platform generation is not required.
+- Avalon-ST details include an illustrative transfer waveform based only on the ports and properties returned by Quartus. Unavailable and zero-width signals are omitted.
 - Automatically refreshes after the source document changes.
 
 By default only Avalon-ST links and their connected modules are shown. Enable **All IP** or more connection types from the toolbar to explore the complete system.
@@ -29,6 +30,9 @@ By default only Avalon-ST links and their connected modules are shown. Enable **
 1. Open a `.qsys` file in VS Code. Qsys Viewer is the default custom editor for this file type.
 2. Alternatively, right-click a `.qsys` file and select **Open Qsys Graph**.
 3. To inspect raw XML, use **Reopen Editor With… → Text Editor**.
+4. Click **Read interfaces…** to read exact interface ports. The extension asks before running IP Tcl, uses a disposable copy in the OS temporary directory, and does not write to the source project.
+
+Qsys Viewer finds `qsys-script` through `QUARTUS_ROOTDIR`, conventional Intel FPGA installation folders, or `PATH`. If necessary, set **Qsys Viewer: Quartus Path**. Local `ip/*/component.ipx`, the standard Quartus catalog, and paths from **Qsys Viewer: IP Search Paths** are passed to Platform Designer. Relative search paths are resolved from the `.qsys` directory.
 
 ## Development
 
@@ -51,7 +55,7 @@ The manifest currently uses `fpga8683920` as its Marketplace publisher ID, match
 
 ## Current scope
 
-Qsys Viewer never writes to `.qsys` files. It parses module and connection metadata that is present in the XML. Some interface properties live in the IP definition rather than the `.qsys` file; inferred values are labelled with the exact module parameter that supplied them, and missing values are not guessed. Waveforms are illustrative protocol examples, not simulation output.
+Qsys Viewer never writes to `.qsys` files or the project directory. Basic graph data comes from XML. Exact interface properties come only from a fresh, user-triggered `qsys-script` elaboration of a temporary copy; `.sopcinfo` is not read and metadata is not cached. If Quartus or an IP definition cannot be resolved, no waveform is shown. Waveforms are illustrative protocol examples, not simulation output.
 
 ## License
 

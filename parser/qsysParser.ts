@@ -186,6 +186,11 @@ export function parseQsys(xml: string, fallbackName = 'Qsys system'): QsysGraph 
     name: !systemName || /\$\$\{FILENAME\}/i.test(systemName) ? fallbackName : systemName,
     modules,
     connections,
+    interfaces: {},
+    metadata: {
+      source: 'qsys-only',
+      label: 'Exact interface metadata is not loaded. Run qsys-script from the viewer; values are never guessed.',
+    },
     warnings,
   };
 }

@@ -1,8 +1,9 @@
 // Copyright 2026 Yaroslav Mariukha
 // SPDX-License-Identifier: MIT
 
-import { connectionKinds, type ConnectionKind, type QsysConnection, type QsysGraph, type QsysModule } from '../parser/graph';
-import { inferStreamMetadata, streamParameters, type StreamMetadata } from '../parser/streamMetadata';
+import { connectionKinds, type ConnectionKind, type QsysConnection, type QsysGraph, type QsysInterface, type QsysModule } from '../parser/graph';
+import { streamParameters } from '../parser/streamMetadata';
+import { createInterfaceWaveform } from '../parser/waveform';
 import { layoutGraph, type LayoutPoint, type LayoutResult } from '../layout/elk';
 import './styles.css';
 
@@ -45,6 +46,7 @@ app.innerHTML = `
     <label class="option"><input id="show-disconnected" type="checkbox"> All IP</label>
     <label class="option"><input id="show-disabled" type="checkbox"> Disabled IP</label>
     <input id="search" class="search" type="search" placeholder="Find IP…" aria-label="Find IP">
+    <button id="quartus-metadata" title="Read exact interface metadata with qsys-script">Read interfaces…</button>
     <button id="fit" title="Fit graph to view">Fit</button>
   </header>
   <main id="viewport" class="viewport">
@@ -64,6 +66,7 @@ const status = required<HTMLElement>('status');
 const details = required<HTMLElement>('details');
 const search = required<HTMLInputElement>('search');
 const filters = required<HTMLElement>('kind-filters');
+const quartusMetadata = required<HTMLButtonElement>('quartus-metadata');
 
 for (const kind of connectionKinds) {
   const label = document.createElement('label');
@@ -97,6 +100,12 @@ showDisabled.addEventListener('change', () => {
   void render();
 });
 required<HTMLButtonElement>('fit').addEventListener('click', fitView);
+quartusMetadata.addEventListener('click', () => {
+  quartusMetadata.disabled = true;
+  quartusMetadata.textContent = 'Running qsys-script…';
+  showStatus('Quartus is elaborating a temporary copy of this Qsys system…');
+  vscode.postMessage({ type: 'loadQuartusMetadata' });
+});
 search.addEventListener('input', updateSearch);
 
 window.addEventListener('message', (event: MessageEvent) => {
@@ -105,9 +114,19 @@ window.addEventListener('message', (event: MessageEvent) => {
     graph = message.graph;
     didInitialFit = false;
     required<HTMLElement>('system-name').textContent = graph.name;
+    quartusMetadata.disabled = false;
+    quartusMetadata.textContent = graph.metadata.source === 'quartus' ? 'Read interfaces again…' : 'Read interfaces…';
     void render();
   } else if (message.type === 'error') {
     showStatus(message.message ?? 'Unable to load Qsys file.', true);
+  } else if (message.type === 'metadataError') {
+    quartusMetadata.disabled = false;
+    quartusMetadata.textContent = 'Retry Quartus metadata';
+    showStatus(message.message ?? 'Unable to read interface metadata with Quartus.', true);
+  } else if (message.type === 'metadataCancelled') {
+    quartusMetadata.disabled = false;
+    quartusMetadata.textContent = graph?.metadata.source === 'quartus' ? 'Read interfaces again…' : 'Read interfaces…';
+    hideStatus();
   }
 });
 
@@ -281,16 +300,28 @@ function showConnectionDetails(connection: QsysConnection): void {
   details.append(detailsCloseButton(), heading, type);
 
   if (connection.kind === 'avalon_streaming' && source && target) {
+    const sourceInterface = graph.interfaces[`${connection.source}.${connection.sourcePort}`];
+    const targetInterface = graph.interfaces[`${connection.target}.${connection.targetPort}`];
     const note = document.createElement('p');
     note.className = 'details-note';
-    note.textContent = 'Interface properties below are inferred from serialized IP parameters. The .qsys file may omit properties held in the IP definition.';
+    note.textContent = graph.metadata.label;
+    details.append(note);
+    if (sourceInterface) details.append(interfaceTable(`Source · ${source.name}.${connection.sourcePort}`, sourceInterface));
+    if (targetInterface) details.append(interfaceTable(`Sink · ${target.name}.${connection.targetPort}`, targetInterface));
+    if (sourceInterface && targetInterface && graph.metadata.source === 'quartus') {
+      details.append(waveformExample(sourceInterface, targetInterface));
+    } else {
+      const unavailable = document.createElement('p');
+      unavailable.className = 'metadata-unavailable';
+      unavailable.textContent = 'Waveform unavailable until qsys-script elaborates both interfaces. Qsys Viewer does not infer missing signals from module parameters.';
+      const load = document.createElement('button');
+      load.textContent = 'Read interfaces with Quartus…';
+      load.addEventListener('click', () => quartusMetadata.click());
+      details.append(unavailable, load);
+    }
     details.append(
-      note,
-      metadataTable(`Source · ${source.name}.${connection.sourcePort}`, inferStreamMetadata(source, 'source')),
-      metadataTable(`Sink · ${target.name}.${connection.targetPort}`, inferStreamMetadata(target, 'target')),
-      waveformExample(),
-      parameterTable(`Source stream parameters · ${source.name}`, streamParameters(source)),
-      parameterTable(`Sink stream parameters · ${target.name}`, streamParameters(target)),
+      parameterTable(`Configured source parameters · ${source.name}`, streamParameters(source)),
+      parameterTable(`Configured sink parameters · ${target.name}`, streamParameters(target)),
     );
   }
   details.append(parameterTable('Connection parameters', connection.parameters));
@@ -323,26 +354,22 @@ function parameterTable(titleText: string, parameters: Record<string, string>): 
   return section;
 }
 
-function metadataTable(titleText: string, metadata: StreamMetadata): HTMLElement {
+function interfaceTable(titleText: string, iface: QsysInterface): HTMLElement {
   const section = document.createElement('section');
   const title = document.createElement('h3');
   title.textContent = titleText;
-  const table = document.createElement('dl');
-  const rows: Array<[string, keyof StreamMetadata]> = [
-    ['Bits per symbol', 'bitsPerSymbol'],
-    ['Symbols per beat', 'symbolsPerBeat'],
-    ['Data width', 'dataWidth'],
-    ['Ready signal', 'ready'],
-    ['Ready latency', 'readyLatency'],
-    ['SOP / EOP packets', 'packets'],
-    ['Empty', 'empty'],
-    ['Channel', 'channel'],
-  ];
-  for (const [label, key] of rows) {
-    const item = metadata[key];
-    appendDefinition(table, label, item ? `${item.value}  ·  ${item.source}` : 'not serialized');
+  const type = document.createElement('div');
+  type.className = 'interface-kind';
+  type.textContent = `${iface.kind} · ${iface.source}`;
+  const parameters = document.createElement('dl');
+  for (const [name, value] of Object.entries(iface.parameters)) appendDefinition(parameters, name, value);
+  const portTitle = document.createElement('h4');
+  portTitle.textContent = 'Elaborated ports';
+  const ports = document.createElement('dl');
+  for (const port of iface.ports) {
+    appendDefinition(ports, port.role, `${port.width} bit · ${port.direction} · ${port.name}`);
   }
-  section.append(title, table);
+  section.append(title, type, parameters, portTitle, ports);
   return section;
 }
 
@@ -354,44 +381,71 @@ function appendDefinition(table: HTMLDListElement, name: string, value: string):
   table.append(term, definition);
 }
 
-function waveformExample(): HTMLElement {
+function waveformExample(source: QsysInterface, target: QsysInterface): HTMLElement {
+  const model = createInterfaceWaveform(source, target);
   const section = document.createElement('section');
   const title = document.createElement('h3');
   title.textContent = 'Example transfer waveform';
   const note = document.createElement('p');
   note.className = 'waveform-note';
-  note.textContent = 'Illustrative Avalon-ST handshake — not simulation output. D1 remains stable while ready is low.';
-  const wave = svg('svg', { class: 'waveform', viewBox: '0 0 420 190', role: 'img' });
-  const left = 64;
-  const cycle = 42;
-  for (let index = 0; index <= 8; index++) {
-    wave.append(svg('line', { x1: left + index * cycle, y1: 16, x2: left + index * cycle, y2: 178, class: 'wave-grid' }));
-    if (index < 8) {
+  const description = [
+    model.symbolsPerBeat === undefined ? undefined : `${model.symbolsPerBeat} symbol${model.symbolsPerBeat === 1 ? '' : 's'}/beat`,
+    model.dataWidth === undefined ? undefined : `${model.dataWidth}-bit data`,
+    model.signals.some((signal) => signal.name === 'ready') ? `ready latency ${model.readyLatency}` : 'no ready port',
+  ].filter(Boolean).join(' · ');
+  note.textContent = `Illustrative Avalon-ST transfer — not simulation output. ${description}.`;
+  const left = 70;
+  const longestValue = Math.max(1, ...model.signals.flatMap((signal) => signal.values.map((value) => value.length)));
+  const cycle = Math.max(48, longestValue * 5.5 + 10);
+  const rowHeight = 34;
+  const top = 30;
+  const width = left + model.cycles * cycle + 4;
+  const height = top + model.signals.length * rowHeight + 10;
+  const wave = svg('svg', { class: 'waveform', viewBox: `0 0 ${width} ${height}`, role: 'img' });
+  for (let index = 0; index <= model.cycles; index++) {
+    wave.append(svg('line', { x1: left + index * cycle, y1: 18, x2: left + index * cycle, y2: height - 8, class: 'wave-grid' }));
+    if (index < model.cycles) {
       const label = svg('text', { x: left + index * cycle + cycle / 2, y: 12, class: 'wave-cycle' });
       label.textContent = String(index);
       wave.append(label);
     }
   }
-  const signals: Array<[string, number[], number]> = [
-    ['valid', [0, 1, 1, 1, 1, 0, 0, 0], 38],
-    ['ready', [1, 1, 0, 0, 1, 1, 1, 1], 72],
-    ['sop',   [0, 1, 0, 0, 0, 0, 0, 0], 106],
-    ['eop',   [0, 0, 0, 0, 1, 0, 0, 0], 140],
-  ];
-  for (const [name, values, y] of signals) {
-    const label = svg('text', { x: 54, y: y + 4, class: 'wave-label' });
-    label.textContent = name;
-    wave.append(label, svg('path', { d: digitalPath(values, left, y, cycle), class: `wave-signal wave-${name}` }));
+  for (const transfer of model.transferCycles) {
+    wave.append(svg('line', {
+      x1: left + transfer * cycle + cycle / 2,
+      y1: 18,
+      x2: left + transfer * cycle + cycle / 2,
+      y2: height - 8,
+      class: 'wave-transfer-line',
+    }));
   }
-  const dataLabel = svg('text', { x: 54, y: 174, class: 'wave-label' });
-  dataLabel.textContent = 'data';
-  wave.append(dataLabel);
-  const data = ['—', 'D0', 'D1', 'D1', 'D2', '—', '—', '—'];
-  for (const [index, value] of data.entries()) {
-    const box = svg('rect', { x: left + index * cycle, y: 153, width: cycle, height: 25, class: value === 'D1' ? 'wave-data stalled' : 'wave-data' });
-    const label = svg('text', { x: left + index * cycle + cycle / 2, y: 170, class: 'wave-data-label' });
-    label.textContent = value;
-    wave.append(box, label);
+  for (const [row, signal] of model.signals.entries()) {
+    const y = top + row * rowHeight + rowHeight / 2;
+    const label = svg('text', { x: left - 10, y: y + 4, class: 'wave-label' });
+    label.textContent = signal.label;
+    wave.append(label);
+    if (signal.kind === 'digital') {
+      wave.append(svg('path', {
+        d: digitalPath(signal.values.map(Number), left, y, cycle),
+        class: `wave-signal wave-${signal.name}`,
+      }));
+      continue;
+    }
+    for (const [index, value] of signal.values.entries()) {
+      const stalled = signal.name === 'data'
+        && value !== '—'
+        && !model.transferCycles.includes(index);
+      const box = svg('rect', {
+        x: left + index * cycle,
+        y: y - 13,
+        width: cycle,
+        height: 26,
+        class: `wave-data${stalled ? ' stalled' : ''}`,
+      });
+      const valueLabel = svg('text', { x: left + index * cycle + cycle / 2, y: y + 4, class: 'wave-data-label' });
+      valueLabel.textContent = value;
+      wave.append(box, valueLabel);
+    }
   }
   section.append(title, note, wave);
   return section;

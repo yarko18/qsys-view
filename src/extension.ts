@@ -1,9 +1,15 @@
 // Copyright 2026 Yaroslav Mariukha
 // SPDX-License-Identifier: MIT
 
+import { execFile } from 'node:child_process';
+import { constants as fsConstants } from 'node:fs';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { parseQsys } from '../parser/qsysParser';
 import type { QsysGraph } from '../parser/graph';
+import { applyQuartusMetadata } from '../parser/quartusMetadataParser';
+import { parseQsys } from '../parser/qsysParser';
 
 class QsysDocument implements vscode.CustomDocument {
   constructor(readonly uri: vscode.Uri) {}
@@ -12,6 +18,7 @@ class QsysDocument implements vscode.CustomDocument {
 
 class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocument> {
   private readonly panels = new Map<string, Set<vscode.WebviewPanel>>();
+  private readonly activeMetadataLoads = new Set<string>();
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -35,9 +42,13 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       if (documentPanels.size === 0) this.panels.delete(key);
     });
 
-    const sendGraph = () => this.sendGraph(document.uri, panel.webview);
-    panel.webview.onDidReceiveMessage((message: { type?: string }) => {
-      if (message.type === 'ready' || message.type === 'refresh') void sendGraph();
+    const sendGraph = (loadQuartus = false) => this.sendGraph(document.uri, panel.webview, loadQuartus);
+    panel.webview.onDidReceiveMessage(async (message: { type?: string }) => {
+      if (message.type === 'ready' || message.type === 'refresh') {
+        await sendGraph();
+      } else if (message.type === 'loadQuartusMetadata') {
+        await this.confirmAndLoadQuartus(document.uri, panel.webview);
+      }
     });
 
     const watcher = vscode.workspace.onDidChangeTextDocument((event) => {
@@ -46,7 +57,36 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     panel.onDidDispose(() => watcher.dispose());
   }
 
-  private async sendGraph(uri: vscode.Uri, webview: vscode.Webview): Promise<void> {
+  private async confirmAndLoadQuartus(uri: vscode.Uri, webview: vscode.Webview): Promise<void> {
+    if (!vscode.workspace.isTrusted) {
+      void vscode.window.showWarningMessage('Trust this workspace before running Quartus IP Tcl files.');
+      await webview.postMessage({ type: 'metadataCancelled' });
+      return;
+    }
+    const key = uri.toString();
+    if (this.activeMetadataLoads.has(key)) return;
+    const choice = await vscode.window.showWarningMessage(
+      'Qsys Viewer will run qsys-script on a temporary copy. Quartus loads the IP Tcl files referenced by this system.',
+      { modal: true, detail: 'The original .qsys file and its project directory are not modified.' },
+      'Read interfaces',
+    );
+    if (choice !== 'Read interfaces') {
+      await webview.postMessage({ type: 'metadataCancelled' });
+      return;
+    }
+    this.activeMetadataLoads.add(key);
+    await webview.postMessage({ type: 'metadataLoading' });
+    try {
+      await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: 'Qsys Viewer: reading interfaces with Quartus…' },
+        () => this.sendGraph(uri, webview, true),
+      );
+    } finally {
+      this.activeMetadataLoads.delete(key);
+    }
+  }
+
+  private async sendGraph(uri: vscode.Uri, webview: vscode.Webview, loadQuartus = false): Promise<void> {
     try {
       const openDocument = vscode.workspace.textDocuments.find(
         (document) => document.uri.toString() === uri.toString(),
@@ -55,7 +95,20 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
         ? Buffer.from(openDocument.getText())
         : await vscode.workspace.fs.readFile(uri);
       const fileName = uri.path.split('/').pop()?.replace(/\.qsys$/i, '') || 'Qsys system';
-      const graph: QsysGraph = parseQsys(bytes.toString('utf8'), fileName);
+      let graph: QsysGraph = parseQsys(bytes.toString('utf8'), fileName);
+      if (loadQuartus) {
+        try {
+          graph = await this.withQuartusMetadata(uri, graph, bytes, fileName);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          graph = {
+            ...graph,
+            warnings: [...graph.warnings, `Quartus metadata unavailable: ${message}`],
+            metadata: { source: 'qsys-only', label: `Quartus metadata unavailable: ${message}` },
+          };
+          void vscode.window.showErrorMessage(`Qsys Viewer: ${message}`);
+        }
+      }
       await webview.postMessage({ type: 'graph', graph });
     } catch (error) {
       await webview.postMessage({
@@ -65,14 +118,84 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     }
   }
 
+  private async withQuartusMetadata(
+    uri: vscode.Uri,
+    graph: QsysGraph,
+    qsysBytes: Uint8Array,
+    systemName: string,
+  ): Promise<QsysGraph> {
+    if (uri.scheme !== 'file') throw new Error('qsys-script metadata is available only for local files.');
+    const executable = await this.findQsysScript(uri);
+    const projectDirectory = path.dirname(uri.fsPath);
+    const searchPath = this.ipSearchPath(uri, projectDirectory);
+    const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'qsys-viewer-'));
+    const temporaryQsys = path.join(temporaryDirectory, `${systemName}.qsys`);
+    const inspector = path.join(this.context.extensionUri.fsPath, 'quartus', 'inspect-interfaces.tcl');
+    try {
+      await fs.writeFile(temporaryQsys, qsysBytes);
+      const output = await runQsysScript(executable, [
+        `--system-file=${temporaryQsys}`,
+        `--search-path=${searchPath}`,
+        `--script=${inspector}`,
+      ], temporaryDirectory);
+      return applyQuartusMetadata(graph, output, executable);
+    } finally {
+      await fs.rm(temporaryDirectory, { recursive: true, force: true });
+    }
+  }
+
+  private ipSearchPath(uri: vscode.Uri, projectDirectory: string): string {
+    const configuration = vscode.workspace.getConfiguration('qsysViewer', uri);
+    const configured = configuration.get<string[]>('ipSearchPaths', []);
+    const workspaceDirectory = vscode.workspace.getWorkspaceFolder(uri)?.uri.fsPath ?? projectDirectory;
+    const expand = (value: string) => {
+      const expanded = value
+      .replaceAll('${qsysDir}', projectDirectory)
+      .replaceAll('${workspaceFolder}', workspaceDirectory);
+      return path.isAbsolute(expanded) || expanded === '$' ? expanded : path.resolve(projectDirectory, expanded);
+    };
+    return [...new Set([
+      ...configured.map(expand),
+      path.join(projectDirectory, 'ip', '*', 'component.ipx'),
+      path.join(projectDirectory, '*', 'component.ipx'),
+      '$',
+    ].filter(Boolean))].join(',');
+  }
+
+  private async findQsysScript(uri: vscode.Uri): Promise<string> {
+    const configured = vscode.workspace.getConfiguration('qsysViewer', uri).get<string>('quartusPath', '').trim();
+    const roots = [
+      configured,
+      process.env.QUARTUS_ROOTDIR,
+      process.env.QUARTUS_ROOTDIR_OVERRIDE,
+    ].filter((value): value is string => Boolean(value));
+    const candidates: string[] = [];
+    for (const root of roots) candidates.push(...qsysScriptCandidates(root));
+    for (const installationRoot of [path.join(os.homedir(), 'intelFPGA'), path.join(os.homedir(), 'intelFPGA_lite')]) {
+      try {
+        const versions = await fs.readdir(installationRoot, { withFileTypes: true });
+        for (const version of versions.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort().reverse()) {
+          candidates.push(path.join(installationRoot, version, 'quartus', 'sopc_builder', 'bin', executableName()));
+        }
+      } catch {
+        // The conventional installation directory is optional.
+      }
+    }
+    for (const candidate of candidates) {
+      try {
+        await fs.access(candidate, fsConstants.X_OK);
+        return candidate;
+      } catch {
+        // Try the next configured or conventional location.
+      }
+    }
+    return executableName();
+  }
+
   private getHtml(webview: vscode.Webview): string {
     const nonce = randomNonce();
-    const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview.js'),
-    );
-    const styleUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview.css'),
-    );
+    const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview.js'));
+    const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview.css'));
     return `<!doctype html>
 <html lang="en">
 <head>
@@ -88,6 +211,43 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
 </body>
 </html>`;
   }
+}
+
+function executableName(): string {
+  return process.platform === 'win32' ? 'qsys-script.exe' : 'qsys-script';
+}
+
+function qsysScriptCandidates(location: string): string[] {
+  if (path.basename(location).toLowerCase().startsWith('qsys-script')) return [location];
+  return [
+    path.join(location, 'sopc_builder', 'bin', executableName()),
+    path.join(location, 'quartus', 'sopc_builder', 'bin', executableName()),
+  ];
+}
+
+function runQsysScript(executable: string, args: string[], cwd: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(executable, args, {
+      cwd,
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+      timeout: 120_000,
+    }, (error, stdout, stderr) => {
+      const output = `${stdout}\n${stderr}`;
+      if (!error) {
+        resolve(output);
+        return;
+      }
+      const cause = (error as NodeJS.ErrnoException).code === 'ENOENT'
+        ? 'qsys-script was not found. Set “Qsys Viewer: Quartus Path” in VS Code settings.'
+        : `qsys-script failed: ${lastLines(output, 12) || error.message}`;
+      reject(new Error(cause));
+    });
+  });
+}
+
+function lastLines(value: string, count: number): string {
+  return value.trim().split(/\r?\n/).slice(-count).join('\n');
 }
 
 function randomNonce(): string {

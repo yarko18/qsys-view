@@ -149,8 +149,11 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 }
 .details h2 { margin: 0 30px 3px 0; font-size: 18px; overflow-wrap: anywhere; }
 .details h3 { margin: 20px 0 8px; font-size: 12px; text-transform: uppercase; opacity: .7; }
+.details h4 { margin: 12px 0 6px; font-size: 11px; color: var(--vscode-descriptionForeground); }
 .details-type { color: var(--vscode-descriptionForeground); }
 .details-note, .waveform-note { margin: 10px 0; color: var(--vscode-descriptionForeground); font-size: 11px; line-height: 1.45; }
+.interface-kind { margin: -4px 0 7px; color: var(--vscode-descriptionForeground); font-size: 10px; }
+.metadata-unavailable { padding: 9px; border-left: 3px solid var(--vscode-charts-yellow); background: var(--vscode-textBlockQuote-background); color: var(--vscode-descriptionForeground); font-size: 11px; }
 .details-close { position: absolute; right: 9px; top: 9px; padding: 1px 7px; font-size: 18px; }
 .details dl { display: grid; grid-template-columns: minmax(90px, 1fr) 1.2fr; gap: 1px 12px; margin: 0; font-size: 11px; }
 .details dt, .details dd { margin: 0; padding: 4px 0; overflow-wrap: anywhere; border-bottom: 1px solid var(--vscode-panel-border); }
@@ -158,6 +161,7 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .empty-parameters { grid-column: 1 / -1; color: var(--vscode-descriptionForeground); padding: 5px 0; }
 .waveform { display: block; width: 100%; height: auto; border: 1px solid var(--vscode-panel-border); background: var(--vscode-editor-background); }
 .wave-grid { stroke: var(--vscode-panel-border); stroke-width: 1; }
+.wave-transfer-line { stroke: var(--vscode-charts-green); stroke-width: 1; stroke-dasharray: 3 3; opacity: .65; }
 .wave-cycle, .wave-label, .wave-data-label { fill: var(--vscode-descriptionForeground); font-size: 9px; }
 .wave-label { text-anchor: end; }
 .wave-data-label { text-anchor: middle; fill: var(--vscode-editor-foreground); }

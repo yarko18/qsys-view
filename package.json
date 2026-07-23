@@ -2,7 +2,7 @@
   "name": "qsys-viewer",
   "displayName": "Qsys Viewer",
   "description": "Explore Intel Platform Designer (.qsys) systems as readable layered graphs.",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "publisher": "fpga8683920",
   "license": "MIT",
   "engines": {
@@ -32,6 +32,24 @@
         "priority": "default"
       }
     ],
+    "configuration": {
+      "title": "Qsys Viewer",
+      "properties": {
+        "qsysViewer.quartusPath": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "Path to a Quartus installation directory or directly to qsys-script. Leave empty to use QUARTUS_ROOTDIR, conventional install locations, or PATH."
+        },
+        "qsysViewer.ipSearchPaths": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "scope": "resource",
+          "description": "Additional Platform Designer IP search paths. Relative paths use the Qsys directory; ${qsysDir} and ${workspaceFolder} are supported. Standard Quartus IP and local component.ipx files are added automatically."
+        }
+      }
+    },
     "menus": {
       "explorer/context": [
         {

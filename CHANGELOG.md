@@ -5,6 +5,20 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 0.2.0
+
+- Read exact elaborated interface parameters and ports on demand with `qsys-script`, without generating the platform.
+- Run Quartus only after confirmation, on a disposable copy outside the project directory.
+- Add configurable Quartus and external IP search paths.
+- Remove `.sopcinfo` use and all interface metadata inference.
+- Draw waveform rows only for real, non-zero-width ports and show multiple symbols per beat as vertical data lanes.
+
+## 0.1.2
+
+- Generate Avalon-ST waveforms from each connection's inferred metadata.
+- Respect symbols per beat, data width, ready latency, and optional signal enable/width values.
+- Order signals like Platform Designer and omit unavailable or zero-width signals.
+
 ## 0.1.1
 
 - Fixed IP clicks being intercepted by canvas panning.
