@@ -10,6 +10,7 @@ import * as vscode from 'vscode';
 import type { QsysGraph } from '../parser/graph';
 import { applyQuartusMetadata } from '../parser/quartusMetadataParser';
 import { parseQsys } from '../parser/qsysParser';
+import { qsysScriptArguments } from './qsysScript';
 
 class QsysDocument implements vscode.CustomDocument {
   constructor(readonly uri: vscode.Uri) {}
@@ -133,11 +134,11 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     const inspector = path.join(this.context.extensionUri.fsPath, 'quartus', 'inspect-interfaces.tcl');
     try {
       await fs.writeFile(temporaryQsys, qsysBytes);
-      const output = await runQsysScript(executable, [
-        `--system-file=${temporaryQsys}`,
-        `--search-path=${searchPath}`,
-        `--script=${inspector}`,
-      ], temporaryDirectory);
+      const output = await runQsysScript(
+        executable,
+        qsysScriptArguments(temporaryQsys, searchPath, inspector),
+        temporaryDirectory,
+      );
       return applyQuartusMetadata(graph, output, executable);
     } finally {
       await fs.rm(temporaryDirectory, { recursive: true, force: true });

@@ -81,20 +81,37 @@ Qsys View finds `qsys-script` through `QUARTUS_ROOTDIR`, conventional Intel FPGA
 
 ## Development
 
+Install Node.js 20 or newer (the current LTS release is recommended) and npm. From the repository root, install the exact dependencies recorded in `package-lock.json`:
+
 ```bash
-npm install
+npm ci
+```
+
+Run individual development checks when needed:
+
+```bash
 npm run check
 npm test
 npm run build
 ```
 
+`npm run build` only compiles the production JavaScript and CSS files into `dist/`.
+
 Press `F5` in VS Code to launch an Extension Development Host. Open a `.qsys` file there.
 
-To build an installable package:
+To run all checks, tests, the production build, and create an installable package in one command:
 
 ```bash
 npm run package
 ```
+
+The resulting file is `qsys-view-<version>.vsix` in the repository root. Install it locally from PowerShell on Windows with:
+
+```powershell
+code --install-extension .\qsys-view-<version>.vsix --force
+```
+
+Run `npm ci` again only after cloning the repository or when `package-lock.json` changes. For normal rebuilds, `npm run package` is enough.
 
 The extension is published under Marketplace publisher ID `YaroslavMariukha` (display name **Mariukha Yaroslav**). See the [VS Code Marketplace publishing guide](https://code.visualstudio.com/api/working-with-extensions/publishing-extension) for release instructions.
 

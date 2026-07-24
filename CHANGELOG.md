@@ -5,6 +5,10 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 0.3.2
+
+- Fix Quartus metadata loading on Windows by passing the temporary `.qsys` file name, rather than its absolute path, to `qsys-script`.
+
 ## 0.3.1
 
 - Rename the extension to Qsys View and publish it as `YaroslavMariukha.qsys-view`.
