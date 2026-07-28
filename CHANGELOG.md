@@ -5,6 +5,14 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## Unreleased
+
+- Add read-only graph support for exported Platform Designer Tcl scripts, with static parsing and optional exact Quartus elaboration.
+- Add separate Pipeline and Complete views with independent interface filters.
+- Show statically unknown Tcl connections as grey edges.
+- Mark Avalon-ST connections that require automatic Quartus adaptation with a red dot and list the endpoint differences.
+- Add Tcl, FIFO, and reset-adapter cases to the example platform.
+
 ## 1.0.0
 
 - Mark Qsys View as a stable 1.0 release.
