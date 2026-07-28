@@ -5,14 +5,16 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
-## Unreleased
+## 1.0.2
 
-- Add read-only graph support for exported Platform Designer Tcl scripts, with static parsing and optional exact Quartus elaboration.
-- Add separate Pipeline and Complete views with independent interface filters.
-- Show statically unknown Tcl connections as grey edges.
-- Mark Avalon-ST connections that require automatic Quartus adaptation with a red dot and list the endpoint differences.
+- Support for exported Platform Designer Tcl scripts, with static parsing and optional exact Quartus elaboration.
+- Separate Pipeline and Complete views with independent interface filters.
+- Show statically unknown (before elaboration) Tcl connections as grey edges.
+- Mark Avalon-ST connections that require automatic Quartus adapter with a red dot and list the endpoint differences.
 - Derive the effective Avalon-ST symbols per beat from elaborated port width, matching Quartus adapter insertion logic.
-- Add Tcl, FIFO, and reset-adapter cases to the example platform.
+
+## 1.0.1
+Develop test version.
 
 ## 1.0.0
 
