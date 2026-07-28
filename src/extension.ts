@@ -11,7 +11,7 @@ import type { QsysGraph } from '../parser/graph';
 import { applyQuartusMetadata } from '../parser/quartusMetadataParser';
 import { parseQsys } from '../parser/qsysParser';
 import { parseQsysTcl } from '../parser/qsysTclParser';
-import { qsysScriptArguments, qsysTclScriptArguments } from './qsysScript';
+import { qsysScriptArguments, qsysTclExportWrapper, qsysTclScriptArguments, temporaryPlatformDesignerDirectory } from './qsysScript';
 
 class QsysDocument implements vscode.CustomDocument {
   constructor(readonly uri: vscode.Uri) {}
@@ -251,8 +251,21 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       return;
     }
     try {
-      const executable = await this.findPlatformDesigner(uri);
-      await this.launchPlatformDesigner(executable, uri.fsPath);
+      const platformDesignerExecutable = await this.findPlatformDesigner(uri);
+      const qsysScriptExecutable = await this.findQsysScript(uri);
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: 'Qsys View: opening Platform Designer…',
+        },
+        async (progress) => {
+          const launchTarget = isQsysTcl(uri)
+            ? await this.prepareTemporaryQsys(uri, qsysScriptExecutable, progress)
+            : { filePath: uri.fsPath, cleanup: undefined as (() => Promise<void>) | undefined };
+          progress.report({ message: 'Launching Platform Designer…' });
+          await this.launchPlatformDesigner(platformDesignerExecutable, launchTarget.filePath, launchTarget.cleanup);
+        },
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       void vscode.window.showErrorMessage(`Qsys View: ${message}`);
@@ -260,7 +273,33 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     }
   }
 
-  private launchPlatformDesigner(executable: string, filePath: string): Promise<void> {
+  private async prepareTemporaryQsys(
+    uri: vscode.Uri,
+    executable: string,
+    progress?: vscode.Progress<{ message?: string }>,
+  ): Promise<{ filePath: string; cleanup?: () => Promise<void> }> {
+    const temporaryDirectory = temporaryPlatformDesignerDirectory(uri.fsPath);
+    const temporaryQsys = path.join(temporaryDirectory, `${path.basename(uri.fsPath, path.extname(uri.fsPath))}.qsys`);
+    const wrapper = path.join(temporaryDirectory, 'export-system.tcl');
+    try {
+      progress?.report({ message: 'Converting Tcl to temporary Qsys…' });
+      await fs.mkdir(temporaryDirectory, { recursive: true });
+      await fs.writeFile(wrapper, qsysTclExportWrapper(uri.fsPath, temporaryQsys));
+      const searchPath = this.ipSearchPath(uri, path.dirname(uri.fsPath));
+      await runQsysScript(executable, qsysTclScriptArguments(searchPath, wrapper), temporaryDirectory);
+      return {
+        filePath: temporaryQsys,
+        cleanup: async () => {
+          await fs.rm(temporaryDirectory, { recursive: true, force: true });
+        },
+      };
+    } catch (error) {
+      await fs.rm(temporaryDirectory, { recursive: true, force: true });
+      throw error;
+    }
+  }
+
+  private launchPlatformDesigner(executable: string, filePath: string, cleanup?: () => Promise<void>): Promise<void> {
     return new Promise((resolve, reject) => {
       const shellCommand = [
         'source ~/.bashrc >/dev/null 2>&1 || true',
@@ -288,6 +327,12 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       child.once('spawn', () => {
         child.unref();
         resolve();
+      });
+      child.once('exit', () => {
+        void cleanup?.();
+      });
+      child.once('error', () => {
+        void cleanup?.();
       });
     });
   }
