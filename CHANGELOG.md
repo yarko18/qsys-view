@@ -11,6 +11,7 @@ SPDX-License-Identifier: MIT
 - Add separate Pipeline and Complete views with independent interface filters.
 - Show statically unknown Tcl connections as grey edges.
 - Mark Avalon-ST connections that require automatic Quartus adaptation with a red dot and list the endpoint differences.
+- Derive the effective Avalon-ST symbols per beat from elaborated port width, matching Quartus adapter insertion logic.
 - Add Tcl, FIFO, and reset-adapter cases to the example platform.
 
 ## 1.0.0

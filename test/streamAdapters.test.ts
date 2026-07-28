@@ -44,6 +44,27 @@ describe('detectStreamingAdaptations', () => {
     ]);
   });
 
+  it('derives symbols per beat from the elaborated data port like the Quartus adapter', () => {
+    const threeSymbolSource = iface(
+      { readyLatency: '1', dataBitsPerSymbol: '8', symbolsPerBeat: '3' },
+      { data: 24, valid: 1, ready: 1 },
+    );
+    const monitorWithDefaultProperty = iface(
+      { readyLatency: '1', dataBitsPerSymbol: '8', symbolsPerBeat: '1' },
+      { data: 24, valid: 1, ready: 1 },
+    );
+    const oneSymbolSink = iface(
+      { readyLatency: '1', dataBitsPerSymbol: '8', symbolsPerBeat: '1' },
+      { data: 8, valid: 1, ready: 1 },
+    );
+
+    expect(detectStreamingAdaptations(threeSymbolSource, monitorWithDefaultProperty)).toEqual([]);
+    expect(detectStreamingAdaptations(threeSymbolSource, oneSymbolSink)).toContainEqual({
+      kind: 'data_format',
+      differences: [{ property: 'symbolsPerBeat', source: '3', target: '1' }],
+    });
+  });
+
   it('does not invent adapters without Quartus metadata for both endpoints', () => {
     const graph: QsysGraph = {
       name: 'demo',

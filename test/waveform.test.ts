@@ -50,4 +50,15 @@ describe('elaborated Avalon-ST waveform', () => {
     expect(waveform.signals.find((signal) => signal.name === 'eop')?.values).toEqual(['0', '0', '1', '0']);
     expect(waveform.signals.find((signal) => signal.name === 'data')?.values).toEqual(['—', 'beat 1', 'beat 2', '—']);
   });
+
+  it('uses the physical data width when symbolsPerBeat is left at its default', () => {
+    const waveform = createInterfaceWaveform(iface({
+      dataBitsPerSymbol: '8', symbolsPerBeat: '1', readyLatency: '1',
+    }, [['valid', 1], ['data', 24]]), iface({}, []));
+
+    expect(waveform.symbolsPerBeat).toBe(3);
+    expect(waveform.signals.filter((signal) => signal.name === 'data').map((signal) => signal.label)).toEqual([
+      'data[7:0] · symbol 1', 'data[15:8] · symbol 2', 'data[23:16] · symbol 3',
+    ]);
+  });
 });

@@ -7,6 +7,7 @@ import type {
   QsysGraph,
   QsysInterface,
 } from './graph';
+import { effectiveSymbolsPerBeat } from './streamFormat';
 
 function parameter(iface: QsysInterface, name: string): string | undefined {
   const normalized = name.toLowerCase().replaceAll('_', '');
@@ -59,6 +60,16 @@ function presenceDifference(
   return source === target ? undefined : { property, source, target };
 }
 
+function symbolsPerBeatDifference(
+  source: QsysInterface,
+  target: QsysInterface,
+): QsysAdapterDifference | undefined {
+  const sourceSymbols = effectiveSymbolsPerBeat(source);
+  const targetSymbols = effectiveSymbolsPerBeat(target);
+  if (sourceSymbols === undefined || targetSymbols === undefined || sourceSymbols === targetSymbols) return undefined;
+  return { property: 'symbolsPerBeat', source: String(sourceSymbols), target: String(targetSymbols) };
+}
+
 function adaptation(
   kind: QsysAdaptation['kind'],
   differences: Array<QsysAdapterDifference | undefined>,
@@ -95,7 +106,7 @@ export function detectStreamingAdaptations(
     valueDifference('readyLatency', parameter(source, 'readyLatency'), parameter(target, 'readyLatency')),
   ]);
   const dataFormat = adaptation('data_format', [
-    valueDifference('symbolsPerBeat', parameter(source, 'symbolsPerBeat'), parameter(target, 'symbolsPerBeat')),
+    symbolsPerBeatDifference(source, target),
     presenceDifference('empty signal', portWidth(source, 'empty'), portWidth(target, 'empty')),
   ]);
   const sourceChannelWidth = portWidth(source, 'channel');
