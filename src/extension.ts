@@ -1,7 +1,7 @@
 // Copyright 2026 Yaroslav Mariukha
 // SPDX-License-Identifier: MIT
 
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { constants as fsConstants } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
@@ -11,7 +11,7 @@ import type { QsysGraph } from '../parser/graph';
 import { applyQuartusMetadata } from '../parser/quartusMetadataParser';
 import { parseQsys } from '../parser/qsysParser';
 import { parseQsysTcl } from '../parser/qsysTclParser';
-import { qsysScriptArguments, qsysTclScriptArguments } from './qsysScript';
+import { qsysScriptArguments, qsysTclExportWrapper, qsysTclScriptArguments, temporaryPlatformDesignerDirectory } from './qsysScript';
 
 class QsysDocument implements vscode.CustomDocument {
   constructor(readonly uri: vscode.Uri) {}
@@ -50,6 +50,8 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
         await sendGraph();
       } else if (message.type === 'loadQuartusMetadata') {
         await this.confirmAndLoadQuartus(document.uri, panel.webview);
+      } else if (message.type === 'openPlatformDesigner') {
+        await this.openPlatformDesigner(document.uri);
       }
     });
 
@@ -212,12 +214,17 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     const configured = vscode.workspace.getConfiguration('qsysView', uri).get<string>('quartusPath', '').trim();
     const roots = [
       configured,
+      process.env.QSYS_ROOTDIR,
       process.env.QUARTUS_ROOTDIR,
       process.env.QUARTUS_ROOTDIR_OVERRIDE,
     ].filter((value): value is string => Boolean(value));
     const candidates: string[] = [];
     for (const root of roots) candidates.push(...qsysScriptCandidates(root));
-    for (const installationRoot of [path.join(os.homedir(), 'intelFPGA'), path.join(os.homedir(), 'intelFPGA_lite')]) {
+    for (const directory of (process.env.PATH ?? '').split(path.delimiter).filter(Boolean)) {
+      candidates.push(path.join(directory, executableName()));
+    }
+    const homeDirectory = process.env.HOME || os.homedir();
+    for (const installationRoot of [path.join(homeDirectory, 'intelFPGA'), path.join(homeDirectory, 'intelFPGA_lite')]) {
       try {
         const versions = await fs.readdir(installationRoot, { withFileTypes: true });
         for (const version of versions.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort().reverse()) {
@@ -236,6 +243,131 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       }
     }
     return executableName();
+  }
+
+  private async openPlatformDesigner(uri: vscode.Uri): Promise<void> {
+    if (uri.scheme !== 'file') {
+      void vscode.window.showErrorMessage('Open in Platform Designer is available only for local files.');
+      return;
+    }
+    try {
+      const platformDesignerExecutable = await this.findPlatformDesigner(uri);
+      const qsysScriptExecutable = await this.findQsysScript(uri);
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: 'Qsys View: opening Platform Designer…',
+        },
+        async (progress) => {
+          const launchTarget = isQsysTcl(uri)
+            ? await this.prepareTemporaryQsys(uri, qsysScriptExecutable, progress)
+            : { filePath: uri.fsPath, cleanup: undefined as (() => Promise<void>) | undefined };
+          progress.report({ message: 'Launching Platform Designer…' });
+          await this.launchPlatformDesigner(platformDesignerExecutable, launchTarget.filePath, launchTarget.cleanup);
+        },
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      void vscode.window.showErrorMessage(`Qsys View: ${message}`);
+      console.error('Qsys View Platform Designer launch failed:', message);
+    }
+  }
+
+  private async prepareTemporaryQsys(
+    uri: vscode.Uri,
+    executable: string,
+    progress?: vscode.Progress<{ message?: string }>,
+  ): Promise<{ filePath: string; cleanup?: () => Promise<void> }> {
+    const temporaryDirectory = temporaryPlatformDesignerDirectory(uri.fsPath);
+    const temporaryQsys = path.join(temporaryDirectory, `${path.basename(uri.fsPath, path.extname(uri.fsPath))}.qsys`);
+    const wrapper = path.join(temporaryDirectory, 'export-system.tcl');
+    try {
+      progress?.report({ message: 'Converting Tcl to temporary Qsys…' });
+      await fs.mkdir(temporaryDirectory, { recursive: true });
+      await fs.writeFile(wrapper, qsysTclExportWrapper(uri.fsPath, temporaryQsys));
+      const searchPath = this.ipSearchPath(uri, path.dirname(uri.fsPath));
+      await runQsysScript(executable, qsysTclScriptArguments(searchPath, wrapper), temporaryDirectory);
+      return {
+        filePath: temporaryQsys,
+        cleanup: async () => {
+          await fs.rm(temporaryDirectory, { recursive: true, force: true });
+        },
+      };
+    } catch (error) {
+      await fs.rm(temporaryDirectory, { recursive: true, force: true });
+      throw error;
+    }
+  }
+
+  private launchPlatformDesigner(executable: string, filePath: string, cleanup?: () => Promise<void>): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const shellCommand = [
+        'source ~/.bashrc >/dev/null 2>&1 || true',
+        `exec ${shellQuote(executable)} ${shellQuote(filePath)}`,
+      ].join('\n');
+      const child = spawn('/bin/bash', ['-lc', shellCommand], {
+        cwd: path.dirname(filePath),
+        detached: true,
+        stdio: 'ignore',
+        env: {
+          ...process.env,
+          DISPLAY: process.env.DISPLAY ?? ':0',
+          WAYLAND_DISPLAY: process.env.WAYLAND_DISPLAY ?? '',
+          QT_QPA_PLATFORM: process.env.QT_QPA_PLATFORM ?? 'xcb',
+        },
+      });
+      child.once('error', (error) => {
+        const err = error as NodeJS.ErrnoException;
+        reject(new Error(
+          err.code === 'ENOENT'
+            ? 'Platform Designer executable not found. Set "Qsys View: Platform Designer Path" in settings.'
+            : `Failed to launch Platform Designer: ${error.message}`,
+        ));
+      });
+      child.once('spawn', () => {
+        child.unref();
+        resolve();
+      });
+      child.once('exit', () => {
+        void cleanup?.();
+      });
+      child.once('error', () => {
+        void cleanup?.();
+      });
+    });
+  }
+
+  private async findPlatformDesigner(uri: vscode.Uri): Promise<string> {
+    const configuration = vscode.workspace.getConfiguration('qsysView', uri);
+    const configured = configuration.get<string>('platformDesignerPath', '').trim();
+    const quartusConfigured = configuration.get<string>('quartusPath', '').trim();
+    const roots = [configured, quartusConfigured, process.env.QSYS_ROOTDIR, process.env.QUARTUS_ROOTDIR, process.env.QUARTUS_ROOTDIR_OVERRIDE]
+      .filter((value): value is string => Boolean(value));
+    const candidates: string[] = [];
+    for (const root of roots) candidates.push(...platformDesignerCandidates(root));
+    for (const directory of (process.env.PATH ?? '').split(path.delimiter).filter(Boolean)) {
+      candidates.push(path.join(directory, platformDesignerExecutableName()));
+    }
+    const homeDirectory = process.env.HOME || os.homedir();
+    for (const installationRoot of [path.join(homeDirectory, 'intelFPGA'), path.join(homeDirectory, 'intelFPGA_lite')]) {
+      try {
+        const versions = await fs.readdir(installationRoot, { withFileTypes: true });
+        for (const version of versions.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort().reverse()) {
+          candidates.push(path.join(installationRoot, version, 'quartus', 'sopc_builder', 'bin', platformDesignerExecutableName()));
+        }
+      } catch {
+        // The conventional installation directory is optional.
+      }
+    }
+    for (const candidate of candidates) {
+      try {
+        await fs.access(candidate, fsConstants.X_OK);
+        return candidate;
+      } catch {
+        // Try the next configured or conventional location.
+      }
+    }
+    return platformDesignerExecutableName();
   }
 
   private getHtml(webview: vscode.Webview): string {
@@ -264,11 +396,38 @@ function executableName(): string {
 }
 
 function qsysScriptCandidates(location: string): string[] {
-  if (path.basename(location).toLowerCase().startsWith('qsys-script')) return [location];
+  const basename = path.basename(location).toLowerCase();
+  if (basename === 'qsys-script' || basename === 'qsys-script.exe') return [location];
+  if (basename === 'bin') return [path.join(location, executableName())];
+  if (basename === 'sopc_builder') return [path.join(location, 'bin', executableName())];
+  if (basename === 'quartus') return [path.join(location, 'sopc_builder', 'bin', executableName())];
   return [
     path.join(location, 'sopc_builder', 'bin', executableName()),
     path.join(location, 'quartus', 'sopc_builder', 'bin', executableName()),
   ];
+}
+
+function platformDesignerExecutableName(): string {
+  return process.platform === 'win32' ? 'qsys.exe' : 'qsys-edit';
+}
+
+function platformDesignerCandidates(location: string): string[] {
+  const basename = path.basename(location).toLowerCase();
+  if (basename === 'qsys' || basename === 'qsys.exe' || basename === 'qsys-edit') return [location];
+  if (basename === 'qsys-script' || basename === 'qsys-script.exe') {
+    return [path.join(path.dirname(location), platformDesignerExecutableName())];
+  }
+  if (basename === 'bin') return [path.join(location, platformDesignerExecutableName())];
+  if (basename === 'sopc_builder') return [path.join(location, 'bin', platformDesignerExecutableName())];
+  if (basename === 'quartus') return [path.join(location, 'sopc_builder', 'bin', platformDesignerExecutableName())];
+  return [
+    path.join(location, 'sopc_builder', 'bin', platformDesignerExecutableName()),
+    path.join(location, 'quartus', 'sopc_builder', 'bin', platformDesignerExecutableName()),
+  ];
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
 function runQsysScript(executable: string, args: string[], cwd: string): Promise<string> {
