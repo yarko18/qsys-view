@@ -89,6 +89,7 @@ app.innerHTML = `
     <label class="option"><input id="show-disabled" type="checkbox"> Disabled IP</label>
     <input id="search" class="search" type="search" placeholder="Find IP…" aria-label="Find IP">
     <button id="quartus-metadata" title="Read exact interface metadata with qsys-script">Read interfaces…</button>
+    <button id="open-platform-designer" title="Open this design in Intel Platform Designer">Open in Platform Designer</button>
     <button id="fit" title="Fit graph to view">Fit</button>
   </header>
   <main id="viewport" class="viewport">
@@ -163,6 +164,11 @@ quartusMetadata.addEventListener('click', () => {
   quartusMetadata.textContent = 'Running qsys-script…';
   showStatus('Quartus is elaborating a temporary copy of this Qsys system…');
   vscode.postMessage({ type: 'loadQuartusMetadata' });
+});
+const openPlatformDesigner = required<HTMLButtonElement>('open-platform-designer');
+openPlatformDesigner.addEventListener('click', () => {
+  showStatus('Launching Platform Designer…');
+  vscode.postMessage({ type: 'openPlatformDesigner' });
 });
 search.addEventListener('input', updateSearch);
 

@@ -2,7 +2,7 @@
   "name": "qsys-view",
   "displayName": "Qsys View",
   "description": "Explore Intel Platform Designer .qsys systems and exported Tcl scripts as readable layered graphs.",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "publisher": "YaroslavMariukha",
   "author": {
     "name": "Mariukha Yaroslav"
@@ -50,6 +50,12 @@
           "default": "",
           "scope": "resource",
           "description": "Path to a Quartus installation directory or directly to qsys-script. Leave empty to use QUARTUS_ROOTDIR, conventional install locations, or PATH."
+        },
+        "qsysView.platformDesignerPath": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "Path to the Platform Designer executable (qsys or qsys.exe). Leave empty to use qsysView.quartusPath, QUARTUS_ROOTDIR, conventional install locations, or PATH."
         },
         "qsysView.ipSearchPaths": {
           "type": "array",

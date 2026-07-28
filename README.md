@@ -120,7 +120,14 @@ npm test
 npm run build
 ```
 
-`npm run build` only compiles the production JavaScript and CSS files into `dist/`.
+To compile a new extension version locally, install dependencies and build the extension:
+
+```bash
+npm ci
+npm run build
+```
+
+`npm run build` compiles the production JavaScript and CSS files into `dist/`.
 
 Press `F5` in VS Code to launch an Extension Development Host. Open a `.qsys` file or reopen an exported `.tcl` file with the Qsys TCL Graph editor there.
 
