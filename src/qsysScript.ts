@@ -20,3 +20,10 @@ export function qsysScriptArguments(
     `--script=${inspectorPath}`,
   ];
 }
+
+export function qsysTclScriptArguments(searchPath: string, wrapperPath: string): string[] {
+  return [
+    `--search-path=${searchPath}`,
+    `--script=${wrapperPath}`,
+  ];
+}

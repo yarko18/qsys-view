@@ -16,10 +16,10 @@ const labels: Record<ConnectionKind, string> = {
   reset: 'Reset',
   interrupt: 'Interrupt',
   conduit: 'Conduit',
-  other: 'Other',
+  other: 'Unknown',
 };
-const filterKinds = connectionKinds.filter((kind) => kind !== 'other');
-const directedKinds = new Set<ConnectionKind>(['avalon_streaming', 'conduit']);
+const filterKinds = connectionKinds;
+const directedKinds = new Set<ConnectionKind>(['avalon_streaming', 'conduit', 'other']);
 const hubLabels: Record<HubKind, string> = {
   avalon_memory_mapped: 'Avalon-MM masters',
   clock: 'Clock sources',
@@ -35,7 +35,7 @@ interface ViewState {
 
 const saved = (vscode.getState() ?? {}) as Partial<ViewState>;
 const state: ViewState = {
-  selectedKinds: (saved.selectedKinds ?? ['avalon_streaming']).filter((kind) => kind !== 'other'),
+  selectedKinds: saved.selectedKinds ?? ['avalon_streaming', 'other'],
   showDisconnected: saved.showDisconnected ?? false,
   showDisabled: saved.showDisabled ?? true,
 };
@@ -181,9 +181,7 @@ async function render(): Promise<void> {
   const allowedModules = graph.modules.filter((module) => state.showDisabled || !module.disabled);
   const allowedIds = new Set(allowedModules.map((module) => module.id));
   const allowedConnections = graph.connections.filter((connection) =>
-    connection.kind !== 'other'
-    && allowedIds.has(connection.source)
-    && allowedIds.has(connection.target),
+    allowedIds.has(connection.source) && allowedIds.has(connection.target),
   );
   const selectedConnections = allowedConnections.filter((connection) =>
     state.selectedKinds.includes(connection.kind)

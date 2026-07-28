@@ -15,7 +15,9 @@ foreach instance [get_instances] {
         }
     }
     foreach interface [get_instance_interfaces $instance] {
-        puts "QSYS_VIEWER\tINTERFACE\t[qv_clean $instance]\t[qv_clean $interface]"
+        set class_name ""
+        catch {set class_name [get_instance_interface_property $instance $interface CLASS_NAME]}
+        puts "QSYS_VIEWER\tINTERFACE\t[qv_clean $instance]\t[qv_clean $interface]\t[qv_clean $class_name]"
         foreach parameter [get_instance_interface_parameters $instance $interface] {
             set value [get_instance_interface_parameter_value $instance $interface $parameter]
             puts "QSYS_VIEWER\tPARAMETER\t[qv_clean $instance]\t[qv_clean $interface]\t[qv_clean $parameter]\t[qv_clean $value]"
