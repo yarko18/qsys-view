@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import type { QsysGraph, QsysInterface } from './graph';
+import { classifyConnection } from './qsysParser';
+import { annotateStreamingAdapters } from './streamAdapters';
 
 const prefix = 'QSYS_VIEWER\t';
 
@@ -27,14 +29,14 @@ export function applyQuartusMetadata(graph: QsysGraph, output: string, executabl
   for (const line of output.split(/\r?\n/)) {
     if (!line.startsWith(prefix)) continue;
     const fields = line.split('\t').slice(1).map(unescapeField);
-    const [record, moduleName, interfaceName] = fields;
+    const [record, moduleName, interfaceName, recordValue] = fields;
     if (!record || !moduleName || !interfaceName) continue;
     const endpoint = `${moduleName}.${interfaceName}`;
     if (!graph.modules.some((module) => module.id === moduleName)) continue;
     const iface = interfaces[endpoint] ?? {
       module: moduleName,
       name: interfaceName,
-      kind: interfaceKind(graph, endpoint),
+      kind: record === 'INTERFACE' && recordValue ? recordValue : interfaceKind(graph, endpoint),
       parameters: {},
       ports: [],
       source: 'quartus' as const,
@@ -57,13 +59,31 @@ export function applyQuartusMetadata(graph: QsysGraph, output: string, executabl
   }
   const count = Object.keys(interfaces).length;
   if (count === 0) throw new Error('qsys-script returned no elaborated interfaces. Check the IP search paths.');
-  return {
+  const connections = graph.connections.map((connection) => {
+    const sourceEndpoint = `${connection.source}.${connection.sourcePort}`;
+    const targetEndpoint = `${connection.target}.${connection.targetPort}`;
+    const candidates = [
+      interfaces[sourceEndpoint]?.kind,
+      interfaces[targetEndpoint]?.kind,
+      connection.rawKind,
+    ].filter((kind): kind is string => Boolean(kind));
+    const rawKind = candidates.find((kind) => classifyConnection(kind) !== 'other')
+      ?? candidates[0]
+      ?? connection.rawKind;
+    return {
+      ...connection,
+      kind: classifyConnection(rawKind),
+      rawKind,
+    };
+  });
+  return annotateStreamingAdapters({
     ...graph,
+    connections,
     interfaces,
     metadata: {
       source: 'quartus',
       label: `Live Quartus metadata (${count} elaborated interfaces).`,
       path: executable,
     },
-  };
+  });
 }

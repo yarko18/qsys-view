@@ -1,7 +1,7 @@
 {
   "name": "qsys-view",
   "displayName": "Qsys View",
-  "description": "Explore Intel Platform Designer (.qsys) systems as readable layered graphs.",
+  "description": "Explore Intel Platform Designer .qsys systems and exported Tcl scripts as readable layered graphs.",
   "version": "1.0.0",
   "publisher": "YaroslavMariukha",
   "author": {
@@ -12,11 +12,12 @@
     "vscode": "^1.90.0"
   },
   "categories": ["Visualization", "Other"],
-  "keywords": ["fpga", "intel", "quartus", "qsys", "platform designer", "avalon"],
+  "keywords": ["fpga", "intel", "quartus", "qsys", "tcl", "platform designer", "avalon"],
   "icon": "media/icon.png",
   "main": "./dist/extension.js",
   "activationEvents": [
     "onCustomEditor:qsysView.graph",
+    "onCustomEditor:qsysView.tclGraph",
     "onCommand:qsysView.openGraph"
   ],
   "contributes": {
@@ -33,6 +34,12 @@
         "displayName": "Qsys Graph",
         "selector": [{ "filenamePattern": "*.qsys" }],
         "priority": "default"
+      },
+      {
+        "viewType": "qsysView.tclGraph",
+        "displayName": "Qsys TCL Graph",
+        "selector": [{ "filenamePattern": "*.tcl" }],
+        "priority": "option"
       }
     ],
     "configuration": {
@@ -57,14 +64,14 @@
       "explorer/context": [
         {
           "command": "qsysView.openGraph",
-          "when": "resourceExtname == .qsys",
+          "when": "resourceExtname == .qsys || resourceExtname == .tcl",
           "group": "navigation@8"
         }
       ],
       "editor/title": [
         {
           "command": "qsysView.openGraph",
-          "when": "resourceExtname == .qsys",
+          "when": "resourceExtname == .qsys || resourceExtname == .tcl",
           "group": "navigation"
         }
       ]

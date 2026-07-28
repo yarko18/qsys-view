@@ -10,7 +10,8 @@ import * as vscode from 'vscode';
 import type { QsysGraph } from '../parser/graph';
 import { applyQuartusMetadata } from '../parser/quartusMetadataParser';
 import { parseQsys } from '../parser/qsysParser';
-import { qsysScriptArguments } from './qsysScript';
+import { parseQsysTcl } from '../parser/qsysTclParser';
+import { qsysScriptArguments, qsysTclScriptArguments } from './qsysScript';
 
 class QsysDocument implements vscode.CustomDocument {
   constructor(readonly uri: vscode.Uri) {}
@@ -66,9 +67,17 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     }
     const key = uri.toString();
     if (this.activeMetadataLoads.has(key)) return;
+    const tcl = isQsysTcl(uri);
     const choice = await vscode.window.showWarningMessage(
-      'Qsys View will run qsys-script on a temporary copy. Quartus loads the IP Tcl files referenced by this system.',
-      { modal: true, detail: 'The original .qsys file and its project directory are not modified.' },
+      tcl
+        ? 'Qsys View will execute a temporary copy of this exported Platform Designer Tcl script with qsys-script.'
+        : 'Qsys View will run qsys-script on a temporary copy. Quartus loads the IP Tcl files referenced by this system.',
+      {
+        modal: true,
+        detail: tcl
+          ? 'The script may load referenced IP Tcl files. Its save_system output is redirected to a disposable directory; the original script and project directory are not modified.'
+          : 'The original .qsys file and its project directory are not modified.',
+      },
       'Read interfaces',
     );
     if (choice !== 'Read interfaces') {
@@ -95,11 +104,15 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       const bytes = openDocument
         ? Buffer.from(openDocument.getText())
         : await vscode.workspace.fs.readFile(uri);
-      const fileName = uri.path.split('/').pop()?.replace(/\.qsys$/i, '') || 'Qsys system';
-      let graph: QsysGraph = parseQsys(bytes.toString('utf8'), fileName);
+      const fileName = uri.path.split('/').pop()?.replace(/\.(?:qsys|tcl)$/i, '') || 'Qsys system';
+      let graph: QsysGraph = isQsysTcl(uri)
+        ? parseQsysTcl(bytes.toString('utf8'), fileName)
+        : parseQsys(bytes.toString('utf8'), fileName);
       if (loadQuartus) {
         try {
-          graph = await this.withQuartusMetadata(uri, graph, bytes, fileName);
+          graph = isQsysTcl(uri)
+            ? await this.withTclQuartusMetadata(uri, graph, bytes)
+            : await this.withQsysQuartusMetadata(uri, graph, bytes, fileName);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           graph = {
@@ -119,7 +132,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     }
   }
 
-  private async withQuartusMetadata(
+  private async withQsysQuartusMetadata(
     uri: vscode.Uri,
     graph: QsysGraph,
     qsysBytes: Uint8Array,
@@ -137,6 +150,37 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       const output = await runQsysScript(
         executable,
         qsysScriptArguments(temporaryQsys, searchPath, inspector),
+        temporaryDirectory,
+      );
+      return applyQuartusMetadata(graph, output, executable);
+    } finally {
+      await fs.rm(temporaryDirectory, { recursive: true, force: true });
+    }
+  }
+
+  private async withTclQuartusMetadata(
+    uri: vscode.Uri,
+    graph: QsysGraph,
+    scriptBytes: Uint8Array,
+  ): Promise<QsysGraph> {
+    if (uri.scheme !== 'file') throw new Error('qsys-script metadata is available only for local files.');
+    const executable = await this.findQsysScript(uri);
+    const projectDirectory = path.dirname(uri.fsPath);
+    const searchPath = this.ipSearchPath(uri, projectDirectory);
+    const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'qsys-view-tcl-'));
+    const temporaryScript = path.join(temporaryDirectory, 'design.tcl');
+    const wrapper = path.join(temporaryDirectory, 'inspect-exported-system.tcl');
+    const inspector = path.join(this.context.extensionUri.fsPath, 'quartus', 'inspect-interfaces.tcl');
+    try {
+      await fs.writeFile(temporaryScript, scriptBytes);
+      await fs.writeFile(wrapper, [
+        'source [file join [file dirname [info script]] design.tcl]',
+        `source ${tclQuoted(inspector)}`,
+        '',
+      ].join('\n'));
+      const output = await runQsysScript(
+        executable,
+        qsysTclScriptArguments(searchPath, wrapper),
         temporaryDirectory,
       );
       return applyQuartusMetadata(graph, output, executable);
@@ -257,19 +301,35 @@ function randomNonce(): string {
   return Array.from({ length: 32 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
 }
 
+function isQsysTcl(uri: vscode.Uri): boolean {
+  return uri.path.toLowerCase().endsWith('.tcl');
+}
+
+function tclQuoted(value: string): string {
+  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('$', '\\$').replaceAll('[', '\\[')}"`;
+}
+
 export function activate(context: vscode.ExtensionContext): void {
   const provider = new QsysEditorProvider(context);
   context.subscriptions.push(
     vscode.window.registerCustomEditorProvider('qsysView.graph', provider, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
+    vscode.window.registerCustomEditorProvider('qsysView.tclGraph', provider, {
+      webviewOptions: { retainContextWhenHidden: true },
+    }),
     vscode.commands.registerCommand('qsysView.openGraph', async (uri?: vscode.Uri) => {
       const target = uri ?? vscode.window.activeTextEditor?.document.uri;
-      if (!target || target.path.toLowerCase().endsWith('.qsys') === false) {
-        void vscode.window.showWarningMessage('Select a .qsys file to open its graph.');
+      const extension = target?.path.toLowerCase();
+      if (!target || (!extension?.endsWith('.qsys') && !extension?.endsWith('.tcl'))) {
+        void vscode.window.showWarningMessage('Select a .qsys file or exported Platform Designer .tcl script to open its graph.');
         return;
       }
-      await vscode.commands.executeCommand('vscode.openWith', target, 'qsysView.graph');
+      await vscode.commands.executeCommand(
+        'vscode.openWith',
+        target,
+        extension.endsWith('.tcl') ? 'qsysView.tclGraph' : 'qsysView.graph',
+      );
     }),
   );
 }

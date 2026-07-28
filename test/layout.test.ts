@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, expect, it } from 'vitest';
-import { layoutAnchoredGraph, projectVisibleLayout } from '../layout/elk';
+import { layoutAnchoredGraph, pathMidpoint, projectVisibleLayout } from '../layout/elk';
 import type { ConnectionKind, QsysConnection, QsysModule } from '../parser/graph';
 
 function module(id: string): QsysModule {
@@ -52,5 +52,15 @@ describe('Avalon-ST anchored layout', () => {
       expect(after && { x: after.x, y: after.y }).toEqual(before && { x: before.x, y: before.y });
     }
     expect(combinedView.edges.find((edge) => edge.id === memoryMapped.id)?.paths[0]?.length).toBeGreaterThan(1);
+  });
+});
+
+describe('pathMidpoint', () => {
+  it('finds the halfway point across orthogonal segments', () => {
+    expect(pathMidpoint([[
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 20 },
+    ]])).toEqual({ x: 10, y: 5 });
   });
 });

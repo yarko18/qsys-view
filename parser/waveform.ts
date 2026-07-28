@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import type { QsysInterface, QsysInterfacePort } from './graph';
+import { effectiveSymbolsPerBeat } from './streamFormat';
 
 export type WaveformSignalName = 'ready' | 'valid' | 'sop' | 'eop' | 'channel' | 'data' | 'empty' | 'error';
 
@@ -40,7 +41,7 @@ function port(source: QsysInterface, target: QsysInterface, role: string): QsysI
 
 export function createInterfaceWaveform(source: QsysInterface, target: QsysInterface): StreamWaveform {
   const dataPort = port(source, target, 'data');
-  const symbolsPerBeat = Math.max(1, Math.floor(numeric(parameter(source, target, 'symbolsPerBeat'), 1)));
+  const symbolsPerBeat = effectiveSymbolsPerBeat(source) ?? effectiveSymbolsPerBeat(target) ?? 1;
   const bitsPerSymbol = Math.max(1, Math.floor(numeric(
     parameter(source, target, 'dataBitsPerSymbol'),
     dataPort ? Math.max(1, Math.floor(dataPort.width / symbolsPerBeat)) : 1,
