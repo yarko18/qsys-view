@@ -7,7 +7,17 @@ SPDX-License-Identifier: MIT
 
 Qsys View turns Intel Platform Designer (`.qsys`) files into readable, layered system diagrams directly in Visual Studio Code. Layout is calculated with ELK's Sugiyama-style layered algorithm.
 
-![Qsys View icon](https://gitlab.com/yarko-fpga/qsys-view/-/raw/main/media/icon.png)
+#### Comparison with Platform Designer
+
+![Qsys View compared with Platform Designer](media/compare.png)
+
+#### Avalon-MM base address view
+
+![Avalon-MM base address view](media/avmm_base_address.png)
+
+#### Clock domain view
+
+![Clock domain view](media/clock_domain.png)
 
 ## Installation
 

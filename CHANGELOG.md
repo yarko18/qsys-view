@@ -5,6 +5,12 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 1.0.0
+
+- Mark Qsys View as a stable 1.0 release.
+- Add a complete example Platform Designer pipeline.
+- Add screenshots comparing Qsys View with Platform Designer and demonstrating Avalon-MM addresses, clock domains, and parameter inspection.
+
 ## 0.3.2
 
 - Fix Quartus metadata loading on Windows by passing the temporary `.qsys` file name, rather than its absolute path, to `qsys-script`.
