@@ -51,6 +51,19 @@ export interface QsysModule {
   ports: QsysPort[];
 }
 
+export type QsysAdapterKind = 'timing' | 'data_format' | 'channel' | 'error';
+
+export interface QsysAdapterDifference {
+  property: string;
+  source: string;
+  target: string;
+}
+
+export interface QsysAdaptation {
+  kind: QsysAdapterKind;
+  differences: QsysAdapterDifference[];
+}
+
 export interface QsysConnection {
   id: string;
   source: string;
@@ -60,6 +73,7 @@ export interface QsysConnection {
   kind: ConnectionKind;
   rawKind: string;
   parameters: Record<string, string>;
+  adaptations?: QsysAdaptation[];
 }
 
 export interface QsysGraph {

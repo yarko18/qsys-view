@@ -3,6 +3,7 @@
 
 import type { QsysGraph, QsysInterface } from './graph';
 import { classifyConnection } from './qsysParser';
+import { annotateStreamingAdapters } from './streamAdapters';
 
 const prefix = 'QSYS_VIEWER\t';
 
@@ -75,7 +76,7 @@ export function applyQuartusMetadata(graph: QsysGraph, output: string, executabl
       rawKind,
     };
   });
-  return {
+  return annotateStreamingAdapters({
     ...graph,
     connections,
     interfaces,
@@ -84,5 +85,5 @@ export function applyQuartusMetadata(graph: QsysGraph, output: string, executabl
       label: `Live Quartus metadata (${count} elaborated interfaces).`,
       path: executable,
     },
-  };
+  });
 }

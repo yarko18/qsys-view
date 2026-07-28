@@ -27,6 +27,28 @@ export interface LayoutEdge extends QsysConnection {
   paths: LayoutPoint[][];
 }
 
+export function pathMidpoint(paths: LayoutPoint[][]): LayoutPoint | undefined {
+  const segments = paths.flatMap((points) => points.slice(1).map((end, index) => ({
+    start: points[index]!,
+    end,
+    length: Math.hypot(end.x - points[index]!.x, end.y - points[index]!.y),
+  })));
+  const total = segments.reduce((sum, segment) => sum + segment.length, 0);
+  if (total === 0) return paths[0]?.[0];
+  let remaining = total / 2;
+  for (const segment of segments) {
+    if (remaining <= segment.length) {
+      const ratio = segment.length === 0 ? 0 : remaining / segment.length;
+      return {
+        x: segment.start.x + (segment.end.x - segment.start.x) * ratio,
+        y: segment.start.y + (segment.end.y - segment.start.y) * ratio,
+      };
+    }
+    remaining -= segment.length;
+  }
+  return segments.at(-1)?.end;
+}
+
 export async function layoutGraph(
   modules: QsysModule[],
   connections: QsysConnection[],

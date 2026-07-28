@@ -1,10 +1,10 @@
 // Copyright 2026 Yaroslav Mariukha
 // SPDX-License-Identifier: MIT
 
-import { connectionKinds, type ConnectionKind, type QsysConnection, type QsysGraph, type QsysInterface, type QsysModule } from '../parser/graph';
+import { connectionKinds, type ConnectionKind, type QsysAdaptation, type QsysConnection, type QsysGraph, type QsysInterface, type QsysModule } from '../parser/graph';
 import { streamParameters } from '../parser/streamMetadata';
 import { createInterfaceWaveform } from '../parser/waveform';
-import { layoutAnchoredGraph, layoutGraph, projectVisibleLayout, type LayoutPoint, type LayoutResult } from '../layout/elk';
+import { layoutAnchoredGraph, layoutGraph, pathMidpoint, projectVisibleLayout, type LayoutPoint, type LayoutResult } from '../layout/elk';
 import { connectionAddress, createInterfaceHubs, type HubKind, type InterfaceHub } from './interfaceHubs';
 import { isDirectKind, isHubKind, type GraphViewMode } from './viewMode';
 import './styles.css';
@@ -25,6 +25,12 @@ const hubLabels: Record<HubKind, string> = {
   clock: 'Clock sources',
   reset: 'Reset sources',
   interrupt: 'IRQ receivers',
+};
+const adapterLabels: Record<QsysAdaptation['kind'], string> = {
+  timing: 'Timing adapter',
+  data_format: 'Data format adapter',
+  channel: 'Channel adapter',
+  error: 'Error adapter',
 };
 
 interface ViewState {
@@ -308,8 +314,24 @@ function draw(result: LayoutResult): void {
         group.append(edgeLabel(edge.targetPort, points.at(-1)!, 'target-port'));
       }
     }
+    if (edge.adaptations && edge.adaptations.length > 0) {
+      const midpoint = pathMidpoint(edge.paths);
+      if (midpoint) {
+        group.append(svg('circle', {
+          cx: midpoint.x,
+          cy: midpoint.y,
+          r: 6,
+          class: 'adapter-dot',
+        }));
+      }
+    }
     const title = svg('title');
-    title.textContent = `${edge.source}.${edge.sourcePort} → ${edge.target}.${edge.targetPort}\n${labels[edge.kind]} (${edge.rawKind})`;
+    const adapterSummary = edge.adaptations?.map(formatAdaptation).join('\n');
+    title.textContent = [
+      `${edge.source}.${edge.sourcePort} → ${edge.target}.${edge.targetPort}`,
+      `${labels[edge.kind]} (${edge.rawKind})`,
+      adapterSummary,
+    ].filter(Boolean).join('\n');
     group.append(title);
     const openDetails = (event: Event) => {
       event.stopPropagation();
@@ -491,6 +513,10 @@ function showConnectionDetails(connection: QsysConnection): void {
   type.textContent = `${labels[connection.kind]} · ${connection.rawKind}`;
   details.append(detailsCloseButton(), heading, type);
 
+  if (connection.adaptations && connection.adaptations.length > 0) {
+    details.append(adaptationDetails(connection.adaptations));
+  }
+
   if (connection.kind === 'avalon_streaming' && source && target) {
     const sourceInterface = graph.interfaces[`${connection.source}.${connection.sourcePort}`];
     const targetInterface = graph.interfaces[`${connection.target}.${connection.targetPort}`];
@@ -518,6 +544,34 @@ function showConnectionDetails(connection: QsysConnection): void {
   }
   details.append(parameterTable('Connection parameters', connection.parameters));
   details.classList.remove('hidden');
+}
+
+function formatAdaptation(item: QsysAdaptation): string {
+  const differences = item.differences.map((difference) =>
+    `${difference.property}: ${difference.source} → ${difference.target}`,
+  ).join(', ');
+  return `${adapterLabels[item.kind]} — ${differences}`;
+}
+
+function adaptationDetails(adaptations: QsysAdaptation[]): HTMLElement {
+  const section = document.createElement('section');
+  section.className = 'adaptation-details';
+  const title = document.createElement('h3');
+  title.textContent = 'Automatic adaptation';
+  const note = document.createElement('p');
+  note.className = 'details-note';
+  note.textContent = 'Quartus will insert adapter logic for the mismatched Avalon-ST endpoints.';
+  section.append(title, note);
+  for (const item of adaptations) {
+    const heading = document.createElement('h4');
+    heading.textContent = adapterLabels[item.kind];
+    const table = document.createElement('dl');
+    for (const difference of item.differences) {
+      appendDefinition(table, difference.property, `${difference.source} → ${difference.target}`);
+    }
+    section.append(heading, table);
+  }
+  return section;
 }
 
 function detailsCloseButton(): HTMLButtonElement {
