@@ -4,8 +4,9 @@
 import { connectionKinds, type ConnectionKind, type QsysConnection, type QsysGraph, type QsysInterface, type QsysModule } from '../parser/graph';
 import { streamParameters } from '../parser/streamMetadata';
 import { createInterfaceWaveform } from '../parser/waveform';
-import { layoutAnchoredGraph, projectVisibleLayout, type LayoutPoint, type LayoutResult } from '../layout/elk';
+import { layoutAnchoredGraph, layoutGraph, projectVisibleLayout, type LayoutPoint, type LayoutResult } from '../layout/elk';
 import { connectionAddress, createInterfaceHubs, type HubKind, type InterfaceHub } from './interfaceHubs';
+import { isDirectKind, isHubKind, type GraphViewMode } from './viewMode';
 import './styles.css';
 
 const vscode = acquireVsCodeApi();
@@ -19,7 +20,6 @@ const labels: Record<ConnectionKind, string> = {
   other: 'Unknown',
 };
 const filterKinds = connectionKinds;
-const directedKinds = new Set<ConnectionKind>(['avalon_streaming', 'conduit', 'other']);
 const hubLabels: Record<HubKind, string> = {
   avalon_memory_mapped: 'Avalon-MM masters',
   clock: 'Clock sources',
@@ -28,14 +28,31 @@ const hubLabels: Record<HubKind, string> = {
 };
 
 interface ViewState {
-  selectedKinds: ConnectionKind[];
+  viewMode: GraphViewMode;
+  selectedKinds: Record<GraphViewMode, ConnectionKind[]>;
   showDisconnected: boolean;
   showDisabled: boolean;
 }
 
-const saved = (vscode.getState() ?? {}) as Partial<ViewState>;
+interface SavedViewState {
+  viewMode?: GraphViewMode;
+  selectedKinds?: ConnectionKind[] | Partial<Record<GraphViewMode, ConnectionKind[]>>;
+  showDisconnected?: boolean;
+  showDisabled?: boolean;
+}
+
+const saved = (vscode.getState() ?? {}) as SavedViewState;
+const savedPipelineKinds = Array.isArray(saved.selectedKinds)
+  ? saved.selectedKinds
+  : saved.selectedKinds?.pipeline;
 const state: ViewState = {
-  selectedKinds: saved.selectedKinds ?? ['avalon_streaming', 'other'],
+  viewMode: saved.viewMode ?? 'pipeline',
+  selectedKinds: {
+    pipeline: savedPipelineKinds ?? ['avalon_streaming', 'other'],
+    complete: !Array.isArray(saved.selectedKinds) && saved.selectedKinds?.complete
+      ? saved.selectedKinds.complete
+      : [...connectionKinds],
+  },
   showDisconnected: saved.showDisconnected ?? false,
   showDisabled: saved.showDisabled ?? true,
 };
@@ -55,6 +72,12 @@ if (!app) throw new Error('Qsys View root element is missing.');
 app.innerHTML = `
   <header class="toolbar">
     <div class="brand"><strong id="system-name">Qsys View</strong><span id="summary"></span></div>
+    <label class="view-mode">View
+      <select id="view-mode" aria-label="Graph view mode">
+        <option value="pipeline">Pipeline</option>
+        <option value="complete">Complete</option>
+      </select>
+    </label>
     <div id="kind-filters" class="filters"></div>
     <label class="option"><input id="show-disconnected" type="checkbox"> All IP</label>
     <label class="option"><input id="show-disabled" type="checkbox"> Disabled IP</label>
@@ -80,25 +103,39 @@ const status = required<HTMLElement>('status');
 const details = required<HTMLElement>('details');
 const search = required<HTMLInputElement>('search');
 const filters = required<HTMLElement>('kind-filters');
+const viewMode = required<HTMLSelectElement>('view-mode');
 const quartusMetadata = required<HTMLButtonElement>('quartus-metadata');
 const interfaceHubs = required<HTMLElement>('interface-hubs');
 
+const filterCheckboxes = new Map<ConnectionKind, HTMLInputElement>();
 for (const kind of filterKinds) {
   const label = document.createElement('label');
   label.className = `kind-filter kind-${kind}`;
   const checkbox = document.createElement('input');
   checkbox.type = 'checkbox';
-  checkbox.checked = state.selectedKinds.includes(kind);
+  checkbox.checked = selectedKinds().includes(kind);
   checkbox.addEventListener('change', () => {
-    state.selectedKinds = checkbox.checked
-      ? [...state.selectedKinds, kind]
-      : state.selectedKinds.filter((selected) => selected !== kind);
+    const current = selectedKinds();
+    state.selectedKinds[state.viewMode] = checkbox.checked
+      ? [...current, kind]
+      : current.filter((selected) => selected !== kind);
     saveState();
     void render();
   });
+  filterCheckboxes.set(kind, checkbox);
   label.append(checkbox, document.createTextNode(labels[kind]));
   filters.append(label);
 }
+
+viewMode.value = state.viewMode;
+viewMode.addEventListener('change', () => {
+  state.viewMode = viewMode.value as GraphViewMode;
+  for (const [kind, checkbox] of filterCheckboxes) checkbox.checked = selectedKinds().includes(kind);
+  activeHubId = undefined;
+  didInitialFit = false;
+  saveState();
+  void render();
+});
 
 const showDisconnected = required<HTMLInputElement>('show-disconnected');
 showDisconnected.checked = state.showDisconnected;
@@ -184,10 +221,11 @@ async function render(): Promise<void> {
     allowedIds.has(connection.source) && allowedIds.has(connection.target),
   );
   const selectedConnections = allowedConnections.filter((connection) =>
-    state.selectedKinds.includes(connection.kind)
+    selectedKinds().includes(connection.kind)
   );
-  const connections = selectedConnections.filter((connection) => directedKinds.has(connection.kind));
-  const hubs = createInterfaceHubs(graph, state.selectedKinds, allowedIds);
+  const connections = selectedConnections.filter((connection) => isDirectKind(connection.kind, state.viewMode));
+  const selectedHubKinds = selectedKinds().filter((kind) => isHubKind(kind, state.viewMode));
+  const hubs = createInterfaceHubs(graph, selectedHubKinds, allowedIds);
   const connectedIds = new Set(connections.flatMap((connection) => [connection.source, connection.target]));
   for (const hub of hubs) {
     for (const moduleId of hub.relatedModuleIds) connectedIds.add(moduleId);
@@ -196,14 +234,16 @@ async function render(): Promise<void> {
     ? allowedModules
     : allowedModules.filter((module) => connectedIds.has(module.id));
   try {
-    const structuralConnections = allowedConnections.filter((connection) => directedKinds.has(connection.kind));
-    const nextLayoutKey = layoutKey(allowedModules, structuralConnections);
+    const structuralConnections = allowedConnections.filter((connection) => isDirectKind(connection.kind, state.viewMode));
+    const nextLayoutKey = layoutKey(allowedModules, structuralConnections, state.viewMode);
     let nextMaster = masterLayoutKey === nextLayoutKey ? masterLayout : undefined;
     if (!nextMaster) {
-      showStatus(structuralConnections.some((connection) => connection.kind === 'avalon_streaming')
+      showStatus(state.viewMode === 'pipeline' && structuralConnections.some((connection) => connection.kind === 'avalon_streaming')
         ? 'Calculating Avalon-ST anchored layout…'
-        : 'Calculating layered layout…');
-      nextMaster = await layoutAnchoredGraph(allowedModules, structuralConnections);
+        : `Calculating ${state.viewMode} layout…`);
+      nextMaster = state.viewMode === 'pipeline'
+        ? await layoutAnchoredGraph(allowedModules, structuralConnections)
+        : await layoutGraph(allowedModules, structuralConnections);
       if (version !== renderVersion) return;
       masterLayout = nextMaster;
       masterLayoutKey = nextLayoutKey;
@@ -232,8 +272,9 @@ async function render(): Promise<void> {
   }
 }
 
-function layoutKey(modules: QsysModule[], connections: QsysConnection[]): string {
+function layoutKey(modules: QsysModule[], connections: QsysConnection[], mode: GraphViewMode): string {
   return JSON.stringify({
+    mode,
     modules: modules.map((module) => [module.id, module.name]),
     connections: connections.map((connection) => [
       connection.id,
@@ -723,5 +764,7 @@ function hideStatus(): void { status.classList.add('hidden'); }
 function clamp(value: number, min: number, max: number): number { return Math.min(max, Math.max(min, value)); }
 function truncate(value: string, length: number): string { return value.length > length ? `${value.slice(0, length - 1)}…` : value; }
 function saveState(): void { vscode.setState(state); }
+
+function selectedKinds(): ConnectionKind[] { return state.selectedKinds[state.viewMode]; }
 
 vscode.postMessage({ type: 'ready' });

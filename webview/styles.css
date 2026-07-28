@@ -40,6 +40,13 @@ button, input { font: inherit; color: inherit; }
   font-size: 11px;
   cursor: pointer;
 }
+.view-mode { display: inline-flex; align-items: center; gap: 5px; color: var(--vscode-descriptionForeground); font-size: 11px; }
+.view-mode select {
+  color: var(--vscode-dropdown-foreground);
+  background: var(--vscode-dropdown-background);
+  border: 1px solid var(--vscode-dropdown-border, transparent);
+  padding: 3px 6px;
+}
 .kind-filter input, .option input { margin: 0; accent-color: var(--edge-color); }
 .option { border-radius: 3px; }
 .search {
