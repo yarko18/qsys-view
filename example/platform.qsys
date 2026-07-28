@@ -17,7 +17,7 @@ SPDX-License-Identifier: MIT
    {
       datum _sortIndex
       {
-         value = "7";
+         value = "8";
          type = "int";
       }
    }
@@ -49,7 +49,7 @@ SPDX-License-Identifier: MIT
    {
       datum _sortIndex
       {
-         value = "14";
+         value = "15";
          type = "int";
       }
    }
@@ -81,7 +81,7 @@ SPDX-License-Identifier: MIT
    {
       datum _sortIndex
       {
-         value = "23";
+         value = "24";
          type = "int";
       }
    }
@@ -89,7 +89,7 @@ SPDX-License-Identifier: MIT
    {
       datum _sortIndex
       {
-         value = "6";
+         value = "7";
          type = "int";
       }
    }
@@ -97,7 +97,7 @@ SPDX-License-Identifier: MIT
    {
       datum _sortIndex
       {
-         value = "16";
+         value = "17";
          type = "int";
       }
    }
@@ -105,7 +105,7 @@ SPDX-License-Identifier: MIT
    {
       datum _sortIndex
       {
-         value = "8";
+         value = "9";
          type = "int";
       }
    }
@@ -113,7 +113,7 @@ SPDX-License-Identifier: MIT
    {
       datum _sortIndex
       {
-         value = "12";
+         value = "13";
          type = "int";
       }
    }
@@ -129,7 +129,7 @@ SPDX-License-Identifier: MIT
    {
       datum _sortIndex
       {
-         value = "21";
+         value = "22";
          type = "int";
       }
    }
@@ -137,7 +137,7 @@ SPDX-License-Identifier: MIT
    {
       datum _sortIndex
       {
-         value = "18";
+         value = "19";
          type = "int";
       }
    }
@@ -161,7 +161,7 @@ SPDX-License-Identifier: MIT
    {
       datum _sortIndex
       {
-         value = "5";
+         value = "6";
          type = "int";
       }
    }
@@ -177,7 +177,7 @@ SPDX-License-Identifier: MIT
    {
       datum _sortIndex
       {
-         value = "9";
+         value = "10";
          type = "int";
       }
    }
@@ -193,7 +193,7 @@ SPDX-License-Identifier: MIT
    {
       datum _sortIndex
       {
-         value = "15";
+         value = "16";
          type = "int";
       }
    }
@@ -209,7 +209,7 @@ SPDX-License-Identifier: MIT
    {
       datum _sortIndex
       {
-         value = "17";
+         value = "18";
          type = "int";
       }
    }
@@ -225,7 +225,7 @@ SPDX-License-Identifier: MIT
    {
       datum _sortIndex
       {
-         value = "22";
+         value = "23";
          type = "int";
       }
    }
@@ -241,7 +241,7 @@ SPDX-License-Identifier: MIT
    {
       datum _sortIndex
       {
-         value = "13";
+         value = "14";
          type = "int";
       }
    }
@@ -249,7 +249,15 @@ SPDX-License-Identifier: MIT
    {
       datum _sortIndex
       {
-         value = "19";
+         value = "20";
+         type = "int";
+      }
+   }
+   element sc_fifo_0
+   {
+      datum _sortIndex
+      {
+         value = "4";
          type = "int";
       }
    }
@@ -257,7 +265,7 @@ SPDX-License-Identifier: MIT
    {
       datum _sortIndex
       {
-         value = "11";
+         value = "12";
          type = "int";
       }
    }
@@ -265,7 +273,7 @@ SPDX-License-Identifier: MIT
    {
       datum _sortIndex
       {
-         value = "4";
+         value = "5";
          type = "int";
       }
    }
@@ -281,7 +289,7 @@ SPDX-License-Identifier: MIT
    {
       datum _sortIndex
       {
-         value = "10";
+         value = "11";
          type = "int";
       }
    }
@@ -297,7 +305,7 @@ SPDX-License-Identifier: MIT
    {
       datum _sortIndex
       {
-         value = "24";
+         value = "25";
          type = "int";
       }
    }
@@ -305,7 +313,7 @@ SPDX-License-Identifier: MIT
    {
       datum _sortIndex
       {
-         value = "20";
+         value = "21";
          type = "int";
       }
    }
@@ -960,6 +968,26 @@ SPDX-License-Identifier: MIT
   <parameter name="SUMMAND_SIGNED" value="0" />
   <parameter name="USER_PACKET_SUPPORT" value="PASSTHROUGH" />
  </module>
+ <module
+   name="sc_fifo_0"
+   kind="altera_avalon_sc_fifo"
+   version="23.1"
+   enabled="1">
+  <parameter name="BITS_PER_SYMBOL" value="16" />
+  <parameter name="CHANNEL_WIDTH" value="0" />
+  <parameter name="EMPTY_LATENCY" value="3" />
+  <parameter name="ENABLE_EXPLICIT_MAXCHANNEL" value="false" />
+  <parameter name="ERROR_WIDTH" value="0" />
+  <parameter name="EXPLICIT_MAXCHANNEL" value="0" />
+  <parameter name="FIFO_DEPTH" value="16" />
+  <parameter name="SYMBOLS_PER_BEAT" value="1" />
+  <parameter name="USE_ALMOST_EMPTY_IF" value="0" />
+  <parameter name="USE_ALMOST_FULL_IF" value="0" />
+  <parameter name="USE_FILL_LEVEL" value="0" />
+  <parameter name="USE_MEMORY_BLOCKS" value="1" />
+  <parameter name="USE_PACKETS" value="1" />
+  <parameter name="USE_STORE_FORWARD" value="0" />
+ </module>
  <module name="scaler" kind="alt_vip_cl_scl" version="23.1" enabled="1">
   <parameter name="ALGORITHM_NAME" value="BICUBIC" />
   <parameter name="ALWAYS_DOWNSCALE" value="0" />
@@ -1323,12 +1351,17 @@ SPDX-License-Identifier: MIT
    kind="avalon_streaming"
    version="23.1"
    start="cvi_mono.dout_0"
-   end="switch_0.din_0" />
+   end="sc_fifo_0.in" />
  <connection
    kind="avalon_streaming"
    version="23.1"
    start="switch_0.dout_1"
    end="switch_1.din_1" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="sc_fifo_0.out"
+   end="switch_0.din_0" />
  <connection
    kind="clock"
    version="23.1"
@@ -1339,6 +1372,11 @@ SPDX-License-Identifier: MIT
    version="23.1"
    start="clk_mono_video.clk"
    end="trace_system.clk" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="sc_fifo_0.clk" />
  <connection
    kind="clock"
    version="23.1"
@@ -1454,6 +1492,11 @@ SPDX-License-Identifier: MIT
    version="23.1"
    start="clk_memory.clk"
    end="frame_buffer_color.mem_clock" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="sc_fifo_0.clk_reset" />
  <connection
    kind="reset"
    version="23.1"
