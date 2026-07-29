@@ -49,6 +49,24 @@ describe('parseQsys', () => {
     expect(graph.exportedInterfaces).toEqual({ din: 'fifo.in' });
   });
 
+  it('orients serialized interrupt connections from sender to receiver', () => {
+    const graph = parseQsys(`
+      <system name="irq-system">
+        <module name="cpu" kind="nios" enabled="1" />
+        <module name="timer" kind="timer" enabled="1" />
+        <connection kind="interrupt" start="cpu.irq" end="timer.irq" />
+      </system>
+    `);
+
+    expect(graph.connections[0]).toMatchObject({
+      source: 'timer',
+      sourcePort: 'irq',
+      target: 'cpu',
+      targetPort: 'irq',
+      kind: 'interrupt',
+    });
+  });
+
   it('rejects malformed XML without a usable graph', () => {
     expect(() => parseQsys('<system><module', 'broken')).toThrow('Invalid Qsys XML');
   });

@@ -86,6 +86,21 @@ describe('parseQsysTcl', () => {
     expect(tcl.connections).toEqual(qsys.connections);
   });
 
+  it('orients explicit interrupt connections from sender to receiver', () => {
+    const graph = parseQsysTcl(`
+      add_instance cpu nios 1.0
+      add_instance timer timer 1.0
+      add_connection cpu.irq timer.irq interrupt timer_irq
+    `);
+
+    expect(graph.connections[0]).toMatchObject({
+      id: 'timer_irq',
+      source: 'timer',
+      target: 'cpu',
+      kind: 'interrupt',
+    });
+  });
+
   it('warns about dynamic Tcl instead of pretending to evaluate it', () => {
     const graph = parseQsysTcl(`
       set instance_name source

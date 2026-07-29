@@ -15,6 +15,7 @@ SPDX-License-Identifier: MIT
 - Analyze each expanded subsystem with Quartus when the parent has exact metadata, so nested Tcl pipelines retain their real interface types.
 - Preserve one clock/reset highlight domain across exported `clock_source` boundaries instead of duplicating it after expansion.
 - Draw expanded subsystems inside rounded dashed containers with an on-canvas collapse control.
+- Draw interrupt arrows in signal-flow order from sender to receiver and group IRQ highlights by the actual receiver.
 
 ## 1.0.5
 

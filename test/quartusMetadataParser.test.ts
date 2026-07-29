@@ -53,4 +53,24 @@ describe('applyQuartusMetadata', () => {
       rawKind: 'avalon_streaming_source',
     });
   });
+
+  it('orients a statically unknown interrupt after Quartus resolves its interfaces', () => {
+    const tcl = `
+      create_system demo
+      add_instance cpu nios 1.0
+      add_instance timer timer 1.0
+      add_connection cpu.irq timer.irq
+    `;
+    const output = [
+      'QSYS_VIEWER\tINTERFACE\tcpu\tirq\tinterrupt_receiver',
+      'QSYS_VIEWER\tINTERFACE\ttimer\tirq\tinterrupt_sender',
+    ].join('\n');
+
+    const graph = applyQuartusMetadata(parseQsysTcl(tcl), output, 'qsys-script');
+    expect(graph.connections[0]).toMatchObject({
+      source: 'timer',
+      target: 'cpu',
+      kind: 'interrupt',
+    });
+  });
 });

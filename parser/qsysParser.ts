@@ -110,6 +110,22 @@ export function classifyConnection(rawKind: string): ConnectionKind {
   return 'other';
 }
 
+/**
+ * Platform Designer serializes interrupt links as receiver -> sender, unlike
+ * their signal flow and unlike the other supported interfaces. Qsys View keeps
+ * all graph connections in signal-flow order so arrows and receiver hubs agree.
+ */
+export function orientPlatformDesignerConnection(connection: QsysConnection): QsysConnection {
+  if (connection.kind !== 'interrupt') return connection;
+  return {
+    ...connection,
+    source: connection.target,
+    sourcePort: connection.targetPort,
+    target: connection.source,
+    targetPort: connection.sourcePort,
+  };
+}
+
 function findSystem(document: XmlNode): XmlNode {
   for (const key of ['system', 'component', 'qsys']) {
     const value = document[key];
@@ -182,7 +198,7 @@ export function parseQsys(xml: string, fallbackName = 'Qsys system'): QsysGraph 
       || interfaceKinds.get(sourceEndpoint)
       || interfaceKinds.get(targetEndpoint)
       || '';
-    connections.push({
+    connections.push(orientPlatformDesignerConnection({
       id: text(connection.name) || `connection-${index}`,
       source,
       sourcePort,
@@ -191,7 +207,7 @@ export function parseQsys(xml: string, fallbackName = 'Qsys system'): QsysGraph 
       kind: classifyConnection(rawKind),
       rawKind: rawKind || 'unknown',
       parameters: collectParameters(connection),
-    });
+    }));
   }
 
   if (modules.length === 0) warnings.push('No modules were found in this Qsys file.');
