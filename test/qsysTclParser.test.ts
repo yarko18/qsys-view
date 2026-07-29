@@ -129,6 +129,31 @@ describe('parseQsysTcl', () => {
     }));
   });
 
+  it('points missing-instance parameter warnings to the first parameter line', () => {
+    const graph = parseQsysTcl([
+      'add_instance clipper alt_vip_cl_clp 23.1',
+      'set_instance_parameter_value cliper {BITS_PER_SYMBOL} {16}',
+      'set_instance_parameter_value cliper {NUMBER_OF_COLOR_PLANES} {3}',
+    ].join('\n'));
+
+    expect(graph.diagnostics).toContainEqual({
+      severity: 'warning',
+      message: 'Parameters refer to missing instance cliper.',
+      line: 2,
+    });
+  });
+
+  it('does not warn when parameters appear before their instance declaration', () => {
+    const graph = parseQsysTcl([
+      'set_instance_parameter_value clipper {BITS_PER_SYMBOL} {16}',
+      'add_instance clipper alt_vip_cl_clp 23.1',
+    ].join('\n'));
+
+    expect(graph.modules[0]?.parameters.BITS_PER_SYMBOL).toBe('16');
+    expect(graph.diagnostics?.map((diagnostic) => diagnostic.message).join('\n'))
+      .not.toContain('missing instance');
+  });
+
   it('rejects malformed Tcl words with a useful line number', () => {
     expect(() => parseQsysTcl('add_instance {broken type 1.0')).toThrow(/line 1.*unmatched brace/i);
   });
