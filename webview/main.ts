@@ -947,6 +947,7 @@ function requestSubsystemExpansion(module: QsysModule): void {
     type: 'loadSubsystem',
     instanceId: module.id,
     resource: module.subsystem.resource,
+    analyze: sourceGraph?.metadata.source === 'quartus',
   });
 }
 

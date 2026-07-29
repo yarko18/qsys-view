@@ -55,6 +55,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       line?: number;
       resource?: string;
       instanceId?: string;
+      analyze?: boolean;
     }) => {
       if (message.type === 'ready') {
         await sendGraph(false, true);
@@ -68,7 +69,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       } else if (message.type === 'revealDiagnostic' && Number.isInteger(message.line)) {
         await this.revealSource(document.uri, message.line!);
       } else if (message.type === 'loadSubsystem' && message.resource && message.instanceId) {
-        await this.sendSubsystem(message.resource, message.instanceId, panel.webview);
+        await this.sendSubsystem(message.resource, message.instanceId, Boolean(message.analyze), panel.webview);
       } else if (message.type === 'openSubsystem' && message.resource) {
         await this.openSubsystem(message.resource);
       } else if (message.type === 'viewStateChanged' && message.state && typeof message.state === 'object') {
@@ -210,10 +211,30 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     return undefined;
   }
 
-  private async sendSubsystem(resource: string, instanceId: string, webview: vscode.Webview): Promise<void> {
+  private async sendSubsystem(
+    resource: string,
+    instanceId: string,
+    analyze: boolean,
+    webview: vscode.Webview,
+  ): Promise<void> {
     try {
       const uri = subsystemUri(resource);
-      const { graph } = await this.readGraph(uri);
+      const source = await this.readGraph(uri);
+      let { graph } = source;
+      if (analyze) {
+        try {
+          graph = isQsysTcl(uri)
+            ? await this.withTclQuartusMetadata(uri, graph, source.bytes)
+            : await this.withQsysQuartusMetadata(uri, graph, source.bytes, source.fileName);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          graph = {
+            ...graph,
+            warnings: [...graph.warnings, `Quartus metadata unavailable: ${message}`],
+            metadata: { source: 'qsys-only', label: `Quartus metadata unavailable: ${message}` },
+          };
+        }
+      }
       await webview.postMessage({ type: 'subsystemGraph', instanceId, graph });
     } catch (error) {
       await webview.postMessage({
