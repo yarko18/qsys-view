@@ -4,7 +4,7 @@
 import { connectionKinds, type ConnectionKind, type QsysAdaptation, type QsysConnection, type QsysGraph, type QsysInterface, type QsysModule } from '../parser/graph';
 import { streamParameters } from '../parser/streamMetadata';
 import { createInterfaceWaveform } from '../parser/waveform';
-import { layoutAnchoredGraph, layoutGraph, pathMidpoint, projectVisibleLayout, type LayoutPoint, type LayoutResult } from '../layout/elk';
+import { layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, projectVisibleLayout, type LayoutPoint, type LayoutResult, type StableLayoutCache } from '../layout/elk';
 import { connectionAddress, createInterfaceHubs, type HubKind, type InterfaceHub } from './interfaceHubs';
 import { availableConnectionKinds, inferClockResetConnections, isDirectKind, isHubKind, type GraphViewMode } from './viewMode';
 import './styles.css';
@@ -64,8 +64,7 @@ applySavedViewState(saved);
 
 let graph: QsysGraph | undefined;
 let layout: LayoutResult | undefined;
-let masterLayout: LayoutResult | undefined;
-let masterLayoutKey = '';
+const stableLayoutCaches: Partial<Record<GraphViewMode, StableLayoutCache>> = {};
 let activeHubId: string | undefined;
 let visibleHubs: InterfaceHub[] = [];
 let renderVersion = 0;
@@ -90,6 +89,7 @@ app.innerHTML = `
     <input id="search" class="search" type="search" placeholder="Find IP…" aria-label="Find IP">
     <button id="quartus-metadata" title="Read exact interface metadata with qsys-script">Read interfaces…</button>
     <button id="open-platform-designer" title="Open this design in Intel Platform Designer">Open in Platform Designer</button>
+    <button id="relayout" title="Recalculate the current layout">Relayout</button>
     <button id="fit" title="Fit graph to view">Fit</button>
   </header>
   <main id="viewport" class="viewport">
@@ -168,6 +168,12 @@ showDisabled.addEventListener('change', () => {
   void render();
 });
 required<HTMLButtonElement>('fit').addEventListener('click', fitView);
+required<HTMLButtonElement>('relayout').addEventListener('click', () => {
+  delete stableLayoutCaches[state.viewMode];
+  activeHubId = undefined;
+  didInitialFit = false;
+  void render();
+});
 quartusMetadata.addEventListener('click', () => {
   quartusMetadata.disabled = true;
   quartusMetadata.textContent = 'Running qsys-script…';
@@ -191,13 +197,14 @@ window.addEventListener('message', (event: MessageEvent) => {
     rememberedViewState?: SavedViewState;
   };
   if (message.type === 'graph' && message.graph) {
+    const firstGraph = !graph;
     if (!receivedInitialState && message.rememberedViewState) {
       applySavedViewState(message.rememberedViewState);
       syncViewControls();
     }
     receivedInitialState = true;
     graph = message.graph;
-    didInitialFit = false;
+    if (firstGraph) didInitialFit = false;
     required<HTMLElement>('system-name').textContent = graph.name;
     quartusMetadata.disabled = false;
     quartusMetadata.textContent = graph.metadata.source === 'quartus' ? 'Read interfaces again…' : 'Read interfaces…';
@@ -273,21 +280,21 @@ async function render(): Promise<void> {
     : allowedModules.filter((module) => connectedIds.has(module.id));
   try {
     const structuralConnections = allowedConnections.filter((connection) => isDirectKind(connection.kind, state.viewMode));
-    const nextLayoutKey = layoutKey(allowedModules, structuralConnections, state.viewMode);
-    let nextMaster = masterLayoutKey === nextLayoutKey ? masterLayout : undefined;
-    if (!nextMaster) {
+    const mode = state.viewMode;
+    if (!stableLayoutCaches[mode]) {
       showStatus(state.viewMode === 'pipeline' && structuralConnections.some((connection) => connection.kind === 'avalon_streaming')
         ? 'Calculating Avalon-ST anchored layout…'
         : `Calculating ${state.viewMode} layout…`);
-      nextMaster = state.viewMode === 'pipeline'
-        ? await layoutAnchoredGraph(allowedModules, structuralConnections)
-        : await layoutGraph(allowedModules, structuralConnections);
-      if (version !== renderVersion) return;
-      masterLayout = nextMaster;
-      masterLayoutKey = nextLayoutKey;
     }
+    const stable = await layoutStableGraph(
+      allowedModules,
+      structuralConnections,
+      stableLayoutCaches[mode],
+      mode === 'pipeline' ? layoutAnchoredGraph : layoutGraph,
+    );
     if (version !== renderVersion) return;
-    const result = projectVisibleLayout(nextMaster, modules, connections);
+    stableLayoutCaches[mode] = stable.cache;
+    const result = projectVisibleLayout(stable.layout, modules, connections);
     layout = result;
     draw(result);
     visibleHubs = hubs;
@@ -308,19 +315,6 @@ async function render(): Promise<void> {
   } catch (error) {
     showStatus(`Layout failed: ${error instanceof Error ? error.message : String(error)}`, true);
   }
-}
-
-function layoutKey(modules: QsysModule[], connections: QsysConnection[], mode: GraphViewMode): string {
-  return JSON.stringify({
-    mode,
-    modules: modules.map((module) => [module.id, module.name]),
-    connections: connections.map((connection) => [
-      connection.id,
-      connection.source,
-      connection.target,
-      connection.kind,
-    ]),
-  });
 }
 
 function draw(result: LayoutResult): void {

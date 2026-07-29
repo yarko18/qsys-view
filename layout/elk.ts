@@ -27,6 +27,23 @@ export interface LayoutEdge extends QsysConnection {
   paths: LayoutPoint[][];
 }
 
+interface FrozenNodeGeometry {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface StableLayoutCache {
+  nodes: Map<string, FrozenNodeGeometry>;
+  routes: Map<string, LayoutPoint[][]>;
+}
+
+export interface StableLayoutResult {
+  layout: LayoutResult;
+  cache: StableLayoutCache;
+}
+
 export function pathMidpoint(paths: LayoutPoint[][]): LayoutPoint | undefined {
   const segments = paths.flatMap((points) => points.slice(1).map((end, index) => ({
     start: points[index]!,
@@ -147,6 +164,66 @@ export async function layoutAnchoredGraph(
   };
 }
 
+/**
+ * Keeps every previously placed node fixed while graph contents change. New
+ * nodes are appended below the frozen area; a caller can discard the cache to
+ * explicitly request a complete relayout.
+ */
+export async function layoutStableGraph(
+  modules: QsysModule[],
+  connections: QsysConnection[],
+  previous: StableLayoutCache | undefined,
+  initialLayout: (modules: QsysModule[], connections: QsysConnection[]) => Promise<LayoutResult> = layoutGraph,
+): Promise<StableLayoutResult> {
+  if (!previous) {
+    const layout = await initialLayout(modules, connections);
+    return {
+      layout,
+      cache: {
+        nodes: new Map(layout.nodes.map((node) => [node.id, geometry(node)])),
+        routes: new Map(layout.edges.map((edge) => [routeKey(edge), edge.paths])),
+      },
+    };
+  }
+
+  const nodes = new Map(previous.nodes);
+  const routes = new Map(previous.routes);
+  const newModules = modules.filter((module) => !nodes.has(module.id));
+  if (newModules.length > 0) {
+    const newIds = new Set(newModules.map((module) => module.id));
+    const newConnections = connections.filter((connection) =>
+      newIds.has(connection.source) && newIds.has(connection.target),
+    );
+    const appended = await layoutGraph(newModules, newConnections);
+    const bottom = Math.max(0, ...[...nodes.values()].map((node) => node.y + node.height));
+    const offsetY = nodes.size > 0 ? bottom + 80 : 0;
+    for (const node of appended.nodes) {
+      nodes.set(node.id, {
+        x: node.x,
+        y: node.y + offsetY,
+        width: node.width,
+        height: node.height,
+      });
+    }
+  }
+
+  const frozenNodes = modules.flatMap((module) => {
+    const frozen = nodes.get(module.id);
+    return frozen ? [{ ...module, ...frozen }] : [];
+  });
+  const reusableEdges = connections.flatMap((connection) => {
+    const paths = routes.get(routeKey(connection));
+    return paths ? [{ ...connection, paths }] : [];
+  });
+  const projected = projectVisibleLayout(
+    { width: 1, height: 1, nodes: frozenNodes, edges: reusableEdges },
+    modules,
+    connections,
+  );
+  for (const edge of projected.edges) routes.set(routeKey(edge), edge.paths);
+  return { layout: projected, cache: { nodes, routes } };
+}
+
 /** Keeps master node coordinates and selects/routs only the currently visible graph. */
 export function projectVisibleLayout(
   master: LayoutResult,
@@ -163,7 +240,9 @@ export function projectVisibleLayout(
     const target = nodeMap.get(connection.target);
     if (!source || !target) return [];
     const existing = masterEdgeMap.get(connection.id);
-    if (existing) return [{ ...connection, paths: existing.paths }];
+    if (existing && existing.source === connection.source && existing.target === connection.target) {
+      return [{ ...connection, paths: existing.paths }];
+    }
 
     const pair = `${connection.source}\u0000${connection.target}`;
     const parallelIndex = parallelCounts.get(pair) ?? 0;
@@ -183,6 +262,14 @@ export function projectVisibleLayout(
     nodes,
     edges,
   };
+}
+
+function geometry(node: LayoutNode): FrozenNodeGeometry {
+  return { x: node.x, y: node.y, width: node.width, height: node.height };
+}
+
+function routeKey(connection: QsysConnection): string {
+  return `${connection.id}\u0000${connection.source}\u0000${connection.target}`;
 }
 
 function translateLayout(layout: LayoutResult, dx: number, dy: number): LayoutResult {

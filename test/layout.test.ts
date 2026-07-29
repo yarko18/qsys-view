@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, expect, it } from 'vitest';
-import { layoutAnchoredGraph, pathMidpoint, projectVisibleLayout } from '../layout/elk';
+import { layoutAnchoredGraph, layoutStableGraph, pathMidpoint, projectVisibleLayout } from '../layout/elk';
 import type { ConnectionKind, QsysConnection, QsysModule } from '../parser/graph';
 
 function module(id: string): QsysModule {
@@ -62,5 +62,33 @@ describe('pathMidpoint', () => {
       { x: 10, y: 0 },
       { x: 10, y: 20 },
     ]])).toEqual({ x: 10, y: 5 });
+  });
+});
+
+describe('stable live layout', () => {
+  it('keeps existing and temporarily removed IP fixed while connections and modules change', async () => {
+    const source = module('source');
+    const sink = module('sink');
+    const added = module('added');
+    const firstConnection = connection('first', source.id, sink.id, 'avalon_streaming');
+    const initial = await layoutStableGraph([source, sink], [firstConnection], undefined);
+    const initialPositions = new Map(initial.layout.nodes.map((node) => [node.id, { x: node.x, y: node.y }]));
+
+    const changedConnection = connection('changed', sink.id, source.id, 'conduit');
+    const changed = await layoutStableGraph(
+      [source, sink, added],
+      [changedConnection],
+      initial.cache,
+    );
+    for (const id of [source.id, sink.id]) {
+      const node = changed.layout.nodes.find((candidate) => candidate.id === id);
+      expect(node && { x: node.x, y: node.y }).toEqual(initialPositions.get(id));
+    }
+    expect(changed.layout.nodes.some((node) => node.id === added.id)).toBe(true);
+
+    const removed = await layoutStableGraph([sink, added], [], changed.cache);
+    const restored = await layoutStableGraph([source, sink, added], [], removed.cache);
+    const restoredSource = restored.layout.nodes.find((node) => node.id === source.id);
+    expect(restoredSource && { x: restoredSource.x, y: restoredSource.y }).toEqual(initialPositions.get(source.id));
   });
 });
