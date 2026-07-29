@@ -42,6 +42,10 @@ export function platformDesignerTemporaryPrefix(sourcePath: string): string {
   return path.join(path.dirname(sourcePath), `.qsys-view-${systemName}-`);
 }
 
+export function siblingQsysSearchPattern(projectDirectory: string): string {
+  return path.join(projectDirectory, '*.qsys');
+}
+
 function normalizeTclPath(value: string): string {
   return value.replaceAll('\\', '/');
 }

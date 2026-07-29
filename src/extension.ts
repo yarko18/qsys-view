@@ -11,7 +11,7 @@ import type { QsysGraph } from '../parser/graph';
 import { applyQuartusMetadata } from '../parser/quartusMetadataParser';
 import { parseQsys } from '../parser/qsysParser';
 import { parseQsysTcl } from '../parser/qsysTclParser';
-import { platformDesignerTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclScriptArguments } from './qsysScript';
+import { platformDesignerTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclScriptArguments, siblingQsysSearchPattern } from './qsysScript';
 
 const lastViewStateKey = 'qsysView.lastViewState';
 
@@ -245,6 +245,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     };
     return [...new Set([
       ...configured.map(expand),
+      siblingQsysSearchPattern(projectDirectory),
       path.join(projectDirectory, 'ip', '*', 'component.ipx'),
       path.join(projectDirectory, 'ip', 'common', '**', '*_hw.tcl'),
       path.join(projectDirectory, '*', 'component.ipx'),

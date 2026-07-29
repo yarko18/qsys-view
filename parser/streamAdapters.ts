@@ -131,6 +131,9 @@ export function annotateStreamingAdapters(graph: QsysGraph): QsysGraph {
       const source = graph.interfaces[`${connection.source}.${connection.sourcePort}`];
       const target = graph.interfaces[`${connection.target}.${connection.targetPort}`];
       if (!source || !target) return connection;
+      if (source.kind === 'missing' || target.kind === 'missing' || source.ports.length === 0 || target.ports.length === 0) {
+        return connection;
+      }
       const adaptations = detectStreamingAdaptations(source, target);
       return adaptations.length > 0 ? { ...connection, adaptations } : connection;
     }),

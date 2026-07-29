@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, expect, it } from 'vitest';
-import { platformDesignerTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclScriptArguments } from '../src/qsysScript';
+import { platformDesignerTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclScriptArguments, siblingQsysSearchPattern } from '../src/qsysScript';
 
 describe('qsysScriptArguments', () => {
   it.each([
@@ -57,5 +57,11 @@ describe('platformDesignerTemporaryPrefix', () => {
     expect(platformDesignerTemporaryPrefix('/work/quartus/video.tcl')).toBe(
       '/work/quartus/.qsys-view-video-',
     );
+  });
+});
+
+describe('siblingQsysSearchPattern', () => {
+  it('lets qsys-script resolve nested systems beside the parent design', () => {
+    expect(siblingQsysSearchPattern('/work/quartus')).toBe('/work/quartus/*.qsys');
   });
 });
