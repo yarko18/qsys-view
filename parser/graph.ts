@@ -58,6 +58,13 @@ export interface QsysModule {
   disabled: boolean;
   parameters: Record<string, string>;
   ports: QsysPort[];
+  subsystem?: QsysSubsystemReference;
+  hierarchyPath?: string[];
+}
+
+export interface QsysSubsystemReference {
+  resource: string;
+  format: 'qsys' | 'tcl';
 }
 
 export type QsysAdapterKind = 'timing' | 'data_format' | 'channel' | 'error';
@@ -93,4 +100,5 @@ export interface QsysGraph {
   metadata: QsysMetadataStatus;
   warnings: string[];
   diagnostics?: QsysDiagnostic[];
+  exportedInterfaces?: Record<string, string>;
 }

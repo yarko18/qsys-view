@@ -297,5 +297,10 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
     },
     warnings,
     diagnostics,
+    exportedInterfaces: Object.fromEntries(
+      [...declaredInterfaces]
+        .filter(([, declared]) => Boolean(declared.exportOf))
+        .map(([name, declared]) => [name, declared.exportOf!]),
+    ),
   };
 }

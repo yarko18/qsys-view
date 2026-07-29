@@ -77,6 +77,20 @@ function collectInterfaces(module: XmlNode): { ports: QsysPort[]; kinds: Map<str
   return { ports, kinds };
 }
 
+function collectExportedInterfaces(system: XmlNode): Record<string, string> {
+  const exportedInterfaces: Record<string, string> = {};
+  const interfaces = [
+    ...arrayOf(system.interface),
+    ...arrayOf((system.interfaces as XmlNode | undefined)?.interface),
+  ];
+  for (const iface of interfaces) {
+    const name = text(iface.name);
+    const internal = text(iface.internal);
+    if (name && internal) exportedInterfaces[name] = internal;
+  }
+  return exportedInterfaces;
+}
+
 function splitEndpoint(endpoint: string): [string, string] {
   const separator = endpoint.lastIndexOf('.');
   return separator < 0
@@ -192,5 +206,6 @@ export function parseQsys(xml: string, fallbackName = 'Qsys system'): QsysGraph 
       label: 'Exact interface metadata is not loaded. Run qsys-script from the viewer; values are never guessed.',
     },
     warnings,
+    exportedInterfaces: collectExportedInterfaces(system),
   };
 }

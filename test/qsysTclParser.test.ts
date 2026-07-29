@@ -58,6 +58,7 @@ describe('parseQsysTcl', () => {
       { id: 'tcl:source.out->stream_sink.in', kind: 'avalon_streaming', rawKind: 'avalon_streaming' },
       { id: 'status_link', kind: 'conduit', rawKind: 'conduit' },
     ]);
+    expect(graph.exportedInterfaces).toEqual({ stream_out: 'source.out' });
     expect(graph.warnings.join('\n')).not.toContain('add_interface');
   });
 

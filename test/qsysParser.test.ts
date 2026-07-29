@@ -38,6 +38,17 @@ describe('parseQsys', () => {
     expect(parseQsys('<system><module name="ip" kind="x" /></system>', 'demo').name).toBe('demo');
   });
 
+  it('keeps exported interface mappings for hierarchy expansion', () => {
+    const graph = parseQsys(`
+      <system name="child">
+        <interface name="din" internal="fifo.in" type="avalon_streaming" dir="end" />
+        <module name="fifo" kind="fifo" enabled="1" />
+      </system>
+    `);
+
+    expect(graph.exportedInterfaces).toEqual({ din: 'fifo.in' });
+  });
+
   it('rejects malformed XML without a usable graph', () => {
     expect(() => parseQsys('<system><module', 'broken')).toThrow('Invalid Qsys XML');
   });
