@@ -12,6 +12,9 @@ SPDX-License-Identifier: MIT
 - Reconnect parent connections through exported child interfaces for both Qsys and Tcl hierarchy sources.
 - Open a subsystem as a complete Qsys View from its details or by double-clicking the subsystem block.
 - Add sibling Qsys systems to the Quartus search path and suppress adapter guesses for unresolved interfaces, eliminating false `ready`/`valid` differences.
+- Analyze each expanded subsystem with Quartus when the parent has exact metadata, so nested Tcl pipelines retain their real interface types.
+- Preserve one clock/reset highlight domain across exported `clock_source` boundaries instead of duplicating it after expansion.
+- Draw expanded subsystems inside rounded dashed containers with an on-canvas collapse control.
 
 ## 1.0.5
 

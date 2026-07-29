@@ -52,7 +52,9 @@ Quartus analysis is user-triggered and runs on a disposable copy. It supplies ex
 
 ## Hierarchical systems
 
-When an IP type matches a sibling `.qsys` or `.tcl` file, its block has a **+** control. Expanding replaces only that instance with its internal graph and reconnects parent links through the child's exported interfaces. Use the `− instance_name` toolbar chip to collapse it again.
+When an IP type matches a sibling `.qsys` or `.tcl` file, its block has a **+** control. Expanding replaces only that instance with its internal graph, reconnects parent links through exported interfaces, and surrounds the child with a dashed container. Use the **−** control on that container or the toolbar chip to collapse it again.
+
+If the parent was read with **Read interfaces…**, expanded children are analyzed too. Nested Tcl connections therefore keep their exact interface types in Pipeline view, while exported clock and reset bridges remain part of the parent domain.
 
 Choose **Open subsystem** in the IP details, or double-click its block, to open the child as a complete Qsys View. Nested children remain collapsed and can be expanded independently.
 
@@ -63,7 +65,7 @@ Choose **Open subsystem** in the IP details, or double-click its block, to open 
 - **Disabled IP** includes disabled instances; off by default.
 - **Infer clk/reset** controls name inference; on by default.
 - **Errors/Warnings** appears when the static Tcl reader finds a problem; click an item to open its source line.
-- **+** expands a detected subsystem; **− instance_name** collapses it.
+- **+** expands a detected subsystem; **−** on its container or toolbar chip collapses it.
 - **Read interfaces…** requests exact Quartus metadata.
 - **Open in Platform Designer** opens or converts the system.
 - **Relayout** recalculates the active mode; **Fit** fits it to the viewport.
