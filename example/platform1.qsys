@@ -1,0 +1,1730 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Copyright 2026 Yaroslav Mariukha
+SPDX-License-Identifier: MIT
+-->
+<system name="$${FILENAME}">
+ <component
+   name="$${FILENAME}"
+   displayName="$${FILENAME}"
+   version="1.0"
+   description=""
+   tags=""
+   categories="System" />
+ <parameter name="bonusData"><![CDATA[bonusData 
+{
+   element clipper
+   {
+      datum _sortIndex
+      {
+         value = "9";
+         type = "int";
+      }
+   }
+   element clipper.control
+   {
+      datum baseAddress
+      {
+         value = "1573888";
+         type = "String";
+      }
+   }
+   element clk_memory
+   {
+      datum _sortIndex
+      {
+         value = "2";
+         type = "int";
+      }
+   }
+   element clk_mono_video
+   {
+      datum _sortIndex
+      {
+         value = "1";
+         type = "int";
+      }
+   }
+   element cvi_color
+   {
+      datum _sortIndex
+      {
+         value = "16";
+         type = "int";
+      }
+   }
+   element cvi_color.control
+   {
+      datum baseAddress
+      {
+         value = "1573632";
+         type = "String";
+      }
+   }
+   element cvi_mono
+   {
+      datum _sortIndex
+      {
+         value = "3";
+         type = "int";
+      }
+   }
+   element cvi_mono.control
+   {
+      datum baseAddress
+      {
+         value = "1573760";
+         type = "String";
+      }
+   }
+   element cvo
+   {
+      datum _sortIndex
+      {
+         value = "25";
+         type = "int";
+      }
+   }
+   element fir
+   {
+      datum _sortIndex
+      {
+         value = "7";
+         type = "int";
+      }
+   }
+   element frame_buffer_color
+   {
+      datum _sortIndex
+      {
+         value = "18";
+         type = "int";
+      }
+   }
+   element frame_buffer_mono
+   {
+      datum _sortIndex
+      {
+         value = "10";
+         type = "int";
+      }
+   }
+   element gamma
+   {
+      datum _sortIndex
+      {
+         value = "14";
+         type = "int";
+      }
+   }
+   element gamma.control
+   {
+      datum baseAddress
+      {
+         value = "1048576";
+         type = "String";
+      }
+   }
+   element interlacer
+   {
+      datum _sortIndex
+      {
+         value = "23";
+         type = "int";
+      }
+   }
+   element mixer
+   {
+      datum _sortIndex
+      {
+         value = "20";
+         type = "int";
+      }
+   }
+   element mixer.control
+   {
+      datum baseAddress
+      {
+         value = "1572864";
+         type = "String";
+      }
+   }
+   element mm_bridge
+   {
+      datum _sortIndex
+      {
+         value = "0";
+         type = "int";
+      }
+   }
+   element monitor_0
+   {
+      datum _sortIndex
+      {
+         value = "6";
+         type = "int";
+      }
+   }
+   element monitor_0.control
+   {
+      datum baseAddress
+      {
+         value = "0";
+         type = "String";
+      }
+   }
+   element monitor_1
+   {
+      datum _sortIndex
+      {
+         value = "11";
+         type = "int";
+      }
+   }
+   element monitor_1.control
+   {
+      datum baseAddress
+      {
+         value = "0";
+         type = "String";
+      }
+   }
+   element monitor_2
+   {
+      datum _sortIndex
+      {
+         value = "17";
+         type = "int";
+      }
+   }
+   element monitor_2.control
+   {
+      datum baseAddress
+      {
+         value = "0";
+         type = "String";
+      }
+   }
+   element monitor_3
+   {
+      datum _sortIndex
+      {
+         value = "19";
+         type = "int";
+      }
+   }
+   element monitor_3.control
+   {
+      datum baseAddress
+      {
+         value = "0";
+         type = "String";
+      }
+   }
+   element monitor_4
+   {
+      datum _sortIndex
+      {
+         value = "24";
+         type = "int";
+      }
+   }
+   element monitor_4.control
+   {
+      datum baseAddress
+      {
+         value = "0";
+         type = "String";
+      }
+   }
+   element mono_to_gray
+   {
+      datum _sortIndex
+      {
+         value = "15";
+         type = "int";
+      }
+   }
+   element platform2_0
+   {
+      datum _sortIndex
+      {
+         value = "8";
+         type = "int";
+      }
+   }
+   element platform2_0.mm_bridge_s
+   {
+      datum baseAddress
+      {
+         value = "0";
+         type = "String";
+      }
+   }
+   element rgb_to_ycbcr
+   {
+      datum _sortIndex
+      {
+         value = "21";
+         type = "int";
+      }
+   }
+   element sc_fifo_0
+   {
+      datum _sortIndex
+      {
+         value = "4";
+         type = "int";
+      }
+   }
+   element scaler
+   {
+      datum _sortIndex
+      {
+         value = "13";
+         type = "int";
+      }
+   }
+   element switch_0
+   {
+      datum _sortIndex
+      {
+         value = "5";
+         type = "int";
+      }
+   }
+   element switch_0.control
+   {
+      datum baseAddress
+      {
+         value = "1573504";
+         type = "String";
+      }
+   }
+   element switch_1
+   {
+      datum _sortIndex
+      {
+         value = "12";
+         type = "int";
+      }
+   }
+   element switch_1.control
+   {
+      datum baseAddress
+      {
+         value = "1573376";
+         type = "String";
+      }
+   }
+   element trace_system
+   {
+      datum _sortIndex
+      {
+         value = "26";
+         type = "int";
+      }
+   }
+   element ycbcr444_to_422
+   {
+      datum _sortIndex
+      {
+         value = "22";
+         type = "int";
+      }
+   }
+}
+]]></parameter>
+ <parameter name="clockCrossingAdapter" value="HANDSHAKE" />
+ <parameter name="device" value="5CGXFC3B6F23C6" />
+ <parameter name="deviceFamily" value="Cyclone V" />
+ <parameter name="deviceSpeedGrade" value="6_H6" />
+ <parameter name="fabricMode" value="QSYS" />
+ <parameter name="generateLegacySim" value="false" />
+ <parameter name="generationId" value="0" />
+ <parameter name="globalResetBus" value="false" />
+ <parameter name="hdlLanguage" value="VERILOG" />
+ <parameter name="hideFromIPCatalog" value="false" />
+ <parameter name="lockedInterfaceDefinition" value="" />
+ <parameter name="maxAdditionalLatency" value="1" />
+ <parameter name="projectName" value="" />
+ <parameter name="sopcBorderPoints" value="false" />
+ <parameter name="systemHash" value="0" />
+ <parameter name="testBenchDutName" value="" />
+ <parameter name="timeStamp" value="0" />
+ <parameter name="useTestBenchNamingPattern" value="false" />
+ <instanceScript></instanceScript>
+ <interface name="clk_memory" internal="clk_memory.clk_in" type="clock" dir="end" />
+ <interface
+   name="clk_mono_video"
+   internal="clk_mono_video.clk_in"
+   type="clock"
+   dir="end" />
+ <interface
+   name="cvi_color_clocked_video"
+   internal="cvi_color.clocked_video"
+   type="conduit"
+   dir="end" />
+ <interface
+   name="cvi_color_status_update_irq"
+   internal="cvi_color.status_update_irq"
+   type="interrupt"
+   dir="end" />
+ <interface
+   name="cvi_mono_clocked_video"
+   internal="cvi_mono.clocked_video"
+   type="conduit"
+   dir="end" />
+ <interface
+   name="cvi_mono_status_update_irq"
+   internal="cvi_mono.status_update_irq"
+   type="interrupt"
+   dir="end" />
+ <interface
+   name="cvo_clocked_video"
+   internal="cvo.clocked_video"
+   type="conduit"
+   dir="end" />
+ <interface
+   name="frame_buffer_color_mem_master_rd"
+   internal="frame_buffer_color.mem_master_rd"
+   type="avalon"
+   dir="start" />
+ <interface
+   name="frame_buffer_color_mem_master_wr"
+   internal="frame_buffer_color.mem_master_wr"
+   type="avalon"
+   dir="start" />
+ <interface
+   name="frame_buffer_mono_mem_master_rd"
+   internal="frame_buffer_mono.mem_master_rd"
+   type="avalon"
+   dir="start" />
+ <interface
+   name="frame_buffer_mono_mem_master_wr"
+   internal="frame_buffer_mono.mem_master_wr"
+   type="avalon"
+   dir="start" />
+ <interface name="mm_bridge_s" internal="mm_bridge.s0" type="avalon" dir="end" />
+ <interface
+   name="platform2_0_frame_buffer_mono_mem_master_rd"
+   internal="platform2_0.frame_buffer_mono_mem_master_rd"
+   type="avalon"
+   dir="start" />
+ <interface
+   name="platform2_0_frame_buffer_mono_mem_master_wr"
+   internal="platform2_0.frame_buffer_mono_mem_master_wr"
+   type="avalon"
+   dir="start" />
+ <interface
+   name="reset_memory"
+   internal="clk_memory.clk_in_reset"
+   type="reset"
+   dir="end" />
+ <interface
+   name="reset_mono_video"
+   internal="clk_mono_video.clk_in_reset"
+   type="reset"
+   dir="end" />
+ <interface
+   name="switch_0_interrupt"
+   internal="switch_0.interrupt"
+   type="interrupt"
+   dir="end" />
+ <interface
+   name="switch_1_interrupt"
+   internal="switch_1.interrupt"
+   type="interrupt"
+   dir="end" />
+ <module name="clipper" kind="alt_vip_cl_clp" version="23.1" enabled="1">
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="BITS_PER_SYMBOL" value="16" />
+  <parameter name="BOTTOM_OFFSET" value="0" />
+  <parameter name="CLIPPING_METHOD" value="OFFSETS" />
+  <parameter name="COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="EXTRA_PIPELINING" value="0" />
+  <parameter name="FAMILY" value="Cyclone V" />
+  <parameter name="LEFT_OFFSET" value="0" />
+  <parameter name="LIMITED_READBACK" value="0" />
+  <parameter name="MAX_IN_HEIGHT" value="720" />
+  <parameter name="MAX_IN_WIDTH" value="1280" />
+  <parameter name="NUMBER_OF_COLOR_PLANES" value="1" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="RECTANGLE_HEIGHT" value="32" />
+  <parameter name="RECTANGLE_WIDTH" value="32" />
+  <parameter name="RIGHT_OFFSET" value="0" />
+  <parameter name="RUNTIME_CONTROL" value="1" />
+  <parameter name="TOP_OFFSET" value="0" />
+  <parameter name="USER_PACKET_FIFO_DEPTH" value="0" />
+  <parameter name="USER_PACKET_SUPPORT" value="PASSTHROUGH" />
+ </module>
+ <module name="clk_memory" kind="clock_source" version="23.1" enabled="1">
+  <parameter name="clockFrequency" value="100000000" />
+  <parameter name="clockFrequencyKnown" value="true" />
+  <parameter name="inputClockFrequency" value="0" />
+  <parameter name="resetSynchronousEdges" value="DEASSERT" />
+ </module>
+ <module name="clk_mono_video" kind="clock_source" version="23.1" enabled="1">
+  <parameter name="clockFrequency" value="50000000" />
+  <parameter name="clockFrequencyKnown" value="true" />
+  <parameter name="inputClockFrequency" value="0" />
+  <parameter name="resetSynchronousEdges" value="DEASSERT" />
+ </module>
+ <module name="cvi_color" kind="alt_vip_cl_cvi" version="23.1" enabled="1">
+  <parameter name="ACCEPT_COLOURS_IN_SEQ" value="0" />
+  <parameter name="ANC_DEPTH" value="1" />
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Cyclone V" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="BPS" value="8" />
+  <parameter name="CLOCKS_ARE_SAME" value="0" />
+  <parameter name="COLOUR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="EXTRACT_TOTAL_RESOLUTION" value="1" />
+  <parameter name="FIFO_DEPTH" value="2048" />
+  <parameter name="GENERATE_ANC" value="0" />
+  <parameter name="GENERATE_VID_F" value="0" />
+  <parameter name="H_ACTIVE_PIXELS_F0" value="1920" />
+  <parameter name="INTERLACED" value="0" />
+  <parameter name="MATCH_CTRLDATA_PKT_CLIP_BASIC" value="0" />
+  <parameter name="MATCH_CTRLDATA_PKT_PAD_ADV" value="0" />
+  <parameter name="NO_OF_CHANNELS" value="1" />
+  <parameter name="NUMBER_OF_COLOUR_PLANES" value="3" />
+  <parameter name="OVERFLOW_HANDLING" value="1" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="STD_WIDTH" value="1" />
+  <parameter name="SYNC_TO" value="0" />
+  <parameter name="USE_CONTROL" value="1" />
+  <parameter name="USE_EMBEDDED_SYNCS" value="0" />
+  <parameter name="USE_HDMI_DEPRICATION" value="0" />
+  <parameter name="USE_STD" value="0" />
+  <parameter name="V_ACTIVE_LINES_F0" value="1080" />
+  <parameter name="V_ACTIVE_LINES_F1" value="480" />
+ </module>
+ <module name="cvi_mono" kind="alt_vip_cl_cvi" version="23.1" enabled="1">
+  <parameter name="ACCEPT_COLOURS_IN_SEQ" value="0" />
+  <parameter name="ANC_DEPTH" value="1" />
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Cyclone V" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="BPS" value="16" />
+  <parameter name="CLOCKS_ARE_SAME" value="1" />
+  <parameter name="COLOUR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="EXTRACT_TOTAL_RESOLUTION" value="1" />
+  <parameter name="FIFO_DEPTH" value="2048" />
+  <parameter name="GENERATE_ANC" value="0" />
+  <parameter name="GENERATE_VID_F" value="0" />
+  <parameter name="H_ACTIVE_PIXELS_F0" value="1280" />
+  <parameter name="INTERLACED" value="0" />
+  <parameter name="MATCH_CTRLDATA_PKT_CLIP_BASIC" value="0" />
+  <parameter name="MATCH_CTRLDATA_PKT_PAD_ADV" value="0" />
+  <parameter name="NO_OF_CHANNELS" value="1" />
+  <parameter name="NUMBER_OF_COLOUR_PLANES" value="1" />
+  <parameter name="OVERFLOW_HANDLING" value="1" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="STD_WIDTH" value="1" />
+  <parameter name="SYNC_TO" value="0" />
+  <parameter name="USE_CONTROL" value="1" />
+  <parameter name="USE_EMBEDDED_SYNCS" value="0" />
+  <parameter name="USE_HDMI_DEPRICATION" value="0" />
+  <parameter name="USE_STD" value="0" />
+  <parameter name="V_ACTIVE_LINES_F0" value="720" />
+  <parameter name="V_ACTIVE_LINES_F1" value="480" />
+ </module>
+ <module name="cvo" kind="alt_vip_cl_cvo" version="23.1" enabled="1">
+  <parameter name="ACCEPT_COLOURS_IN_SEQ" value="0" />
+  <parameter name="ACCEPT_SYNC" value="0" />
+  <parameter name="ANC_LINE" value="9" />
+  <parameter name="AP_LINE" value="21" />
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Cyclone V" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="BPS" value="8" />
+  <parameter name="CLOCKS_ARE_SAME" value="0" />
+  <parameter name="COLOUR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="CONTEXT_WIDTH" value="8" />
+  <parameter name="COUNT_STEP_IS_PIP_VALUE" value="0" />
+  <parameter name="DST_WIDTH" value="8" />
+  <parameter name="FIELD0_ANC_LINE" value="571" />
+  <parameter name="FIELD0_V_BACK_PORCH" value="0" />
+  <parameter name="FIELD0_V_BLANK" value="23" />
+  <parameter name="FIELD0_V_FRONT_PORCH" value="0" />
+  <parameter name="FIELD0_V_RISING_EDGE" value="561" />
+  <parameter name="FIELD0_V_SYNC_LENGTH" value="0" />
+  <parameter name="FIFO_DEPTH" value="1920" />
+  <parameter name="F_FALLING_EDGE" value="1" />
+  <parameter name="F_RISING_EDGE" value="564" />
+  <parameter name="GENERATE_SYNC" value="0" />
+  <parameter name="H_ACTIVE_PIXELS" value="1920" />
+  <parameter name="H_BACK_PORCH" value="0" />
+  <parameter name="H_BLANK" value="280" />
+  <parameter name="H_FRONT_PORCH" value="0" />
+  <parameter name="H_SYNC_LENGTH" value="0" />
+  <parameter name="INTERLACED" value="1" />
+  <parameter name="LOW_LATENCY" value="0" />
+  <parameter name="NO_OF_CHANNELS" value="1" />
+  <parameter name="NO_OF_MODES" value="1" />
+  <parameter name="NUMBER_OF_COLOUR_PLANES" value="2" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="SRC_WIDTH" value="8" />
+  <parameter name="STD_WIDTH" value="1" />
+  <parameter name="TASK_WIDTH" value="8" />
+  <parameter name="THRESHOLD" value="1919" />
+  <parameter name="USE_CONTROL" value="0" />
+  <parameter name="USE_EMBEDDED_SYNCS" value="1" />
+  <parameter name="V_ACTIVE_LINES" value="1080" />
+  <parameter name="V_BACK_PORCH" value="0" />
+  <parameter name="V_BLANK" value="22" />
+  <parameter name="V_FRONT_PORCH" value="0" />
+  <parameter name="V_SYNC_LENGTH" value="0" />
+ </module>
+ <module name="fir" kind="alt_vip_cl_2dfir" version="23.1" enabled="1">
+  <parameter name="ALGORITHM_NAME">EDGE_ADAPTIVE_SHARPEN</parameter>
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="BITS_PER_SYMBOL_IN" value="16" />
+  <parameter name="BITS_PER_SYMBOL_OUT" value="8" />
+  <parameter name="COEFF_FRACTION_BITS" value="7" />
+  <parameter name="COEFF_INTEGER_BITS" value="1" />
+  <parameter name="COEFF_SIGNED" value="1" />
+  <parameter name="COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="DEFAULT_LOWER_BLUR" value="0" />
+  <parameter name="DEFAULT_UPPER_BLUR" value="15" />
+  <parameter name="DIAG_SYMMETRIC" value="0" />
+  <parameter name="DO_MIRRORING" value="1" />
+  <parameter name="ENABLE_WIDE_BLUR_SHARPEN" value="1" />
+  <parameter name="EXTRA_PIPELINING" value="0" />
+  <parameter name="FAMILY" value="Cyclone V" />
+  <parameter name="FIXED_COEFF_FILE"><![CDATA[<enter file name (including full path)>]]></parameter>
+  <parameter name="H_SYMMETRIC" value="0" />
+  <parameter name="H_TAPS" value="8" />
+  <parameter name="INPUT_GUARD_BANDS_ENABLE" value="0" />
+  <parameter name="INPUT_GUARD_BAND_LOWER" value="0" />
+  <parameter name="INPUT_GUARD_BAND_UPPER" value="255" />
+  <parameter name="IS_422" value="0" />
+  <parameter name="LIMITED_READBACK" value="0" />
+  <parameter name="MAX_HEIGHT" value="720" />
+  <parameter name="MAX_WIDTH" value="1280" />
+  <parameter name="MOVE_BINARY_POINT_RIGHT" value="0" />
+  <parameter name="NO_BLANKING" value="0" />
+  <parameter name="NUMBER_OF_COLOR_PLANES" value="1" />
+  <parameter name="OUTPUT_GUARD_BANDS_ENABLE" value="0" />
+  <parameter name="OUTPUT_GUARD_BAND_LOWER" value="0" />
+  <parameter name="OUTPUT_GUARD_BAND_UPPER" value="255" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="ROUNDING_METHOD" value="ROUND_HALF_UP" />
+  <parameter name="RUNTIME_CONTROL" value="0" />
+  <parameter name="USER_PACKET_SUPPORT" value="PASSTHROUGH" />
+  <parameter name="V_SYMMETRIC" value="0" />
+  <parameter name="V_TAPS" value="8" />
+ </module>
+ <module
+   name="frame_buffer_color"
+   kind="alt_vip_cl_vfb"
+   version="23.1"
+   enabled="1">
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="BITS_PER_SYMBOL" value="8" />
+  <parameter name="BURST_ALIGNMENT" value="1" />
+  <parameter name="CLOCKS_ARE_SEPARATE" value="1" />
+  <parameter name="COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="CONTROLLED_DROP_REPEAT" value="0" />
+  <parameter name="DROP_FRAMES" value="1" />
+  <parameter name="DROP_INVALID_FIELDS" value="0" />
+  <parameter name="DROP_REPEAT_USER" value="0" />
+  <parameter name="FAMILY" value="Cyclone V" />
+  <parameter name="INTERLACED_SUPPORT" value="0" />
+  <parameter name="IS_FRAME_READER" value="0" />
+  <parameter name="IS_FRAME_WRITER" value="0" />
+  <parameter name="IS_SYNC_MASTER" value="0" />
+  <parameter name="IS_SYNC_SLAVE" value="0" />
+  <parameter name="LINE_BASED_BUFFERING" value="0" />
+  <parameter name="MAX_HEIGHT" value="1080" />
+  <parameter name="MAX_SYMBOLS_PER_PACKET" value="10" />
+  <parameter name="MAX_WIDTH" value="1920" />
+  <parameter name="MEM_BASE_ADDR" value="0" />
+  <parameter name="MEM_BUFFER_OFFSET" value="16777216" />
+  <parameter name="MEM_PORT_WIDTH" value="256" />
+  <parameter name="MULTI_FRAME_DELAY" value="1" />
+  <parameter name="NUMBER_OF_COLOR_PLANES" value="3" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="PRIORITIZE_FMAX" value="0" />
+  <parameter name="READER_RUNTIME_CONTROL" value="0" />
+  <parameter name="READY_LATENCY" value="1" />
+  <parameter name="READ_BURST_TARGET" value="32" />
+  <parameter name="READ_FIFO_DEPTH" value="64" />
+  <parameter name="REPEAT_FRAMES" value="1" />
+  <parameter name="TEST_INIT" value="0" />
+  <parameter name="USER_PACKETS_MAX_STORAGE" value="0" />
+  <parameter name="USE_BUFFER_OFFSET" value="0" />
+  <parameter name="WRITER_RUNTIME_CONTROL" value="0" />
+  <parameter name="WRITE_BURST_TARGET" value="32" />
+  <parameter name="WRITE_FIFO_DEPTH" value="64" />
+ </module>
+ <module
+   name="frame_buffer_mono"
+   kind="alt_vip_cl_vfb"
+   version="23.1"
+   enabled="1">
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="BITS_PER_SYMBOL" value="16" />
+  <parameter name="BURST_ALIGNMENT" value="1" />
+  <parameter name="CLOCKS_ARE_SEPARATE" value="1" />
+  <parameter name="COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="CONTROLLED_DROP_REPEAT" value="0" />
+  <parameter name="DROP_FRAMES" value="1" />
+  <parameter name="DROP_INVALID_FIELDS" value="0" />
+  <parameter name="DROP_REPEAT_USER" value="0" />
+  <parameter name="FAMILY" value="Cyclone V" />
+  <parameter name="INTERLACED_SUPPORT" value="0" />
+  <parameter name="IS_FRAME_READER" value="0" />
+  <parameter name="IS_FRAME_WRITER" value="0" />
+  <parameter name="IS_SYNC_MASTER" value="0" />
+  <parameter name="IS_SYNC_SLAVE" value="0" />
+  <parameter name="LINE_BASED_BUFFERING" value="0" />
+  <parameter name="MAX_HEIGHT" value="720" />
+  <parameter name="MAX_SYMBOLS_PER_PACKET" value="10" />
+  <parameter name="MAX_WIDTH" value="1280" />
+  <parameter name="MEM_BASE_ADDR" value="0" />
+  <parameter name="MEM_BUFFER_OFFSET" value="16777216" />
+  <parameter name="MEM_PORT_WIDTH" value="256" />
+  <parameter name="MULTI_FRAME_DELAY" value="1" />
+  <parameter name="NUMBER_OF_COLOR_PLANES" value="1" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="PRIORITIZE_FMAX" value="0" />
+  <parameter name="READER_RUNTIME_CONTROL" value="0" />
+  <parameter name="READY_LATENCY" value="1" />
+  <parameter name="READ_BURST_TARGET" value="32" />
+  <parameter name="READ_FIFO_DEPTH" value="64" />
+  <parameter name="REPEAT_FRAMES" value="1" />
+  <parameter name="TEST_INIT" value="0" />
+  <parameter name="USER_PACKETS_MAX_STORAGE" value="0" />
+  <parameter name="USE_BUFFER_OFFSET" value="0" />
+  <parameter name="WRITER_RUNTIME_CONTROL" value="0" />
+  <parameter name="WRITE_BURST_TARGET" value="32" />
+  <parameter name="WRITE_FIFO_DEPTH" value="64" />
+ </module>
+ <module
+   name="gamma"
+   kind="alt_vip_cl_gamma_corrector"
+   version="23.1"
+   enabled="1">
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Cyclone V" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="CONVERSION_MODE" value="LSB" />
+  <parameter name="ENABLE_TWO_BANKS" value="0" />
+  <parameter name="EXTRA_PIPELINING" value="0" />
+  <parameter name="INPUT_BITS_PER_SYMBOL" value="16" />
+  <parameter name="LIMITED_READBACK" value="0" />
+  <parameter name="NUMBER_OF_COLOR_PLANES" value="1" />
+  <parameter name="OUTPUT_BITS_PER_SYMBOL" value="8" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="RUNTIME_CONTROL" value="1" />
+  <parameter name="USER_PACKET_FIFO_DEPTH" value="0" />
+  <parameter name="USER_PACKET_SUPPORT" value="PASSTHROUGH" />
+ </module>
+ <module
+   name="interlacer"
+   kind="alt_vip_cl_interlacer"
+   version="23.1"
+   enabled="1">
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Cyclone V" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="BITS_PER_SYMBOL" value="8" />
+  <parameter name="COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="CTRL_OVERRIDE" value="1" />
+  <parameter name="EXTRA_PIPELINING" value="0" />
+  <parameter name="INTERLACE_PASSTHROUGH" value="1" />
+  <parameter name="LIMITED_READBACK" value="0" />
+  <parameter name="MAX_HEIGHT" value="1080" />
+  <parameter name="MAX_WIDTH" value="1920" />
+  <parameter name="NUMBER_OF_COLOR_PLANES" value="2" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="RUNTIME_CONTROL" value="0" />
+  <parameter name="SEND_F1_FIRST" value="1" />
+ </module>
+ <module name="mixer" kind="alt_vip_cl_mixer" version="23.1" enabled="1">
+  <parameter name="ALPHA_ENABLE" value="0" />
+  <parameter name="ALPHA_STREAM_ENABLE0" value="0" />
+  <parameter name="ALPHA_STREAM_ENABLE1" value="0" />
+  <parameter name="ALPHA_STREAM_ENABLE10" value="0" />
+  <parameter name="ALPHA_STREAM_ENABLE11" value="0" />
+  <parameter name="ALPHA_STREAM_ENABLE12" value="0" />
+  <parameter name="ALPHA_STREAM_ENABLE13" value="0" />
+  <parameter name="ALPHA_STREAM_ENABLE14" value="0" />
+  <parameter name="ALPHA_STREAM_ENABLE15" value="0" />
+  <parameter name="ALPHA_STREAM_ENABLE16" value="0" />
+  <parameter name="ALPHA_STREAM_ENABLE17" value="0" />
+  <parameter name="ALPHA_STREAM_ENABLE18" value="0" />
+  <parameter name="ALPHA_STREAM_ENABLE19" value="0" />
+  <parameter name="ALPHA_STREAM_ENABLE2" value="0" />
+  <parameter name="ALPHA_STREAM_ENABLE3" value="0" />
+  <parameter name="ALPHA_STREAM_ENABLE4" value="0" />
+  <parameter name="ALPHA_STREAM_ENABLE5" value="0" />
+  <parameter name="ALPHA_STREAM_ENABLE6" value="0" />
+  <parameter name="ALPHA_STREAM_ENABLE7" value="0" />
+  <parameter name="ALPHA_STREAM_ENABLE8" value="0" />
+  <parameter name="ALPHA_STREAM_ENABLE9" value="0" />
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="BITS_PER_SYMBOL" value="8" />
+  <parameter name="COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="COLOR_SPACE" value="RGB" />
+  <parameter name="DATA_PIPELINE_STAGES" value="0" />
+  <parameter name="FAMILY" value="Cyclone V" />
+  <parameter name="IS_422" value="1" />
+  <parameter name="LAYER_POSITION_ENABLE" value="0" />
+  <parameter name="LIMITED_READBACK" value="0" />
+  <parameter name="LOW_LATENCY_MODE" value="0" />
+  <parameter name="MAX_HEIGHT" value="1080" />
+  <parameter name="MAX_WIDTH" value="1920" />
+  <parameter name="NO_OF_INPUTS" value="2" />
+  <parameter name="NUMBER_OF_COLOR_PLANES" value="2" />
+  <parameter name="PATTERN" value="colorbars" />
+  <parameter name="PIPELINE_READY" value="0" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="UNIFORM_VALUE_BCR" value="0" />
+  <parameter name="UNIFORM_VALUE_GCB" value="0" />
+  <parameter name="UNIFORM_VALUE_RY" value="0" />
+  <parameter name="USER_PACKET_FIFO_DEPTH" value="0" />
+  <parameter name="USER_PACKET_SUPPORT" value="DISCARD" />
+ </module>
+ <module
+   name="mm_bridge"
+   kind="altera_avalon_mm_bridge"
+   version="23.1"
+   enabled="1">
+  <parameter name="ADDRESS_UNITS" value="WORDS" />
+  <parameter name="ADDRESS_WIDTH" value="10" />
+  <parameter name="DATA_WIDTH" value="32" />
+  <parameter name="LINEWRAPBURSTS" value="0" />
+  <parameter name="MAX_BURST_SIZE" value="1" />
+  <parameter name="MAX_PENDING_RESPONSES" value="4" />
+  <parameter name="PIPELINE_COMMAND" value="1" />
+  <parameter name="PIPELINE_RESPONSE" value="1" />
+  <parameter name="SYMBOL_WIDTH" value="8" />
+  <parameter name="SYSINFO_ADDR_WIDTH" value="21" />
+  <parameter name="USE_AUTO_ADDRESS_WIDTH" value="1" />
+  <parameter name="USE_RESPONSE" value="0" />
+ </module>
+ <module
+   name="monitor_0"
+   kind="alt_vip_avst_video_monitor"
+   version="23.1"
+   enabled="1">
+  <parameter name="AUTO_CLOCK_CLOCK_DOMAIN" value="2" />
+  <parameter name="AUTO_CLOCK_CLOCK_RATE" value="50000000" />
+  <parameter name="AUTO_CLOCK_RESET_DOMAIN" value="2" />
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Cyclone V" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="BPS" value="16" />
+  <parameter name="BUFFER_DEPTH" value="256" />
+  <parameter name="CAPTURE_SYM_WIDTH" value="32" />
+  <parameter name="COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="NUMBER_OF_COLOR_PLANES" value="1" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="THUMBNAIL_SUPPORT" value="0" />
+ </module>
+ <module
+   name="monitor_1"
+   kind="alt_vip_avst_video_monitor"
+   version="23.1"
+   enabled="1">
+  <parameter name="AUTO_CLOCK_CLOCK_DOMAIN" value="2" />
+  <parameter name="AUTO_CLOCK_CLOCK_RATE" value="50000000" />
+  <parameter name="AUTO_CLOCK_RESET_DOMAIN" value="2" />
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Cyclone V" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="BPS" value="16" />
+  <parameter name="BUFFER_DEPTH" value="256" />
+  <parameter name="CAPTURE_SYM_WIDTH" value="32" />
+  <parameter name="COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="NUMBER_OF_COLOR_PLANES" value="1" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="THUMBNAIL_SUPPORT" value="0" />
+ </module>
+ <module
+   name="monitor_2"
+   kind="alt_vip_avst_video_monitor"
+   version="23.1"
+   enabled="1">
+  <parameter name="AUTO_CLOCK_CLOCK_DOMAIN" value="2" />
+  <parameter name="AUTO_CLOCK_CLOCK_RATE" value="50000000" />
+  <parameter name="AUTO_CLOCK_RESET_DOMAIN" value="2" />
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Cyclone V" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="BPS" value="8" />
+  <parameter name="BUFFER_DEPTH" value="256" />
+  <parameter name="CAPTURE_SYM_WIDTH" value="32" />
+  <parameter name="COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="NUMBER_OF_COLOR_PLANES" value="3" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="THUMBNAIL_SUPPORT" value="0" />
+ </module>
+ <module
+   name="monitor_3"
+   kind="alt_vip_avst_video_monitor"
+   version="23.1"
+   enabled="1">
+  <parameter name="AUTO_CLOCK_CLOCK_DOMAIN" value="2" />
+  <parameter name="AUTO_CLOCK_CLOCK_RATE" value="50000000" />
+  <parameter name="AUTO_CLOCK_RESET_DOMAIN" value="2" />
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Cyclone V" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="BPS" value="8" />
+  <parameter name="BUFFER_DEPTH" value="256" />
+  <parameter name="CAPTURE_SYM_WIDTH" value="32" />
+  <parameter name="COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="NUMBER_OF_COLOR_PLANES" value="3" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="THUMBNAIL_SUPPORT" value="0" />
+ </module>
+ <module
+   name="monitor_4"
+   kind="alt_vip_avst_video_monitor"
+   version="23.1"
+   enabled="1">
+  <parameter name="AUTO_CLOCK_CLOCK_DOMAIN" value="2" />
+  <parameter name="AUTO_CLOCK_CLOCK_RATE" value="50000000" />
+  <parameter name="AUTO_CLOCK_RESET_DOMAIN" value="2" />
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Cyclone V" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="BPS" value="8" />
+  <parameter name="BUFFER_DEPTH" value="256" />
+  <parameter name="CAPTURE_SYM_WIDTH" value="32" />
+  <parameter name="COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="NUMBER_OF_COLOR_PLANES" value="2" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="THUMBNAIL_SUPPORT" value="0" />
+ </module>
+ <module name="mono_to_gray" kind="alt_vip_cl_cps" version="23.1" enabled="1">
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Cyclone V" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="BITS_PER_SYMBOL" value="8" />
+  <parameter name="EXTRA_PIPELINING" value="0" />
+  <parameter name="INPUT_0_COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="INPUT_0_FIFO" value="0" />
+  <parameter name="INPUT_0_FIFO_SIZE" value="8" />
+  <parameter name="INPUT_0_NUMBER_OF_COLOR_PLANES" value="1" />
+  <parameter name="INPUT_0_PATTERN" value="C0" />
+  <parameter name="INPUT_0_PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="INPUT_0_TWO_PIXELS_PATTERN" value="0" />
+  <parameter name="INPUT_1_COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="INPUT_1_FIFO" value="0" />
+  <parameter name="INPUT_1_FIFO_SIZE" value="8" />
+  <parameter name="INPUT_1_NUMBER_OF_COLOR_PLANES" value="3" />
+  <parameter name="INPUT_1_PATTERN" value="C0,C1,C2" />
+  <parameter name="INPUT_1_PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="INPUT_1_TWO_PIXELS_PATTERN" value="0" />
+  <parameter name="INPUT_VALIDATION" value="1" />
+  <parameter name="NUMBER_OF_INPUTS" value="1" />
+  <parameter name="NUMBER_OF_OUTPUTS" value="1" />
+  <parameter name="OUTPUT_0_COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="OUTPUT_0_FIFO" value="0" />
+  <parameter name="OUTPUT_0_FIFO_SIZE" value="8" />
+  <parameter name="OUTPUT_0_NUMBER_OF_COLOR_PLANES" value="3" />
+  <parameter name="OUTPUT_0_PATTERN" value="C0,C0,C0" />
+  <parameter name="OUTPUT_0_PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="OUTPUT_0_TWO_PIXELS_PATTERN" value="0" />
+  <parameter name="OUTPUT_1_COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="OUTPUT_1_FIFO" value="0" />
+  <parameter name="OUTPUT_1_FIFO_SIZE" value="8" />
+  <parameter name="OUTPUT_1_NUMBER_OF_COLOR_PLANES" value="3" />
+  <parameter name="OUTPUT_1_PATTERN" value="C0,C1,C2" />
+  <parameter name="OUTPUT_1_PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="OUTPUT_1_TWO_PIXELS_PATTERN" value="0" />
+  <parameter name="OUTPUT_VALIDATION" value="1" />
+  <parameter name="USER_PACKET_SUPPORT" value="PASSTHROUGH" />
+  <parameter name="USER_PKT_0_TO_0" value="1" />
+  <parameter name="USER_PKT_0_TO_1" value="0" />
+  <parameter name="USER_PKT_1_TO_0" value="0" />
+  <parameter name="USER_PKT_1_TO_1" value="1" />
+ </module>
+ <module name="platform2_0" kind="platform2" version="1.0" enabled="1">
+  <parameter name="AUTO_CLK_MEMORY_CLOCK_DOMAIN" value="1" />
+  <parameter name="AUTO_CLK_MEMORY_CLOCK_RATE" value="100000000" />
+  <parameter name="AUTO_CLK_MEMORY_RESET_DOMAIN" value="1" />
+  <parameter name="AUTO_CLK_MONO_VIDEO_CLOCK_DOMAIN" value="2" />
+  <parameter name="AUTO_CLK_MONO_VIDEO_CLOCK_RATE" value="50000000" />
+  <parameter name="AUTO_CLK_MONO_VIDEO_RESET_DOMAIN" value="2" />
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Cyclone V" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="AUTO_FRAME_BUFFER_MONO_MEM_MASTER_RD_ADDRESS_MAP" value="" />
+  <parameter
+     name="AUTO_FRAME_BUFFER_MONO_MEM_MASTER_RD_ADDRESS_WIDTH"
+     value="AddressWidth = -1" />
+  <parameter name="AUTO_FRAME_BUFFER_MONO_MEM_MASTER_WR_ADDRESS_MAP" value="" />
+  <parameter
+     name="AUTO_FRAME_BUFFER_MONO_MEM_MASTER_WR_ADDRESS_WIDTH"
+     value="AddressWidth = -1" />
+  <parameter name="AUTO_GENERATION_ID" value="0" />
+  <parameter name="AUTO_UNIQUE_ID">$${FILENAME}_platform2_0</parameter>
+ </module>
+ <module name="rgb_to_ycbcr" kind="alt_vip_cl_csc" version="23.1" enabled="1">
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="COEFFICIENT_INT_BITS" value="0" />
+  <parameter name="COEFFICIENT_SIGNED" value="1" />
+  <parameter name="COEF_SUM_FRACTION_BITS" value="8" />
+  <parameter name="COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="CONVERSION_MODE" value="LSB" />
+  <parameter name="FAMILY" value="Cyclone V" />
+  <parameter name="INPUT_BITS_PER_SYMBOL" value="8" />
+  <parameter name="INPUT_DATA_TYPE_GUARD_BAND" value="0" />
+  <parameter name="INPUT_DATA_TYPE_MAX" value="255" />
+  <parameter name="INPUT_DATA_TYPE_MIN" value="0" />
+  <parameter name="INPUT_DATA_TYPE_SIGNED" value="0" />
+  <parameter name="LIMITED_READBACK" value="0" />
+  <parameter name="MOVE_BINARY_POINT_RIGHT" value="0" />
+  <parameter name="NUMBER_OF_COLOR_PLANES" value="3" />
+  <parameter name="OUTPUT_BITS_PER_SYMBOL" value="8" />
+  <parameter name="OUTPUT_DATA_TYPE_GUARD_BAND" value="0" />
+  <parameter name="OUTPUT_DATA_TYPE_MAX" value="255" />
+  <parameter name="OUTPUT_DATA_TYPE_MIN" value="0" />
+  <parameter name="OUTPUT_DATA_TYPE_SIGNED" value="0" />
+  <parameter name="PIPELINE_DATA_OUTPUT" value="1" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="REMOVE_FRACTION_METHOD" value="1" />
+  <parameter name="REQ_FCOEFF_A0" value="0.439" />
+  <parameter name="REQ_FCOEFF_A1" value="-0.04" />
+  <parameter name="REQ_FCOEFF_A2" value="0.062" />
+  <parameter name="REQ_FCOEFF_B0" value="-0.338" />
+  <parameter name="REQ_FCOEFF_B1" value="-0.399" />
+  <parameter name="REQ_FCOEFF_B2" value="0.614" />
+  <parameter name="REQ_FCOEFF_C0" value="-0.101" />
+  <parameter name="REQ_FCOEFF_C1" value="0.439" />
+  <parameter name="REQ_FCOEFF_C2" value="0.183" />
+  <parameter name="REQ_FCOEFF_S0" value="128.0" />
+  <parameter name="REQ_FCOEFF_S1" value="128.0" />
+  <parameter name="REQ_FCOEFF_S2" value="16.0" />
+  <parameter name="RUNTIME_CONTROL" value="0" />
+  <parameter name="SIGN_TO_UNSIGN_METHOD" value="0" />
+  <parameter name="SUMMAND_INT_BITS" value="8" />
+  <parameter name="SUMMAND_SIGNED" value="0" />
+  <parameter name="USER_PACKET_SUPPORT" value="PASSTHROUGH" />
+ </module>
+ <module
+   name="sc_fifo_0"
+   kind="altera_avalon_sc_fifo"
+   version="23.1"
+   enabled="1">
+  <parameter name="BITS_PER_SYMBOL" value="16" />
+  <parameter name="CHANNEL_WIDTH" value="0" />
+  <parameter name="EMPTY_LATENCY" value="3" />
+  <parameter name="ENABLE_EXPLICIT_MAXCHANNEL" value="false" />
+  <parameter name="ERROR_WIDTH" value="0" />
+  <parameter name="EXPLICIT_MAXCHANNEL" value="0" />
+  <parameter name="FIFO_DEPTH" value="16" />
+  <parameter name="SYMBOLS_PER_BEAT" value="1" />
+  <parameter name="USE_ALMOST_EMPTY_IF" value="0" />
+  <parameter name="USE_ALMOST_FULL_IF" value="0" />
+  <parameter name="USE_FILL_LEVEL" value="0" />
+  <parameter name="USE_MEMORY_BLOCKS" value="1" />
+  <parameter name="USE_PACKETS" value="1" />
+  <parameter name="USE_STORE_FORWARD" value="0" />
+ </module>
+ <module name="scaler" kind="alt_vip_cl_scl" version="23.1" enabled="1">
+  <parameter name="ALGORITHM_NAME" value="BICUBIC" />
+  <parameter name="ALWAYS_DOWNSCALE" value="0" />
+  <parameter name="ARE_IDENTICAL" value="0" />
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="BITS_PER_SYMBOL" value="16" />
+  <parameter name="DEFAULT_EDGE_THRESH" value="7" />
+  <parameter name="DEFAULT_LOWER_BLUR" value="0" />
+  <parameter name="DEFAULT_UPPER_BLUR" value="0" />
+  <parameter name="ENABLE_FIR" value="0" />
+  <parameter name="EXTRA_PIPELINING" value="1" />
+  <parameter name="FAMILY" value="Cyclone V" />
+  <parameter name="H_BANKS" value="1" />
+  <parameter name="H_COEFF_FILE"><![CDATA[<enter file name (including full path)>]]></parameter>
+  <parameter name="H_FRACTION_BITS" value="7" />
+  <parameter name="H_FUNCTION" value="LANCZOS_2" />
+  <parameter name="H_INTEGER_BITS" value="1" />
+  <parameter name="H_PHASES" value="16" />
+  <parameter name="H_SIGNED" value="1" />
+  <parameter name="H_SYMMETRIC" value="0" />
+  <parameter name="H_TAPS" value="8" />
+  <parameter name="IS_420" value="0" />
+  <parameter name="IS_422" value="0" />
+  <parameter name="LIMITED_READBACK" value="0" />
+  <parameter name="LOAD_AT_RUNTIME" value="0" />
+  <parameter name="MAX_IN_HEIGHT" value="720" />
+  <parameter name="MAX_IN_WIDTH" value="1280" />
+  <parameter name="MAX_OUT_HEIGHT" value="1080" />
+  <parameter name="MAX_OUT_WIDTH" value="1920" />
+  <parameter name="NO_BLANKING" value="0" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="PRESERVE_BITS" value="0" />
+  <parameter name="RUNTIME_CONTROL" value="0" />
+  <parameter name="SYMBOLS_IN_PAR" value="1" />
+  <parameter name="SYMBOLS_IN_SEQ" value="1" />
+  <parameter name="USER_PACKET_FIFO_DEPTH" value="0" />
+  <parameter name="USER_PACKET_SUPPORT" value="PASSTHROUGH" />
+  <parameter name="V_BANKS" value="1" />
+  <parameter name="V_COEFF_FILE"><![CDATA[<enter file name (including full path)>]]></parameter>
+  <parameter name="V_FRACTION_BITS" value="7" />
+  <parameter name="V_FUNCTION" value="LANCZOS_2" />
+  <parameter name="V_INTEGER_BITS" value="1" />
+  <parameter name="V_PHASES" value="16" />
+  <parameter name="V_SIGNED" value="1" />
+  <parameter name="V_SYMMETRIC" value="0" />
+  <parameter name="V_TAPS" value="8" />
+ </module>
+ <module name="switch_0" kind="alt_vip_cl_swi" version="23.1" enabled="1">
+  <parameter name="BITS_PER_SYMBOL" value="16" />
+  <parameter name="COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="NO_OF_INPUTS" value="1" />
+  <parameter name="NO_OF_OUTPUTS" value="2" />
+  <parameter name="NUMBER_OF_COLOR_PLANES" value="1" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="READY_LATENCY" value="1" />
+ </module>
+ <module name="switch_1" kind="alt_vip_cl_swi" version="23.1" enabled="1">
+  <parameter name="BITS_PER_SYMBOL" value="16" />
+  <parameter name="COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="NO_OF_INPUTS" value="2" />
+  <parameter name="NO_OF_OUTPUTS" value="1" />
+  <parameter name="NUMBER_OF_COLOR_PLANES" value="1" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="READY_LATENCY" value="1" />
+ </module>
+ <module
+   name="trace_system"
+   kind="altera_trace_system"
+   version="23.1"
+   enabled="1">
+  <parameter name="AUTO_CLK_CLOCK_DOMAIN" value="2" />
+  <parameter name="AUTO_CLK_RESET_DOMAIN" value="2" />
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Cyclone V" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="AUTO_STORAGE_MASTER_ADDRESS_MAP" value="" />
+  <parameter name="AUTO_STORAGE_MASTER_ADDRESS_WIDTH" value="AddressWidth = -1" />
+  <parameter name="CAPTURE_WIDTH" value="32" />
+  <parameter name="CLOCK_RATE" value="50000000" />
+  <parameter name="ENABLE_BETA_EXTERNAL_MEM" value="false" />
+  <parameter name="EXTMEM_BASE" value="0" />
+  <parameter name="EXTMEM_SIZE" value="1048576" />
+  <parameter name="HOST_LINK_NAME" value="" />
+  <parameter name="HOST_TYPE" value="JTAG" />
+  <parameter name="INPUTS" value="5" />
+  <parameter name="INTERNAL_MEM" value="1" />
+  <parameter name="MANUAL_DEBUG_FABRIC" value="0" />
+  <parameter name="MEMSIZE" value="32768" />
+  <parameter name="PIPELINE_STAGE_ON_ALL_INPUTS" value="true" />
+ </module>
+ <module
+   name="ycbcr444_to_422"
+   kind="alt_vip_cl_cps"
+   version="23.1"
+   enabled="1">
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_FAMILY" value="Cyclone V" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="BITS_PER_SYMBOL" value="8" />
+  <parameter name="EXTRA_PIPELINING" value="0" />
+  <parameter name="INPUT_0_COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="INPUT_0_FIFO" value="0" />
+  <parameter name="INPUT_0_FIFO_SIZE" value="8" />
+  <parameter name="INPUT_0_NUMBER_OF_COLOR_PLANES" value="3" />
+  <parameter name="INPUT_0_PATTERN" value="C0,C1,C2" />
+  <parameter name="INPUT_0_PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="INPUT_0_TWO_PIXELS_PATTERN" value="0" />
+  <parameter name="INPUT_1_COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="INPUT_1_FIFO" value="0" />
+  <parameter name="INPUT_1_FIFO_SIZE" value="8" />
+  <parameter name="INPUT_1_NUMBER_OF_COLOR_PLANES" value="3" />
+  <parameter name="INPUT_1_PATTERN" value="C0,C1,C2" />
+  <parameter name="INPUT_1_PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="INPUT_1_TWO_PIXELS_PATTERN" value="0" />
+  <parameter name="INPUT_VALIDATION" value="1" />
+  <parameter name="NUMBER_OF_INPUTS" value="1" />
+  <parameter name="NUMBER_OF_OUTPUTS" value="1" />
+  <parameter name="OUTPUT_0_COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="OUTPUT_0_FIFO" value="0" />
+  <parameter name="OUTPUT_0_FIFO_SIZE" value="8" />
+  <parameter name="OUTPUT_0_NUMBER_OF_COLOR_PLANES" value="2" />
+  <parameter name="OUTPUT_0_PATTERN" value="C0,C1,C0,C2" />
+  <parameter name="OUTPUT_0_PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="OUTPUT_0_TWO_PIXELS_PATTERN" value="1" />
+  <parameter name="OUTPUT_1_COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="OUTPUT_1_FIFO" value="0" />
+  <parameter name="OUTPUT_1_FIFO_SIZE" value="8" />
+  <parameter name="OUTPUT_1_NUMBER_OF_COLOR_PLANES" value="3" />
+  <parameter name="OUTPUT_1_PATTERN" value="C0,C1,C2" />
+  <parameter name="OUTPUT_1_PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="OUTPUT_1_TWO_PIXELS_PATTERN" value="0" />
+  <parameter name="OUTPUT_VALIDATION" value="1" />
+  <parameter name="USER_PACKET_SUPPORT" value="PASSTHROUGH" />
+  <parameter name="USER_PKT_0_TO_0" value="1" />
+  <parameter name="USER_PKT_0_TO_1" value="0" />
+  <parameter name="USER_PKT_1_TO_0" value="0" />
+  <parameter name="USER_PKT_1_TO_1" value="1" />
+ </module>
+ <connection
+   kind="avalon"
+   version="23.1"
+   start="trace_system.control_0"
+   end="monitor_0.control">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x0000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="23.1"
+   start="trace_system.control_1"
+   end="monitor_1.control">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x0000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="23.1"
+   start="trace_system.control_2"
+   end="monitor_2.control">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x0000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="23.1"
+   start="trace_system.control_3"
+   end="monitor_3.control">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x0000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="23.1"
+   start="trace_system.control_4"
+   end="monitor_4.control">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x0000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="23.1"
+   start="mm_bridge.m0"
+   end="cvi_mono.control">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x00180380" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="23.1"
+   start="mm_bridge.m0"
+   end="clipper.control">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x00180400" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection kind="avalon" version="23.1" start="mm_bridge.m0" end="gamma.control">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x00100000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection kind="avalon" version="23.1" start="mm_bridge.m0" end="mixer.control">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x00180000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="23.1"
+   start="mm_bridge.m0"
+   end="cvi_color.control">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x00180300" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="23.1"
+   start="mm_bridge.m0"
+   end="switch_0.control">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x00180280" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="23.1"
+   start="mm_bridge.m0"
+   end="switch_1.control">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x00180200" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="23.1"
+   start="mm_bridge.m0"
+   end="platform2_0.mm_bridge_s">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x0000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="monitor_0.capture"
+   end="trace_system.capture_0" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="monitor_1.capture"
+   end="trace_system.capture_1" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="monitor_2.capture"
+   end="trace_system.capture_2" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="monitor_3.capture"
+   end="trace_system.capture_3" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="monitor_4.capture"
+   end="trace_system.capture_4" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="scaler.dout"
+   end="gamma.din" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="mixer.dout"
+   end="rgb_to_ycbcr.din" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="clipper.dout"
+   end="frame_buffer_mono.din" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="monitor_0.dout"
+   end="fir.din" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="frame_buffer_mono.dout"
+   end="monitor_1.din" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="interlacer.dout"
+   end="monitor_4.din" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="monitor_4.dout"
+   end="cvo.din" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="frame_buffer_color.dout"
+   end="monitor_3.din" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="monitor_2.dout"
+   end="frame_buffer_color.din" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="fir.dout"
+   end="platform2_0.din" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="platform2_0.dout"
+   end="clipper.din" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="monitor_3.dout"
+   end="mixer.din1" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="gamma.dout"
+   end="mono_to_gray.din_0" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="rgb_to_ycbcr.dout"
+   end="ycbcr444_to_422.din_0" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="monitor_1.dout"
+   end="switch_1.din_0" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="ycbcr444_to_422.dout_0"
+   end="interlacer.din" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="cvi_color.dout_0"
+   end="monitor_2.din" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="switch_0.dout_0"
+   end="monitor_0.din" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="switch_1.dout_0"
+   end="scaler.din" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="mono_to_gray.dout_0"
+   end="mixer.din0" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="cvi_mono.dout_0"
+   end="sc_fifo_0.in" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="switch_0.dout_1"
+   end="switch_1.din_1" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="sc_fifo_0.out"
+   end="switch_0.din_0" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="mm_bridge.clk" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="trace_system.clk" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="sc_fifo_0.clk" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_memory.clk"
+   end="platform2_0.clk_memory" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="platform2_0.clk_mono_video" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="monitor_0.clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="monitor_1.clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="monitor_4.clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="monitor_3.clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="monitor_2.clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="fir.main_clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="cvi_mono.main_clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="frame_buffer_mono.main_clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="clipper.main_clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="scaler.main_clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="gamma.main_clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="mono_to_gray.main_clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="mixer.main_clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="cvo.main_clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="frame_buffer_color.main_clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="cvi_color.main_clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="rgb_to_ycbcr.main_clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="ycbcr444_to_422.main_clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="interlacer.main_clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="switch_0.main_clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="switch_1.main_clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_memory.clk"
+   end="frame_buffer_mono.mem_clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_memory.clk"
+   end="frame_buffer_color.mem_clock" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="sc_fifo_0.clk_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="switch_0.main_clock_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="switch_1.main_clock_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="fir.main_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="cvi_mono.main_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="frame_buffer_mono.main_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="clipper.main_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="scaler.main_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="gamma.main_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="mono_to_gray.main_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="mixer.main_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="cvo.main_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="frame_buffer_color.main_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="cvi_color.main_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="rgb_to_ycbcr.main_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="ycbcr444_to_422.main_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="interlacer.main_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_memory.clk_reset"
+   end="frame_buffer_mono.mem_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_memory.clk_reset"
+   end="frame_buffer_color.mem_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="mm_bridge.reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="monitor_0.reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="monitor_1.reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="monitor_4.reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="monitor_3.reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="monitor_2.reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_memory.clk_reset"
+   end="platform2_0.reset_memory" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="platform2_0.reset_mono_video" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="trace_system.reset"
+   end="monitor_0.reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="trace_system.reset"
+   end="monitor_4.reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="trace_system.reset"
+   end="monitor_3.reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="trace_system.reset"
+   end="monitor_2.reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="trace_system.reset"
+   end="monitor_1.reset" />
+ <interconnectRequirement for="$system" name="qsys_mm.clockCrossingAdapter" value="HANDSHAKE" />
+ <interconnectRequirement for="$system" name="qsys_mm.enableEccProtection" value="FALSE" />
+ <interconnectRequirement for="$system" name="qsys_mm.insertDefaultSlave" value="FALSE" />
+ <interconnectRequirement for="$system" name="qsys_mm.maxAdditionalLatency" value="1" />
+</system>
