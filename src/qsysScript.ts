@@ -36,6 +36,12 @@ export function qsysTclExportWrapper(sourcePath: string, generatedSystemPath: st
   ].join('\n');
 }
 
+export function platformDesignerTemporaryPrefix(sourcePath: string): string {
+  const extension = path.extname(sourcePath);
+  const systemName = path.basename(sourcePath, extension);
+  return path.join(path.dirname(sourcePath), `.qsys-view-${systemName}-`);
+}
+
 function normalizeTclPath(value: string): string {
   return value.replaceAll('\\', '/');
 }

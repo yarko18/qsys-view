@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, expect, it } from 'vitest';
-import { qsysScriptArguments, qsysTclExportWrapper, qsysTclScriptArguments } from '../src/qsysScript';
+import { platformDesignerTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclScriptArguments } from '../src/qsysScript';
 
 describe('qsysScriptArguments', () => {
   it.each([
@@ -49,5 +49,13 @@ describe('qsysTclExportWrapper', () => {
       'save_system "/tmp/output\\[0]\\$.qsys"',
       '',
     ].join('\n'));
+  });
+});
+
+describe('platformDesignerTemporaryPrefix', () => {
+  it('places the generated Platform Designer folder beside the source Tcl file', () => {
+    expect(platformDesignerTemporaryPrefix('/work/quartus/video.tcl')).toBe(
+      '/work/quartus/.qsys-view-video-',
+    );
   });
 });

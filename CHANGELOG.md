@@ -9,7 +9,7 @@ SPDX-License-Identifier: MIT
 
 - Keep graph connections visually subdued while highlighting clock, reset, Avalon-MM, or interrupt domains.
 - Keep Platform Designer launch state out of the graph overlay and support direct process launch on Linux and Windows.
-- Convert exported Tcl in a unique OS temporary directory without creating or deleting folders in the source project.
+- Convert exported Tcl for Platform Designer in a unique disposable folder beside the source script.
 
 ## 1.0.2
 

@@ -11,7 +11,7 @@ import type { QsysGraph } from '../parser/graph';
 import { applyQuartusMetadata } from '../parser/quartusMetadataParser';
 import { parseQsys } from '../parser/qsysParser';
 import { parseQsysTcl } from '../parser/qsysTclParser';
-import { qsysScriptArguments, qsysTclExportWrapper, qsysTclScriptArguments } from './qsysScript';
+import { platformDesignerTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclScriptArguments } from './qsysScript';
 
 class QsysDocument implements vscode.CustomDocument {
   constructor(readonly uri: vscode.Uri) {}
@@ -284,7 +284,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     executable: string,
     progress?: vscode.Progress<{ message?: string }>,
   ): Promise<{ filePath: string; cleanup?: () => Promise<void> }> {
-    const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'qsys-view-pd-'));
+    const temporaryDirectory = await fs.mkdtemp(platformDesignerTemporaryPrefix(uri.fsPath));
     const temporaryQsys = path.join(temporaryDirectory, `${path.basename(uri.fsPath, path.extname(uri.fsPath))}.qsys`);
     const temporaryScript = path.join(temporaryDirectory, 'design.tcl');
     const wrapper = path.join(temporaryDirectory, 'export-system.tcl');
