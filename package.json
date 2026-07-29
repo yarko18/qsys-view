@@ -2,7 +2,7 @@
   "name": "qsys-view",
   "displayName": "Qsys View",
   "description": "Explore Intel Platform Designer .qsys systems and exported Tcl scripts as readable layered graphs.",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "publisher": "YaroslavMariukha",
   "author": {
     "name": "Mariukha Yaroslav"

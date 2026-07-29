@@ -5,168 +5,101 @@ SPDX-License-Identifier: MIT
 
 # Qsys View
 
-Qsys View turns Intel Platform Designer systems into readable, layered diagrams directly in Visual Studio Code. It opens `.qsys` files and exported Platform Designer `.tcl` scripts without modifying them. Layout is calculated with ELK's Sugiyama-style layered algorithm.
-
-#### Comparison with Platform Designer
+Qsys View is a read-only Visual Studio Code viewer for Intel Platform Designer systems. It opens `.qsys` files and exported Platform Designer `.tcl` scripts as compact layered graphs.
 
 ![Qsys View compared with Platform Designer](media/compare.png)
 
-#### Avalon-MM base address view
+## What it does
 
-![Avalon-MM base address view](media/avmm_base_address.png)
+- Opens `.qsys` directly and `.tcl` through **Reopen Editor With… → Qsys TCL Graph**.
+- Keeps hierarchical subsystems collapsed as single IP blocks.
+- Draws a left-to-right graph with orthogonal connections.
+- Shows IP and connection parameters on click.
+- Highlights clock, reset, Avalon-MM, and interrupt domains without filling the graph with their edges.
+- Detects Avalon-ST adapters after Quartus analysis and marks them with a red dot.
+- Shows elaborated interface ports, parameters, and an illustrative Avalon-ST waveform.
+- Updates connections while a Tcl file is edited without moving existing IP.
+- Adds new IP below the frozen graph; **Relayout** recalculates the active layout.
+- Opens Qsys directly in Platform Designer or converts Tcl in a disposable sibling folder first.
 
-#### Clock domain view
+## Views and interfaces
 
-![Clock domain view](media/clock_domain.png)
+Qsys View has two modes:
 
-#### IP parameters
+| Interface | Pipeline | Complete |
+| --- | --- | --- |
+| Avalon-ST | Directed edge and layout anchor | Directed edge |
+| Conduit | Directed edge | Directed edge |
+| Avalon-MM | Highlight hub | Directed edge |
+| Interrupt | Highlight hub | Directed edge |
+| Clock | Highlight hub | Highlight hub |
+| Reset | Highlight hub | Highlight hub |
+| Other or unknown | Hidden | Grey directed edge |
 
-![IP parameters](media/ip_params.png)
+Only interface filters present in the current system are shown. Pipeline layout is anchored exclusively by Avalon-ST when streaming connections exist.
 
-#### Elaborated interface details
+The Tcl reader accepts Platform Designer declarations for `avalon`, `axi`, `tristate_conduit`, `avalon_streaming`, `interrupt`, `conduit`, `clock`, `reset`, and `nios_custom_instruction`.
 
-![Elaborated interface parameters and ports](media/interface_params.png)
+## Tcl and Quartus analysis
+
+The static reader understands `add_instance`, instance parameters, `add_interface`, `add_interface_port`, `EXPORT_OF`, `add_connection`, and connection parameters. An explicit connection kind is available immediately. The usual two-argument exported `add_connection` remains unknown until **Read interfaces…** runs `qsys-script`.
+
+**Infer clk/reset** classifies only unknown static Tcl connections by interface names. It recognizes `clock`, `clk`, `reset`, `reset_n`, `rst`, `rst_n`, `nrst`, and `rstn`. Reset takes priority for names such as `clk_reset`. Disable the checkbox if a project uses those words for unrelated interfaces. Explicit Qsys/Tcl kinds and Quartus results are never overridden.
+
+Quartus analysis is user-triggered and runs on a disposable copy. It supplies exact types and ports, Avalon-ST format information, and automatic-adapter detection. The source file is never modified.
+
+## Controls
+
+- **View** switches between Complete and Pipeline.
+- **All IP** includes disconnected IP; off by default.
+- **Disabled IP** includes disabled instances; off by default.
+- **Infer clk/reset** controls name inference; on by default.
+- **Read interfaces…** requests exact Quartus metadata.
+- **Open in Platform Designer** opens or converts the system.
+- **Relayout** recalculates the active mode; **Fit** fits it to the viewport.
+- Drag to pan, use the wheel to zoom, and search by instance name or IP type.
+
+New viewers start in Complete mode. With **Remember Last View State** enabled, Qsys View reuses the last mode, interface filters, IP visibility options, and name-inference choice across editors.
 
 ## Installation
 
-Install Qsys View from the Extensions view in Visual Studio Code by searching for `Qsys View`, or run:
+Install **Qsys View** from the VS Code Extensions view, or run:
 
 ```bash
 code --install-extension YaroslavMariukha.qsys-view
 ```
 
-To install a locally packaged `.vsix` file instead, run:
+A local package can be installed with:
 
 ```bash
-code --install-extension qsys-view-x.y.z.vsix
+code --install-extension qsys-view-1.0.4.vsix --force
 ```
-
-Alternatively, open the Extensions view in VS Code, select **Views and More Actions… → Install from VSIX…**, and choose the package.
-
-Static graph viewing only requires VS Code 1.90 or newer. Intel Quartus Prime is optional and runs only when you explicitly request exact elaborated interface metadata, adapter detection, and Avalon-ST waveform examples.
-
-## Features
-
-- Opens `.qsys` files as a read-only graph editor and exported Platform Designer `.tcl` files as an optional editor.
-- Layered left-to-right automatic layout with orthogonal edge routing.
-- **Pipeline** view keeps Avalon-ST as the structural graph when a streaming pipeline is present. Avalon-MM, clock, reset, and interrupt interfaces use compact hubs.
-- **Complete** view draws Avalon-ST, Avalon-MM, interrupt, conduit, and unknown connections as edges. Clocks and resets remain compact hubs to avoid visual clutter.
-- Separate filter selections are retained for Pipeline and Complete views.
-- Hover a hub to highlight all connected IP; click an MM master to show each slave's relative base address.
-- Known clock frequencies are shown directly on their source hubs.
-- Connections whose type cannot be determined are shown in grey in Complete view and are hidden in Pipeline view.
-- Interface filters are shown only for connection types present in the current system and supported by the selected view.
-- A red dot marks an Avalon-ST connection for which Quartus will insert timing, data-format, channel, or error adaptation. Hover or click the connection to see the endpoint differences.
-- Pan, zoom, and fit-to-window navigation.
-- Search by IP instance name or type.
-- Optional display of disconnected and disabled IP.
-- Click an IP to inspect all parameters stored in the Qsys XML.
-- Click a connection or endpoint label to inspect connection and exact elaborated interface parameters.
-- Read interface ports and parameters on demand with the installed Quartus `qsys-script`; full platform generation is not required.
-- Avalon-ST details include an illustrative transfer waveform based only on the ports and properties returned by Quartus. Multiple symbols use separate physical `data[high:low]` rows; unavailable and zero-width signals are omitted.
-- Waveforms can be enlarged from 50% to 400% with buttons or Ctrl+mouse-wheel.
-- Hierarchical Platform Designer subsystems stay collapsed as individual IP blocks.
-- Automatically refreshes after the source document changes.
-
-By default Qsys View starts in **Pipeline** view with Avalon-ST and conduit links enabled. Enable **All IP**, select a domain filter, or switch to **Complete** view to explore the rest of the system.
-
-When Pipeline view contains at least one Avalon-ST link, Qsys View calculates that pipeline independently and places non-streaming-only IP in a separate stable area. Enabling hub interfaces does not add graph edges or change node positions. Systems without Avalon-ST links use the normal layered layout. Complete view always uses the full set of direct connections for layout.
-
-## Interface visualization
-
-The static Tcl reader recognizes the Platform Designer interface declarations below. A two-argument `add_connection` has no serialized kind and therefore remains unknown until **Read interfaces…** runs `qsys-script`.
-
-| Tcl interface type | Directions |
-| --- | --- |
-| `avalon` | `master`, `slave` |
-| `axi` | `master`, `slave` |
-| `tristate_conduit` | `master`, `slave` |
-| `avalon_streaming` | `source`, `sink` |
-| `interrupt` | `sender`, `receiver` |
-| `conduit` | `end` |
-| `clock` | `source`, `sink` |
-| `reset` | `source`, `sink` |
-| `nios_custom_instruction` | `slave` |
-
-| Interface | Pipeline view | Complete view |
-| --- | --- | --- |
-| Avalon-ST | Directed edge | Directed edge |
-| Conduit | Directed edge | Directed edge |
-| Avalon-MM | Master hub | Directed edge |
-| Clock | Source hub | Source hub |
-| Reset | Source hub | Source hub |
-| Interrupt | Receiver hub | Directed edge |
-| Other/unknown | Hidden | Grey directed edge |
-
-Click an edge to inspect its connection and endpoint parameters. Avalon-ST details can include an illustrative transfer waveform and detected automatic adapters. Hover a hub to highlight related IP; click it to pin the highlighting. An Avalon-MM master hub also shows each slave's relative base address.
-
-## Usage
-
-1. Open a `.qsys` file in VS Code. Qsys View is the default custom editor for this file type.
-2. For an exported Platform Designer `.tcl` file, use **Reopen Editor With… → Qsys TCL Graph** or right-click it and select **Open Qsys Graph**. Qsys View intentionally does not replace the normal editor for every Tcl file.
-3. Use the **View** selector to switch between Pipeline and Complete layouts.
-4. Click **Open in Platform Designer** to open a `.qsys` file directly. For exported Tcl, Qsys View converts a disposable copy in a unique hidden folder beside the source script and removes that folder after Platform Designer exits.
-5. To inspect the source, use **Reopen Editor With… → Text Editor**.
-6. Click **Read interfaces…** to read exact interface types, ports, and parameters. The extension asks before running IP Tcl, works on a disposable copy in the OS temporary directory, and does not write to the source project.
-
-The static Tcl reader supports declarative Platform Designer commands including `add_instance`, `set_instance_parameter_value`, `add_interface`, `add_interface_port`, `set_interface_property`, `add_connection`, and `set_connection_parameter_value`. An explicit `add_connection <start> <end> <kind> <name>` is classified immediately; the common exported two-argument form remains unknown until Quartus elaborates it. The reader does not evaluate arbitrary Tcl expressions or source other scripts.
-
-Qsys View finds `qsys-script` through `QUARTUS_ROOTDIR`, conventional Intel FPGA installation folders, or `PATH`. If necessary, set **Qsys View: Quartus Path**. Local `ip/*/component.ipx`, composition dependencies under `ip/common/**/*_hw.tcl`, the standard Quartus catalog, and paths from **Qsys View: IP Search Paths** are passed to Platform Designer. Relative search paths are resolved from the `.qsys` directory.
 
 ## Settings
 
-| Setting | Description |
+| Setting | Purpose |
 | --- | --- |
-| `qsysView.quartusPath` | Quartus installation directory or direct path to `qsys-script` |
-| `qsysView.platformDesignerPath` | Direct path to `qsys-edit` on Linux or `qsys.exe` on Windows |
-| `qsysView.ipSearchPaths` | Additional Platform Designer IP search paths; `${qsysDir}` and `${workspaceFolder}` are supported |
+| `qsysView.quartusPath` | Quartus directory or direct path to `qsys-script` |
+| `qsysView.platformDesignerPath` | Direct path to `qsys-edit` or `qsys.exe` |
+| `qsysView.ipSearchPaths` | Additional Platform Designer IP search paths |
+| `qsysView.rememberLastViewState` | Remember toolbar choices across editors |
 
 ## Development
 
-Install Node.js 20 or newer (the current LTS release is recommended) and npm. From the repository root, install the exact dependencies recorded in `package-lock.json`:
+Node.js 20 or newer is required.
 
 ```bash
 npm ci
-```
-
-Run individual development checks when needed:
-
-```bash
-npm run check
 npm test
-npm run build
-```
-
-To compile a new extension version locally, install dependencies and build the extension:
-
-```bash
-npm ci
-npm run build
-```
-
-`npm run build` compiles the production JavaScript and CSS files into `dist/`.
-
-Press `F5` in VS Code to launch an Extension Development Host. Open a `.qsys` file or reopen an exported `.tcl` file with the Qsys TCL Graph editor there.
-
-To run all checks, tests, the production build, and create an installable package in one command:
-
-```bash
+npm run check
 npm run package
 ```
 
-The resulting file is `qsys-view-<version>.vsix` in the repository root. Install it locally from PowerShell on Windows with:
+`npm run package` creates `qsys-view-<version>.vsix`. Press `F5` in VS Code to run an Extension Development Host.
 
-```powershell
-code --install-extension .\qsys-view-<version>.vsix --force
-```
+## Scope
 
-Run `npm ci` again only after cloning the repository or when `package-lock.json` changes. For normal rebuilds, `npm run package` is enough.
-
-The extension is published under Marketplace publisher ID `YaroslavMariukha` (display name **Mariukha Yaroslav**). See the [VS Code Marketplace publishing guide](https://code.visualstudio.com/api/working-with-extensions/publishing-extension) for release instructions.
-
-## Current scope
-
-Qsys View never modifies `.qsys` or `.tcl` source files. Opening a Tcl design in Platform Designer creates a disposable sibling folder; interface analysis uses the OS temporary directory. Basic graph data comes from Qsys XML or static Tcl commands. Exact interface properties and automatic-adapter annotations come only from a fresh, user-triggered `qsys-script` elaboration; `.sopcinfo` is not read and metadata is not cached. If Quartus or an IP definition cannot be resolved, unknown connections remain grey in Complete view and no waveform or adapter annotation is shown. Waveforms are illustrative protocol examples, not simulation output.
+Qsys View does not edit Qsys or Tcl sources and does not replace Platform Designer validation. Unknown Tcl connections remain grey in Complete mode until their type is explicit, inferred, or resolved by Quartus. Waveforms are protocol illustrations, not simulation output.
 
 ## License
 
