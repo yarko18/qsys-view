@@ -16,6 +16,11 @@ SPDX-License-Identifier: MIT
 - Preserve one clock/reset highlight domain across exported `clock_source` boundaries instead of duplicating it after expansion.
 - Draw expanded subsystems inside rounded dashed containers with an on-canvas collapse control.
 - Draw interrupt arrows in signal-flow order from sender to receiver and group IRQ highlights by the actual receiver.
+- Keep expanded subsystem containers clear of top-level IP and prevent canvas panning from intercepting their controls.
+- Enter a subsystem in the same canvas and return through a breadcrumb Back control while preserving the parent layout and zoom.
+- Hide interface-analysis controls while metadata is current and invalidate it when a loaded Qsys or Tcl source changes.
+- Hide clock/reset-only IP unless All IP is enabled, while retaining functional Avalon-MM and IRQ hub endpoints.
+- Disable Pipeline view for Tcl until every visible hierarchy level has exact Quartus interface metadata.
 
 ## 1.0.5
 
