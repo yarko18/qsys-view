@@ -7,7 +7,7 @@ import { createInterfaceWaveform } from '../parser/waveform';
 import { layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, projectVisibleLayout, separateHierarchyGroups, type LayoutPoint, type LayoutResult, type StableLayoutCache } from '../layout/elk';
 import { composeHierarchy, hierarchyBounds, type HierarchyBounds } from './hierarchy';
 import { connectionAddress, createInterfaceHubs, type HubKind, type InterfaceHub } from './interfaceHubs';
-import { availableConnectionKinds, inferClockResetConnections, isDirectKind, isHubKind, type GraphViewMode } from './viewMode';
+import { availableConnectionKinds, canUsePipelineView, connectedModuleIds, inferClockResetConnections, isDirectKind, isHubKind, type GraphViewMode } from './viewMode';
 import './styles.css';
 
 const vscode = acquireVsCodeApi();
@@ -146,6 +146,8 @@ const details = required<HTMLElement>('details');
 const search = required<HTMLInputElement>('search');
 const filters = required<HTMLElement>('kind-filters');
 const viewMode = required<HTMLSelectElement>('view-mode');
+const pipelineViewOption = viewMode.querySelector<HTMLOptionElement>('option[value="pipeline"]')!;
+if (!pipelineViewOption) throw new Error('Missing Pipeline view option.');
 const quartusMetadata = required<HTMLButtonElement>('quartus-metadata');
 const interfaceHubs = required<HTMLElement>('interface-hubs');
 const inferClockResetNames = required<HTMLInputElement>('infer-clock-reset');
@@ -344,10 +346,7 @@ async function render(): Promise<void> {
   const connections = selectedConnections.filter((connection) => isDirectKind(connection.kind, state.viewMode));
   const selectedHubKinds = enabledKinds.filter((kind) => isHubKind(kind, state.viewMode));
   const hubs = createInterfaceHubs(renderedGraph, selectedHubKinds, allowedIds);
-  const connectedIds = new Set(connections.flatMap((connection) => [connection.source, connection.target]));
-  for (const hub of hubs) {
-    for (const moduleId of hub.relatedModuleIds) connectedIds.add(moduleId);
-  }
+  const connectedIds = connectedModuleIds(connections, hubs);
   const modules = state.showDisconnected
     ? allowedModules
     : allowedModules.filter((module) => connectedIds.has(module.id));
@@ -1162,6 +1161,28 @@ function updateAnalysisControls(): void {
   inferClockResetOption.classList.toggle('hidden', Boolean(exact));
   quartusMetadata.disabled = false;
   quartusMetadata.textContent = 'Read interfaces…';
+  updateViewAvailability();
+}
+
+function updateViewAvailability(): void {
+  const available = canUsePipelineView([
+    { resource: activeResource, exactMetadata: sourceGraph?.metadata.source === 'quartus' },
+    ...[...expandedSubsystemResources].map(([instanceId, resource]) => ({
+      resource,
+      exactMetadata: expandedSubsystems.get(instanceId)?.metadata.source === 'quartus',
+    })),
+  ]);
+  const unavailable = !available;
+  pipelineViewOption.disabled = unavailable;
+  viewMode.title = unavailable
+    ? 'Pipeline view requires Read interfaces for this Tcl hierarchy.'
+    : '';
+  if (unavailable && state.viewMode === 'pipeline') {
+    state.viewMode = 'complete';
+    viewMode.value = 'complete';
+    activeHubId = undefined;
+    didInitialFit = false;
+  }
 }
 
 function updateInactiveResourceGraph(resource: string, nextGraph: QsysGraph): void {
