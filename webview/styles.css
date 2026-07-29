@@ -237,7 +237,10 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
   font-weight: 600;
   pointer-events: none;
 }
-.node-subsystem-control, .hierarchy-collapse-control { outline: none; }
+.node-subsystem-control, .hierarchy-collapse-control, .hierarchy-enter-control {
+  outline: none;
+  pointer-events: all;
+}
 .node-subsystem-control circle, .hierarchy-collapse-control circle {
   fill: var(--vscode-button-background);
   stroke: var(--vscode-button-foreground);

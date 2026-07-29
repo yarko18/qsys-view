@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, expect, it } from 'vitest';
-import { layoutAnchoredGraph, layoutStableGraph, pathMidpoint, projectVisibleLayout } from '../layout/elk';
+import { layoutAnchoredGraph, layoutStableGraph, pathMidpoint, projectVisibleLayout, separateHierarchyGroups } from '../layout/elk';
 import type { ConnectionKind, QsysConnection, QsysModule } from '../parser/graph';
 
 function module(id: string): QsysModule {
@@ -62,6 +62,27 @@ describe('pathMidpoint', () => {
       { x: 10, y: 0 },
       { x: 10, y: 20 },
     ]])).toEqual({ x: 10, y: 5 });
+  });
+});
+
+describe('expanded hierarchy layout', () => {
+  it('moves a subsystem as one block when its frame covers a top-level node', () => {
+    const top = { ...module('top'), x: 200, y: 50, width: 100, height: 70 };
+    const first = { ...module('nested/first'), x: 100, y: 40, width: 100, height: 70 };
+    const second = { ...module('nested/second'), x: 350, y: 40, width: 100, height: 70 };
+    const link = connection('into-child', 'top', 'nested/first', 'avalon_streaming');
+    const separated = separateHierarchyGroups({
+      width: 500,
+      height: 160,
+      nodes: [top, first, second],
+      edges: [{ ...link, paths: [[{ x: 300, y: 85 }, { x: 100, y: 75 }]] }],
+    }, ['nested']);
+
+    expect(separated.nodes.find((node) => node.id === 'top')?.y).toBe(50);
+    expect(separated.nodes.find((node) => node.id === 'nested/first')?.y).toBeGreaterThan(170);
+    expect(separated.nodes.find((node) => node.id === 'nested/second')?.y)
+      .toBe(separated.nodes.find((node) => node.id === 'nested/first')?.y);
+    expect(separated.edges[0]?.paths[0]?.at(-1)?.y).toBeGreaterThan(170);
   });
 });
 

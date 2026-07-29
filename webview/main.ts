@@ -4,7 +4,7 @@
 import { connectionKinds, type ConnectionKind, type QsysAdaptation, type QsysConnection, type QsysDiagnostic, type QsysGraph, type QsysInterface, type QsysModule } from '../parser/graph';
 import { streamParameters } from '../parser/streamMetadata';
 import { createInterfaceWaveform } from '../parser/waveform';
-import { layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, projectVisibleLayout, type LayoutPoint, type LayoutResult, type StableLayoutCache } from '../layout/elk';
+import { layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, projectVisibleLayout, separateHierarchyGroups, type LayoutPoint, type LayoutResult, type StableLayoutCache } from '../layout/elk';
 import { composeHierarchy, hierarchyBounds, type HierarchyBounds } from './hierarchy';
 import { connectionAddress, createInterfaceHubs, type HubKind, type InterfaceHub } from './interfaceHubs';
 import { availableConnectionKinds, inferClockResetConnections, isDirectKind, isHubKind, type GraphViewMode } from './viewMode';
@@ -264,7 +264,7 @@ window.addEventListener('message', (event: MessageEvent) => {
 
 let pointer: { id: number; startX: number; startY: number; originX: number; originY: number } | undefined;
 canvas.addEventListener('pointerdown', (event) => {
-  if ((event.target as Element).closest('.node, .edge')) return;
+  if ((event.target as Element).closest('.node, .edge, .hierarchy-collapse-control, .hierarchy-enter-control')) return;
   pointer = { id: event.pointerId, startX: event.clientX, startY: event.clientY, originX: transform.x, originY: transform.y };
   canvas.setPointerCapture(event.pointerId);
   canvas.classList.add('panning');
@@ -322,11 +322,15 @@ async function render(): Promise<void> {
         ? 'Calculating Avalon-ST anchored layout…'
         : `Calculating ${state.viewMode} layout…`);
     }
+    const baseLayout = mode === 'pipeline' ? layoutAnchoredGraph : layoutGraph;
     const stable = await layoutStableGraph(
       allowedModules,
       structuralConnections,
       stableLayoutCaches[mode],
-      mode === 'pipeline' ? layoutAnchoredGraph : layoutGraph,
+      async (layoutModules, layoutConnections) => separateHierarchyGroups(
+        await baseLayout(layoutModules, layoutConnections),
+        [...expandedSubsystems.keys()],
+      ),
     );
     if (version !== renderVersion) return;
     stableLayoutCaches[mode] = stable.cache;
