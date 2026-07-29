@@ -13,6 +13,8 @@ import { parseQsys } from '../parser/qsysParser';
 import { parseQsysTcl } from '../parser/qsysTclParser';
 import { platformDesignerTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclScriptArguments } from './qsysScript';
 
+const lastViewStateKey = 'qsysView.lastViewState';
+
 class QsysDocument implements vscode.CustomDocument {
   constructor(readonly uri: vscode.Uri) {}
   dispose(): void {}
@@ -44,15 +46,20 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       if (documentPanels.size === 0) this.panels.delete(key);
     });
 
-    const sendGraph = (loadQuartus = false) => this.sendGraph(document.uri, panel.webview, loadQuartus);
-    panel.webview.onDidReceiveMessage(async (message: { type?: string }) => {
-      if (message.type === 'ready' || message.type === 'refresh') {
+    const sendGraph = (loadQuartus = false, includeViewState = false) =>
+      this.sendGraph(document.uri, panel.webview, loadQuartus, includeViewState);
+    panel.webview.onDidReceiveMessage(async (message: { type?: string; state?: unknown }) => {
+      if (message.type === 'ready') {
+        await sendGraph(false, true);
+      } else if (message.type === 'refresh') {
         await sendGraph();
       } else if (message.type === 'loadQuartusMetadata') {
         await this.confirmAndLoadQuartus(document.uri, panel.webview);
       } else if (message.type === 'openPlatformDesigner') {
         await this.openPlatformDesigner(document.uri);
         await panel.webview.postMessage({ type: 'platformDesignerFinished' });
+      } else if (message.type === 'viewStateChanged' && message.state && typeof message.state === 'object') {
+        await this.rememberViewState(document.uri, message.state);
       }
     });
 
@@ -99,7 +106,12 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     }
   }
 
-  private async sendGraph(uri: vscode.Uri, webview: vscode.Webview, loadQuartus = false): Promise<void> {
+  private async sendGraph(
+    uri: vscode.Uri,
+    webview: vscode.Webview,
+    loadQuartus = false,
+    includeViewState = false,
+  ): Promise<void> {
     try {
       const openDocument = vscode.workspace.textDocuments.find(
         (document) => document.uri.toString() === uri.toString(),
@@ -126,13 +138,24 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
           void vscode.window.showErrorMessage(`Qsys View: ${message}`);
         }
       }
-      await webview.postMessage({ type: 'graph', graph });
+      const rememberLastViewState = vscode.workspace.getConfiguration('qsysView', uri)
+        .get<boolean>('rememberLastViewState', true);
+      const rememberedViewState = includeViewState && rememberLastViewState
+        ? this.context.globalState.get<unknown>(lastViewStateKey)
+        : undefined;
+      await webview.postMessage({ type: 'graph', graph, rememberedViewState });
     } catch (error) {
       await webview.postMessage({
         type: 'error',
         message: error instanceof Error ? error.message : String(error),
       });
     }
+  }
+
+  private async rememberViewState(uri: vscode.Uri, state: unknown): Promise<void> {
+    const enabled = vscode.workspace.getConfiguration('qsysView', uri)
+      .get<boolean>('rememberLastViewState', true);
+    if (enabled) await this.context.globalState.update(lastViewStateKey, state);
   }
 
   private async withQsysQuartusMetadata(

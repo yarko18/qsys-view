@@ -5,6 +5,15 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 1.0.4
+
+- Start new viewers in Complete mode with All IP and Disabled IP turned off.
+- Optionally remember the last view mode, filters, IP visibility, and name inference across editors.
+- Classify unknown Tcl clock/reset connections from common interface names, including `reset_n`, `rst_n`, `nrst`, and `rstn`; the inference can be disabled from the toolbar.
+- Keep existing IP positions fixed while a Tcl document changes, append new IP without moving the old graph, and preserve positions for temporarily removed IP.
+- Add a Relayout button to explicitly recalculate the active Complete or Pipeline layout.
+- Replace the long README with a concise guide to views, interfaces, Quartus analysis, and settings.
+
 ## 1.0.3
 
 - Parse `add_interface`, `add_interface_port`, exported interfaces, and explicit connection kinds from Platform Designer Tcl scripts.

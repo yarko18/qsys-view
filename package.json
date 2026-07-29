@@ -2,7 +2,7 @@
   "name": "qsys-view",
   "displayName": "Qsys View",
   "description": "Explore Intel Platform Designer .qsys systems and exported Tcl scripts as readable layered graphs.",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "publisher": "YaroslavMariukha",
   "author": {
     "name": "Mariukha Yaroslav"
@@ -63,6 +63,12 @@
           "default": [],
           "scope": "resource",
           "description": "Additional Platform Designer IP search paths. Relative paths use the Qsys directory; ${qsysDir} and ${workspaceFolder} are supported. Standard Quartus IP and local component.ipx files are added automatically."
+        },
+        "qsysView.rememberLastViewState": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "Remember the last view mode, interface filters, All IP, Disabled IP, and clock/reset name inference across Qsys View editors."
         }
       }
     },
