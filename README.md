@@ -90,8 +90,9 @@ Click an edge to inspect its connection and endpoint parameters. Avalon-ST detai
 1. Open a `.qsys` file in VS Code. Qsys View is the default custom editor for this file type.
 2. For an exported Platform Designer `.tcl` file, use **Reopen Editor With… → Qsys TCL Graph** or right-click it and select **Open Qsys Graph**. Qsys View intentionally does not replace the normal editor for every Tcl file.
 3. Use the **View** selector to switch between Pipeline and Complete layouts.
-4. To inspect the source, use **Reopen Editor With… → Text Editor**.
-5. Click **Read interfaces…** to read exact interface types, ports, and parameters. The extension asks before running IP Tcl, works on a disposable copy in the OS temporary directory, and does not write to the source project.
+4. Click **Open in Platform Designer** to open a `.qsys` file directly. For exported Tcl, Qsys View converts a disposable copy to a temporary `.qsys` file first.
+5. To inspect the source, use **Reopen Editor With… → Text Editor**.
+6. Click **Read interfaces…** to read exact interface types, ports, and parameters. The extension asks before running IP Tcl, works on a disposable copy in the OS temporary directory, and does not write to the source project.
 
 The static Tcl reader supports exported, declarative Platform Designer commands such as `add_instance`, `set_instance_parameter_value`, `add_connection`, and `set_connection_parameter_value`. It does not evaluate arbitrary Tcl expressions or source other scripts. Until Quartus elaborates the system, Tcl connection types are therefore intentionally shown as unknown grey links.
 
@@ -102,6 +103,7 @@ Qsys View finds `qsys-script` through `QUARTUS_ROOTDIR`, conventional Intel FPGA
 | Setting | Description |
 | --- | --- |
 | `qsysView.quartusPath` | Quartus installation directory or direct path to `qsys-script` |
+| `qsysView.platformDesignerPath` | Direct path to `qsys-edit` on Linux or `qsys.exe` on Windows |
 | `qsysView.ipSearchPaths` | Additional Platform Designer IP search paths; `${qsysDir}` and `${workspaceFolder}` are supported |
 
 ## Development

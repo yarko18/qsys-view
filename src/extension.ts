@@ -11,7 +11,7 @@ import type { QsysGraph } from '../parser/graph';
 import { applyQuartusMetadata } from '../parser/quartusMetadataParser';
 import { parseQsys } from '../parser/qsysParser';
 import { parseQsysTcl } from '../parser/qsysTclParser';
-import { qsysScriptArguments, qsysTclExportWrapper, qsysTclScriptArguments, temporaryPlatformDesignerDirectory } from './qsysScript';
+import { qsysScriptArguments, qsysTclExportWrapper, qsysTclScriptArguments } from './qsysScript';
 
 class QsysDocument implements vscode.CustomDocument {
   constructor(readonly uri: vscode.Uri) {}
@@ -52,6 +52,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
         await this.confirmAndLoadQuartus(document.uri, panel.webview);
       } else if (message.type === 'openPlatformDesigner') {
         await this.openPlatformDesigner(document.uri);
+        await panel.webview.postMessage({ type: 'platformDesignerFinished' });
       }
     });
 
@@ -250,9 +251,14 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       void vscode.window.showErrorMessage('Open in Platform Designer is available only for local files.');
       return;
     }
+    if (!vscode.workspace.isTrusted) {
+      void vscode.window.showWarningMessage(
+        'Trust this workspace before opening the design in Platform Designer. Platform Designer may execute project IP Tcl files.',
+      );
+      return;
+    }
     try {
       const platformDesignerExecutable = await this.findPlatformDesigner(uri);
-      const qsysScriptExecutable = await this.findQsysScript(uri);
       await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
@@ -260,7 +266,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
         },
         async (progress) => {
           const launchTarget = isQsysTcl(uri)
-            ? await this.prepareTemporaryQsys(uri, qsysScriptExecutable, progress)
+            ? await this.prepareTemporaryQsys(uri, await this.findQsysScript(uri), progress)
             : { filePath: uri.fsPath, cleanup: undefined as (() => Promise<void>) | undefined };
           progress.report({ message: 'Launching Platform Designer…' });
           await this.launchPlatformDesigner(platformDesignerExecutable, launchTarget.filePath, launchTarget.cleanup);
@@ -278,13 +284,14 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     executable: string,
     progress?: vscode.Progress<{ message?: string }>,
   ): Promise<{ filePath: string; cleanup?: () => Promise<void> }> {
-    const temporaryDirectory = temporaryPlatformDesignerDirectory(uri.fsPath);
+    const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'qsys-view-pd-'));
     const temporaryQsys = path.join(temporaryDirectory, `${path.basename(uri.fsPath, path.extname(uri.fsPath))}.qsys`);
+    const temporaryScript = path.join(temporaryDirectory, 'design.tcl');
     const wrapper = path.join(temporaryDirectory, 'export-system.tcl');
     try {
       progress?.report({ message: 'Converting Tcl to temporary Qsys…' });
-      await fs.mkdir(temporaryDirectory, { recursive: true });
-      await fs.writeFile(wrapper, qsysTclExportWrapper(uri.fsPath, temporaryQsys));
+      await fs.copyFile(uri.fsPath, temporaryScript);
+      await fs.writeFile(wrapper, qsysTclExportWrapper(temporaryScript, temporaryQsys));
       const searchPath = this.ipSearchPath(uri, path.dirname(uri.fsPath));
       await runQsysScript(executable, qsysTclScriptArguments(searchPath, wrapper), temporaryDirectory);
       return {
@@ -301,20 +308,11 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
 
   private launchPlatformDesigner(executable: string, filePath: string, cleanup?: () => Promise<void>): Promise<void> {
     return new Promise((resolve, reject) => {
-      const shellCommand = [
-        'source ~/.bashrc >/dev/null 2>&1 || true',
-        `exec ${shellQuote(executable)} ${shellQuote(filePath)}`,
-      ].join('\n');
-      const child = spawn('/bin/bash', ['-lc', shellCommand], {
+      const child = spawn(executable, [filePath], {
         cwd: path.dirname(filePath),
         detached: true,
         stdio: 'ignore',
-        env: {
-          ...process.env,
-          DISPLAY: process.env.DISPLAY ?? ':0',
-          WAYLAND_DISPLAY: process.env.WAYLAND_DISPLAY ?? '',
-          QT_QPA_PLATFORM: process.env.QT_QPA_PLATFORM ?? 'xcb',
-        },
+        windowsHide: true,
       });
       child.once('error', (error) => {
         const err = error as NodeJS.ErrnoException;
@@ -424,10 +422,6 @@ function platformDesignerCandidates(location: string): string[] {
     path.join(location, 'sopc_builder', 'bin', platformDesignerExecutableName()),
     path.join(location, 'quartus', 'sopc_builder', 'bin', platformDesignerExecutableName()),
   ];
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
 function runQsysScript(executable: string, args: string[], cwd: string): Promise<string> {

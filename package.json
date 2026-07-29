@@ -55,7 +55,7 @@
           "type": "string",
           "default": "",
           "scope": "resource",
-          "description": "Path to the Platform Designer executable (qsys or qsys.exe). Leave empty to use qsysView.quartusPath, QUARTUS_ROOTDIR, conventional install locations, or PATH."
+          "description": "Path to the Platform Designer executable (qsys-edit or qsys.exe). Leave empty to use qsysView.quartusPath, QUARTUS_ROOTDIR, conventional install locations, or PATH."
         },
         "qsysView.ipSearchPaths": {
           "type": "array",

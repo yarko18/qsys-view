@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, expect, it } from 'vitest';
-import { qsysScriptArguments, qsysTclExportWrapper, qsysTclScriptArguments, temporaryPlatformDesignerDirectory } from '../src/qsysScript';
+import { qsysScriptArguments, qsysTclExportWrapper, qsysTclScriptArguments } from '../src/qsysScript';
 
 describe('qsysScriptArguments', () => {
   it.each([
@@ -42,10 +42,12 @@ describe('qsysTclExportWrapper', () => {
       '',
     ].join('\n'));
   });
-});
 
-describe('temporaryPlatformDesignerDirectory', () => {
-  it('creates a sibling folder named tmp_<stem> for Tcl sources', () => {
-    expect(temporaryPlatformDesignerDirectory('/tmp/project/design.tcl')).toBe('/tmp/project/tmp_design');
+  it('quotes Tcl substitutions in file paths', () => {
+    expect(qsysTclExportWrapper('/tmp/$source[0].tcl', '/tmp/output[0]$.qsys')).toEqual([
+      'source "/tmp/\\$source\\[0].tcl"',
+      'save_system "/tmp/output\\[0]\\$.qsys"',
+      '',
+    ].join('\n'));
   });
 });

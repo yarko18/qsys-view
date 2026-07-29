@@ -36,17 +36,14 @@ export function qsysTclExportWrapper(sourcePath: string, generatedSystemPath: st
   ].join('\n');
 }
 
-export function temporaryPlatformDesignerDirectory(sourcePath: string): string {
-  const directory = path.dirname(sourcePath);
-  const extension = path.extname(sourcePath);
-  const stem = path.basename(sourcePath, extension).replace(/[^A-Za-z0-9._-]+/g, '_');
-  return path.join(directory, `tmp_${stem}`);
-}
-
 function normalizeTclPath(value: string): string {
   return value.replaceAll('\\', '/');
 }
 
 function quoteTclValue(value: string): string {
-  return `"${value.replaceAll('"', '\\"')}"`;
+  return `"${value
+    .replaceAll('\\', '\\\\')
+    .replaceAll('"', '\\"')
+    .replaceAll('$', '\\$')
+    .replaceAll('[', '\\[')}"`;
 }

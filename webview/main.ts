@@ -167,7 +167,8 @@ quartusMetadata.addEventListener('click', () => {
 });
 const openPlatformDesigner = required<HTMLButtonElement>('open-platform-designer');
 openPlatformDesigner.addEventListener('click', () => {
-  showStatus('Launching Platform Designer…');
+  openPlatformDesigner.disabled = true;
+  openPlatformDesigner.textContent = 'Opening Platform Designer…';
   vscode.postMessage({ type: 'openPlatformDesigner' });
 });
 search.addEventListener('input', updateSearch);
@@ -191,6 +192,9 @@ window.addEventListener('message', (event: MessageEvent) => {
     quartusMetadata.disabled = false;
     quartusMetadata.textContent = graph?.metadata.source === 'quartus' ? 'Read interfaces again…' : 'Read interfaces…';
     hideStatus();
+  } else if (message.type === 'platformDesignerFinished') {
+    openPlatformDesigner.disabled = false;
+    openPlatformDesigner.textContent = 'Open in Platform Designer';
   }
 });
 
