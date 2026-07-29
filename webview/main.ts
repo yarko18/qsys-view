@@ -101,7 +101,7 @@ app.innerHTML = `
       <label class="view-mode">View
         <select id="view-mode" aria-label="Graph view mode">
           <option value="pipeline">Pipeline</option>
-          <option value="complete">Complete</option>
+          <option value="complete">Classic</option>
         </select>
       </label>
       <div id="kind-filters" class="filters"></div>
@@ -357,7 +357,7 @@ async function render(): Promise<void> {
     if (!stableLayoutCaches[mode]) {
       showStatus(state.viewMode === 'pipeline' && structuralConnections.some((connection) => connection.kind === 'avalon_streaming')
         ? 'Calculating Avalon-ST anchored layout…'
-        : `Calculating ${state.viewMode} layout…`);
+        : `Calculating ${state.viewMode === 'complete' ? 'Classic' : 'Pipeline'} layout…`);
     }
     const baseLayout = mode === 'pipeline' ? layoutAnchoredGraph : layoutGraph;
     const stable = await layoutStableGraph(

@@ -28,7 +28,7 @@ Qsys View is a read-only Visual Studio Code viewer for Intel Platform Designer s
 
 Qsys View has two modes:
 
-| Interface | Pipeline | Complete |
+| Interface | Pipeline | Classic |
 | --- | --- | --- |
 | Avalon-ST | Directed edge and layout anchor | Directed edge |
 | Conduit | Directed edge | Directed edge |
@@ -52,7 +52,7 @@ Quartus analysis is user-triggered and runs on a disposable copy. It supplies ex
 
 ## Hierarchical systems
 
-When an IP type matches a sibling `.qsys` or `.tcl` file, its block has a **+** control. Expanding replaces only that instance with its internal graph, reconnects parent links through exported interfaces, and surrounds the child with a dashed container kept clear of top-level IP. Use **−** to collapse the container or **↘** to enter it as the complete canvas.
+When an IP type matches a sibling `.qsys` or `.tcl` file, its block has a **+** control. Expanding replaces only that instance with its internal graph, reconnects parent links through exported interfaces, and surrounds the child with a dashed container kept clear of top-level IP. Use **−** to collapse the container or **↘** to enter it as the full canvas.
 
 If the parent was read with **Read interfaces…**, expanded children are analyzed too. Nested Tcl connections therefore keep their exact interface types in Pipeline view, while exported clock and reset bridges remain part of the parent domain.
 
@@ -60,7 +60,7 @@ Choose **Enter subsystem** in the IP details to navigate within the current view
 
 ## Controls
 
-- **View** switches between Complete and Pipeline.
+- **View** switches between Classic and Pipeline.
 - **All IP** includes IP without visible functional connections; off by default. Clock/reset highlighting alone does not make an IP visible.
 - **Disabled IP** includes disabled instances; off by default.
 - **Infer clk/reset** controls name inference; on by default.
@@ -71,7 +71,7 @@ Choose **Enter subsystem** in the IP details to navigate within the current view
 - **Relayout** recalculates the active mode; **Fit** fits it to the viewport.
 - Drag to pan, use the wheel to zoom, and search by instance name or IP type.
 
-New viewers start in Complete mode. With **Remember Last View State** enabled, Qsys View reuses the last mode, interface filters, IP visibility options, and name-inference choice across editors.
+New viewers start in Classic mode. With **Remember Last View State** enabled, Qsys View reuses the last mode, interface filters, IP visibility options, and name-inference choice across editors.
 
 ## Installation
 
@@ -111,7 +111,7 @@ npm run package
 
 ## Scope
 
-Qsys View does not edit Qsys or Tcl sources and its static diagnostics do not replace Platform Designer validation. Unknown Tcl connections remain grey in Complete mode until their type is explicit, inferred, or resolved by Quartus. Waveforms are protocol illustrations, not simulation output.
+Qsys View does not edit Qsys or Tcl sources and its static diagnostics do not replace Platform Designer validation. Unknown Tcl connections remain grey in Classic mode until their type is explicit, inferred, or resolved by Quartus. Waveforms are protocol illustrations, not simulation output.
 
 ## License
 

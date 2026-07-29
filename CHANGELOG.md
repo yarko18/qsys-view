@@ -21,6 +21,9 @@ SPDX-License-Identifier: MIT
 - Hide interface-analysis controls while metadata is current and invalidate it when a loaded Qsys or Tcl source changes.
 - Hide clock/reset-only IP unless All IP is enabled, while retaining functional Avalon-MM and IRQ hub endpoints.
 - Disable Pipeline view for Tcl until every visible hierarchy level has exact Quartus interface metadata.
+- Recursively prepare sibling Tcl subsystems before analyzing a top-level export and retain the first useful Quartus errors instead of a noisy log tail.
+- Keep an expanded subsystem inline with its parent pipeline while moving only top-level IP that would overlap its container.
+- Rename the user-facing Complete mode to Classic mode.
 
 ## 1.0.5
 
