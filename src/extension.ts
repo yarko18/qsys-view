@@ -39,6 +39,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     panel.webview.html = this.getHtml(panel.webview);
 
     const key = document.uri.toString();
+    const loadedResources = new Set([key]);
     const documentPanels = this.panels.get(key) ?? new Set<vscode.WebviewPanel>();
     documentPanels.add(panel);
     this.panels.set(key, documentPanels);
@@ -69,6 +70,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       } else if (message.type === 'revealDiagnostic' && Number.isInteger(message.line)) {
         await this.revealSource(message.resource ? subsystemUri(message.resource) : document.uri, message.line!);
       } else if (message.type === 'loadSubsystem' && message.resource && message.instanceId) {
+        loadedResources.add(message.resource);
         await this.sendSubsystem(message.resource, message.instanceId, Boolean(message.analyze), panel.webview);
       } else if (message.type === 'openSubsystem' && message.resource) {
         await this.openSubsystem(message.resource);
@@ -78,7 +80,9 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     });
 
     const watcher = vscode.workspace.onDidChangeTextDocument((event) => {
-      if (event.document.uri.toString() === key) void sendGraph();
+      if (loadedResources.has(event.document.uri.toString())) {
+        void this.sendGraph(event.document.uri, panel.webview);
+      }
     });
     panel.onDidDispose(() => watcher.dispose());
   }

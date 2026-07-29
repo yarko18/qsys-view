@@ -111,7 +111,7 @@ app.innerHTML = `
         <button id="subsystem-back" title="Return to the parent system">← Back</button>
         <span id="subsystem-path"></span>
       </div>
-      <label class="option" title="Classify unknown Tcl interfaces from common clock and reset names"><input id="infer-clock-reset" type="checkbox"> Infer clk/reset</label>
+      <label id="infer-clock-reset-option" class="option" title="Classify unknown Tcl interfaces from common clock and reset names"><input id="infer-clock-reset" type="checkbox"> Infer clk/reset</label>
       <label class="option"><input id="show-disconnected" type="checkbox"> All IP</label>
       <label class="option"><input id="show-disabled" type="checkbox"> Disabled IP</label>
       <div id="expanded-subsystems" class="expanded-subsystems hidden"></div>
@@ -149,6 +149,7 @@ const viewMode = required<HTMLSelectElement>('view-mode');
 const quartusMetadata = required<HTMLButtonElement>('quartus-metadata');
 const interfaceHubs = required<HTMLElement>('interface-hubs');
 const inferClockResetNames = required<HTMLInputElement>('infer-clock-reset');
+const inferClockResetOption = required<HTMLElement>('infer-clock-reset-option');
 const expandedSubsystemControls = required<HTMLElement>('expanded-subsystems');
 const subsystemNavigation = required<HTMLElement>('subsystem-navigation');
 const subsystemPath = required<HTMLElement>('subsystem-path');
@@ -245,8 +246,7 @@ window.addEventListener('message', (event: MessageEvent) => {
   };
   if (message.type === 'graph' && message.graph) {
     if (activeResource && message.resource && message.resource !== activeResource) {
-      const frame = [...navigationStack].reverse().find((candidate) => candidate.resource === message.resource);
-      if (frame) frame.sourceGraph = message.graph;
+      updateInactiveResourceGraph(message.resource, message.graph);
       return;
     }
     const firstGraph = !sourceGraph;
@@ -260,8 +260,7 @@ window.addEventListener('message', (event: MessageEvent) => {
     graph = composeHierarchy(sourceGraph, expandedSubsystems);
     if (firstGraph) didInitialFit = false;
     required<HTMLElement>('system-name').textContent = sourceGraph.name;
-    quartusMetadata.disabled = false;
-    quartusMetadata.textContent = graph.metadata.source === 'quartus' ? 'Read interfaces again…' : 'Read interfaces…';
+    updateAnalysisControls();
     updateDiagnostics(graph.diagnostics ?? []);
     updateExpandedSubsystemControls();
     updateSubsystemNavigation();
@@ -292,8 +291,7 @@ window.addEventListener('message', (event: MessageEvent) => {
     quartusMetadata.textContent = 'Retry Quartus metadata';
     showStatus(message.message ?? 'Unable to read interface metadata with Quartus.', true);
   } else if (message.type === 'metadataCancelled') {
-    quartusMetadata.disabled = false;
-    quartusMetadata.textContent = graph?.metadata.source === 'quartus' ? 'Read interfaces again…' : 'Read interfaces…';
+    updateAnalysisControls();
     hideStatus();
   } else if (message.type === 'platformDesignerFinished') {
     openPlatformDesigner.disabled = false;
@@ -1117,8 +1115,7 @@ function enterSubsystem(child: QsysGraph, resource: string): void {
   pendingSubsystemActions.clear();
   details.classList.add('hidden');
   required<HTMLElement>('system-name').textContent = sourceGraph.name;
-  quartusMetadata.disabled = false;
-  quartusMetadata.textContent = sourceGraph.metadata.source === 'quartus' ? 'Read interfaces again…' : 'Read interfaces…';
+  updateAnalysisControls();
   updateDiagnostics(sourceGraph.diagnostics ?? []);
   updateExpandedSubsystemControls();
   updateSubsystemNavigation();
@@ -1143,8 +1140,7 @@ function leaveSubsystem(): void {
   pendingSubsystemActions.clear();
   details.classList.add('hidden');
   required<HTMLElement>('system-name').textContent = sourceGraph.name;
-  quartusMetadata.disabled = false;
-  quartusMetadata.textContent = sourceGraph.metadata.source === 'quartus' ? 'Read interfaces again…' : 'Read interfaces…';
+  updateAnalysisControls();
   updateDiagnostics(sourceGraph.diagnostics ?? []);
   updateExpandedSubsystemControls();
   updateSubsystemNavigation();
@@ -1157,6 +1153,33 @@ function updateSubsystemNavigation(): void {
   subsystemPath.textContent = sourceGraph
     ? [...navigationStack.map((frame) => frame.sourceGraph.name), sourceGraph.name].join(' › ')
     : '';
+}
+
+function updateAnalysisControls(): void {
+  const exact = sourceGraph?.metadata.source === 'quartus'
+    && [...expandedSubsystems.values()].every((child) => child.metadata.source === 'quartus');
+  quartusMetadata.classList.toggle('hidden', Boolean(exact));
+  inferClockResetOption.classList.toggle('hidden', Boolean(exact));
+  quartusMetadata.disabled = false;
+  quartusMetadata.textContent = 'Read interfaces…';
+}
+
+function updateInactiveResourceGraph(resource: string, nextGraph: QsysGraph): void {
+  let changedCurrentHierarchy = false;
+  for (const [instanceId, expandedResource] of expandedSubsystemResources) {
+    if (expandedResource !== resource || !expandedSubsystems.has(instanceId)) continue;
+    expandedSubsystems.set(instanceId, nextGraph);
+    changedCurrentHierarchy = true;
+  }
+  for (const frame of navigationStack) {
+    if (frame.resource === resource) frame.sourceGraph = nextGraph;
+    for (const [instanceId, expandedResource] of frame.expandedSubsystemResources) {
+      if (expandedResource === resource && frame.expandedSubsystems.has(instanceId)) {
+        frame.expandedSubsystems.set(instanceId, nextGraph);
+      }
+    }
+  }
+  if (changedCurrentHierarchy) refreshComposedHierarchy();
 }
 
 function collapseSubsystem(instanceId: string): void {
@@ -1187,6 +1210,7 @@ function refreshComposedHierarchy(): void {
   didInitialFit = false;
   details.classList.add('hidden');
   updateExpandedSubsystemControls();
+  updateAnalysisControls();
   updateKindFilters();
   void render();
 }
