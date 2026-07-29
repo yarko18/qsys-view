@@ -44,6 +44,17 @@ function addPort(module: QsysModule, interfaceName: string): void {
   module.ports.push(port);
 }
 
+function connectionId(
+  connection: PendingConnection,
+  duplicateCounts: Map<string, number>,
+): string {
+  if (connection.name) return connection.name;
+  const base = `tcl:${connection.sourceEndpoint}->${connection.targetEndpoint}`;
+  const duplicate = duplicateCounts.get(base) ?? 0;
+  duplicateCounts.set(base, duplicate + 1);
+  return duplicate === 0 ? base : `${base}#${duplicate + 1}`;
+}
+
 /**
  * Parses the linear Tcl emitted by Platform Designer's “Export System as
  * Platform Designer script” command. It deliberately does not evaluate Tcl.
@@ -160,6 +171,7 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
     if (declared.exportOf) exportedKinds.set(declared.exportOf, declared.kind);
   }
   const connections: QsysConnection[] = [];
+  const duplicateConnectionCounts = new Map<string, number>();
   for (const connection of rawConnections) {
     const [source, sourcePort] = splitEndpoint(connection.sourceEndpoint);
     const [target, targetPort] = splitEndpoint(connection.targetEndpoint);
@@ -176,7 +188,7 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
       || exportedKinds.get(connection.targetEndpoint)
       || '';
     connections.push({
-      id: connection.name || `connection-${connections.length}`,
+      id: connectionId(connection, duplicateConnectionCounts),
       source,
       sourcePort,
       target,

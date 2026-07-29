@@ -54,7 +54,7 @@ describe('parseQsysTcl', () => {
     `);
 
     expect(graph.connections).toMatchObject([
-      { id: 'connection-0', kind: 'avalon_streaming', rawKind: 'avalon_streaming' },
+      { id: 'tcl:source.out->stream_sink.in', kind: 'avalon_streaming', rawKind: 'avalon_streaming' },
       { id: 'status_link', kind: 'conduit', rawKind: 'conduit' },
     ]);
     expect(graph.warnings.join('\n')).not.toContain('add_interface');
@@ -98,5 +98,37 @@ describe('parseQsysTcl', () => {
 
   it('rejects malformed Tcl words with a useful line number', () => {
     expect(() => parseQsysTcl('add_instance {broken type 1.0')).toThrow(/line 1.*unmatched brace/i);
+  });
+
+  it('keeps unnamed connection identities stable when an earlier connection is removed', () => {
+    const prefix = `
+      add_instance source source_type 1.0
+      add_instance middle middle_type 1.0
+      add_instance sink sink_type 1.0
+    `;
+    const original = parseQsysTcl(`${prefix}
+      add_connection source.out middle.in
+      add_connection middle.out sink.in
+    `);
+    const changed = parseQsysTcl(`${prefix}
+      add_connection middle.out sink.in
+    `);
+
+    expect(original.connections[1]?.id).toBe('tcl:middle.out->sink.in');
+    expect(changed.connections[0]?.id).toBe(original.connections[1]?.id);
+  });
+
+  it('gives duplicate unnamed connections unique deterministic identities', () => {
+    const graph = parseQsysTcl(`
+      add_instance source source_type 1.0
+      add_instance sink sink_type 1.0
+      add_connection source.out sink.in
+      add_connection source.out sink.in
+    `);
+
+    expect(graph.connections.map((connection) => connection.id)).toEqual([
+      'tcl:source.out->sink.in',
+      'tcl:source.out->sink.in#2',
+    ]);
   });
 });
