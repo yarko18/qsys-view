@@ -5,6 +5,10 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## Unreleased
+
+- Keep graph connections visually subdued while highlighting clock, reset, Avalon-MM, or interrupt domains.
+
 ## 1.0.2
 
 - Support for exported Platform Designer Tcl scripts, with static parsing and optional exact Quartus elaboration.

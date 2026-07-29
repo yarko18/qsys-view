@@ -433,6 +433,9 @@ function restoreActiveHub(): void {
 
 function applyHubHighlight(hub: InterfaceHub | undefined): void {
   const related = new Set(hub?.relatedModuleIds ?? []);
+  scene.querySelectorAll<SVGGElement>('.edge').forEach((edge) => {
+    edge.classList.toggle('hub-dimmed', Boolean(hub));
+  });
   scene.querySelectorAll<SVGGElement>('.node').forEach((node) => {
     const moduleId = node.dataset.moduleId ?? '';
     if (hub) node.style.setProperty('--active-hub-color', hubColor(hub));

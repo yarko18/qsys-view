@@ -161,7 +161,14 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .node.hub-origin rect { stroke: var(--active-hub-color); stroke-dasharray: 3 2; stroke-width: 3; }
 .node-name { fill: var(--vscode-editor-foreground); font-size: 15px; font-weight: 600; }
 .node-kind { fill: var(--vscode-descriptionForeground); font-size: 10px; }
-.edge { --edge-color: var(--vscode-descriptionForeground); color: var(--edge-color); cursor: pointer; outline: none; }
+.edge {
+  --edge-color: var(--vscode-descriptionForeground);
+  color: var(--edge-color);
+  cursor: pointer;
+  outline: none;
+  transition: opacity .15s;
+}
+.edge.hub-dimmed { opacity: .12; }
 .edge-line {
   fill: none;
   stroke: var(--edge-color);
