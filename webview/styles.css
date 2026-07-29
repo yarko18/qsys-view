@@ -38,6 +38,8 @@ button, input { font: inherit; color: inherit; }
 .brand strong { overflow: hidden; text-overflow: ellipsis; max-width: 230px; }
 .brand span { font-size: 10px; opacity: .65; }
 .filters { display: flex; flex-wrap: wrap; gap: 4px; }
+.expanded-subsystems { display: flex; flex-wrap: wrap; gap: 4px; }
+.expanded-subsystem { padding: 3px 7px; border-radius: 12px; font-size: 11px; }
 .kind-filter, .option {
   display: inline-flex;
   align-items: center;
@@ -212,6 +214,7 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
   vector-effect: non-scaling-stroke;
 }
 .node:hover rect, .node:focus rect { stroke-width: 2.5; filter: brightness(1.08); }
+.node.nested > rect { stroke-dasharray: 4 2; }
 .node.disabled { opacity: .48; }
 .node.disabled rect { stroke-dasharray: 5 4; }
 .node.match rect { stroke: var(--vscode-charts-yellow); stroke-width: 4; }
@@ -221,6 +224,25 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .node.hub-origin rect { stroke: var(--active-hub-color); stroke-dasharray: 3 2; stroke-width: 3; }
 .node-name { fill: var(--vscode-editor-foreground); font-size: 15px; font-weight: 600; }
 .node-kind { fill: var(--vscode-descriptionForeground); font-size: 10px; }
+.node-hierarchy { fill: var(--vscode-descriptionForeground); font-size: 8px; text-transform: uppercase; }
+.node-subsystem-control { outline: none; }
+.node-subsystem-control circle {
+  fill: var(--vscode-button-background);
+  stroke: var(--vscode-button-foreground);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.node-subsystem-control text {
+  fill: var(--vscode-button-foreground);
+  font-size: 15px;
+  font-weight: 700;
+  text-anchor: middle;
+  pointer-events: none;
+}
+.node-subsystem-control:hover circle, .node-subsystem-control:focus circle {
+  fill: var(--vscode-button-hoverBackground);
+  stroke-width: 2;
+}
 .edge {
   --edge-color: var(--vscode-descriptionForeground);
   color: var(--edge-color);
@@ -296,6 +318,7 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .details h3 { margin: 20px 0 8px; font-size: 12px; text-transform: uppercase; opacity: .7; }
 .details h4 { margin: 12px 0 6px; font-size: 11px; color: var(--vscode-descriptionForeground); }
 .details-type { color: var(--vscode-descriptionForeground); }
+.details-actions { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0; }
 .details-note, .waveform-note { margin: 10px 0; color: var(--vscode-descriptionForeground); font-size: 11px; line-height: 1.45; }
 .interface-kind { margin: -4px 0 7px; color: var(--vscode-descriptionForeground); font-size: 10px; }
 .metadata-unavailable { padding: 9px; border-left: 3px solid var(--vscode-charts-yellow); background: var(--vscode-textBlockQuote-background); color: var(--vscode-descriptionForeground); font-size: 11px; }
