@@ -73,6 +73,18 @@ When Pipeline view contains at least one Avalon-ST link, Qsys View calculates th
 
 ## Interface visualization
 
+| Interface Type | 	Direction |
+|--|--|
+|avalon | 	master, slave |
+|axi | 	master, slave |
+|tristate_conduit | 	master, slave |
+|avalon_streaming | 	source, sink |
+|interrupt | 	sender, receiver |
+|conduit | 	end |
+|clock | 	source, sink |
+|reset | 	source, sink |
+|nios_custom_instruction | 	slave  |
+
 | Interface | Pipeline view | Complete view |
 | --- | --- | --- |
 | Avalon-ST | Directed edge | Directed edge |

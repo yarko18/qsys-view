@@ -2,180 +2,30 @@
 // SPDX-License-Identifier: MIT
 
 import type { QsysConnection, QsysGraph, QsysModule, QsysPort } from './graph';
-
-interface TclCommand {
-  name: string;
-  words: string[];
-  line: number;
-}
+import { classifyConnection } from './qsysParser';
+import { parseTclCommands } from './tclCommands';
 interface PendingConnection {
   sourceEndpoint: string;
   targetEndpoint: string;
   line: number;
   parameters: Record<string, string>;
+  rawKind?: string;
+  name?: string;
+}
+
+interface DeclaredInterface {
+  kind: string;
+  direction: string;
+  exportOf?: string;
 }
 
 const ignoredCommands = new Set([
   'package',
   'set_project_property',
-  'add_interface',
-  'set_interface_property',
   'set_interconnect_requirement',
   'save_system',
   'sync_sysinfo_parameters',
 ]);
-
-function splitCommands(script: string): Array<{ text: string; line: number }> {
-  const commands: Array<{ text: string; line: number }> = [];
-  let current = '';
-  let line = 1;
-  let commandLine = 1;
-  let braceDepth = 0;
-  let bracketDepth = 0;
-  let quoted = false;
-  let escaped = false;
-  let comment = false;
-  let hasContent = false;
-
-  const finish = () => {
-    const text = current.trim();
-    if (text) commands.push({ text, line: commandLine });
-    current = '';
-    hasContent = false;
-    comment = false;
-  };
-
-  for (let index = 0; index < script.length; index++) {
-    const character = script[index]!;
-    if (comment) {
-      if (character === '\n') {
-        finish();
-        line++;
-        commandLine = line;
-      }
-      continue;
-    }
-    if (!hasContent && character === '#') {
-      comment = true;
-      continue;
-    }
-    if (escaped) {
-      current += character;
-      escaped = false;
-      if (character === '\n') line++;
-      continue;
-    }
-    if (character === '\\') {
-      current += character;
-      escaped = true;
-      hasContent = true;
-      continue;
-    }
-    if (character === '"' && braceDepth === 0) quoted = !quoted;
-    if (!quoted) {
-      if (character === '{') braceDepth++;
-      else if (character === '}' && braceDepth > 0) braceDepth--;
-      else if (braceDepth === 0 && character === '[') bracketDepth++;
-      else if (braceDepth === 0 && character === ']' && bracketDepth > 0) bracketDepth--;
-    }
-    const separator = !quoted && braceDepth === 0 && bracketDepth === 0
-      && (character === '\n' || character === ';');
-    if (separator) {
-      finish();
-      if (character === '\n') line++;
-      commandLine = line;
-      continue;
-    }
-    current += character;
-    if (!/\s/.test(character)) {
-      if (!hasContent) commandLine = line;
-      hasContent = true;
-    }
-    if (character === '\n') line++;
-  }
-  finish();
-  return commands;
-}
-
-function decodeEscapes(value: string): string {
-  return value.replace(/\\([\\nrt" ])/g, (_match, escaped: string) => {
-    if (escaped === 'n') return '\n';
-    if (escaped === 'r') return '\r';
-    if (escaped === 't') return '\t';
-    return escaped;
-  });
-}
-
-function tokenize(command: { text: string; line: number }): TclCommand | undefined {
-  const words: string[] = [];
-  const value = command.text;
-  let index = 0;
-  while (index < value.length) {
-    while (/\s/.test(value[index] ?? '')) index++;
-    if (index >= value.length) break;
-    const start = value[index];
-    if (start === '{') {
-      let depth = 1;
-      let word = '';
-      index++;
-      while (index < value.length && depth > 0) {
-        const character = value[index]!;
-        const next = value[index + 1];
-        if (character === '\\' && next !== undefined) {
-          word += character + next;
-          index += 2;
-          continue;
-        }
-        if (character === '{') depth++;
-        if (character === '}') depth--;
-        if (depth > 0) word += character;
-        index++;
-      }
-      if (depth !== 0) throw new Error(`Invalid Qsys Tcl at line ${command.line}: unmatched brace.`);
-      words.push(word);
-      continue;
-    }
-    if (start === '"') {
-      let word = '';
-      let closed = false;
-      index++;
-      while (index < value.length) {
-        const character = value[index]!;
-        const next = value[index + 1];
-        if (character === '\\' && next !== undefined) {
-          word += character + next;
-          index += 2;
-          continue;
-        }
-        if (character === '"') {
-          closed = true;
-          index++;
-          break;
-        }
-        word += character;
-        index++;
-      }
-      if (!closed) throw new Error(`Invalid Qsys Tcl at line ${command.line}: unmatched quote.`);
-      words.push(decodeEscapes(word));
-      continue;
-    }
-    let word = '';
-    while (index < value.length && !/\s/.test(value[index]!)) {
-      const character = value[index]!;
-      const next = value[index + 1];
-      if (character === '\\' && next !== undefined) {
-        word += character + next;
-        index += 2;
-      } else {
-        word += character;
-        index++;
-      }
-    }
-    words.push(decodeEscapes(word));
-  }
-  const [name, ...args] = words;
-  return name ? { name, words: args, line: command.line } : undefined;
-}
 
 function splitEndpoint(endpoint: string): [string, string] {
   const separator = endpoint.lastIndexOf('.');
@@ -199,7 +49,7 @@ function addPort(module: QsysModule, interfaceName: string): void {
  * Platform Designer script” command. It deliberately does not evaluate Tcl.
  */
 export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): QsysGraph {
-  const commands = splitCommands(script).map(tokenize).filter((command): command is TclCommand => Boolean(command));
+  const commands = parseTclCommands(script);
   const warnings: string[] = [];
   const unsupported = new Set<string>();
   const modules: QsysModule[] = [];
@@ -207,6 +57,7 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
   const pendingParameters = new Map<string, Record<string, string>>();
   const rawConnections: PendingConnection[] = [];
   const connectionByName = new Map<string, PendingConnection>();
+  const declaredInterfaces = new Map<string, DeclaredInterface>();
   let systemName = fallbackName;
 
   for (const command of commands) {
@@ -249,9 +100,35 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
       if (!moduleByName.has(instanceName)) pendingParameters.set(instanceName, parameters);
       continue;
     }
+    if (command.name === 'add_interface') {
+      const [name, kind, direction = ''] = command.words;
+      if (!name || !kind || hasSubstitution([name, kind, direction])) {
+        warnings.push(`Skipped dynamic or incomplete add_interface at line ${command.line}.`);
+        continue;
+      }
+      declaredInterfaces.set(name, { kind, direction });
+      continue;
+    }
+    if (command.name === 'add_interface_port') {
+      const [interfaceName] = command.words;
+      if (!interfaceName || hasSubstitution([interfaceName])) {
+        warnings.push(`Skipped dynamic or incomplete add_interface_port at line ${command.line}.`);
+      }
+      continue;
+    }
+    if (command.name === 'set_interface_property') {
+      const [interfaceName, property, value = ''] = command.words;
+      if (!interfaceName || !property || hasSubstitution([interfaceName, property])) continue;
+      if (property.toUpperCase() === 'EXPORT_OF') {
+        const declared = declaredInterfaces.get(interfaceName);
+        if (declared) declared.exportOf = value;
+        else warnings.push(`Interface property at line ${command.line} refers to unknown ${interfaceName}.`);
+      }
+      continue;
+    }
     if (command.name === 'add_connection') {
-      const [sourceEndpoint, targetEndpoint] = command.words;
-      if (!sourceEndpoint || !targetEndpoint || hasSubstitution(command.words)) {
+      const [sourceEndpoint, targetEndpoint, rawKind, name] = command.words;
+      if (!sourceEndpoint || !targetEndpoint || hasSubstitution([sourceEndpoint, targetEndpoint])) {
         warnings.push(`Skipped dynamic or incomplete connection at line ${command.line}.`);
         continue;
       }
@@ -260,6 +137,8 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
         targetEndpoint,
         line: command.line,
         parameters: {},
+        rawKind: rawKind && !hasSubstitution([rawKind]) ? rawKind : undefined,
+        name: name && !hasSubstitution([name]) ? name : undefined,
       };
       rawConnections.push(connection);
       connectionByName.set(`${sourceEndpoint}/${targetEndpoint}`, connection);
@@ -276,6 +155,10 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
     if (!ignoredCommands.has(command.name)) unsupported.add(command.name);
   }
 
+  const exportedKinds = new Map<string, string>();
+  for (const declared of declaredInterfaces.values()) {
+    if (declared.exportOf) exportedKinds.set(declared.exportOf, declared.kind);
+  }
   const connections: QsysConnection[] = [];
   for (const connection of rawConnections) {
     const [source, sourcePort] = splitEndpoint(connection.sourceEndpoint);
@@ -288,14 +171,18 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
     }
     addPort(sourceModule, sourcePort);
     addPort(targetModule, targetPort);
+    const rawKind = connection.rawKind
+      || exportedKinds.get(connection.sourceEndpoint)
+      || exportedKinds.get(connection.targetEndpoint)
+      || '';
     connections.push({
-      id: `connection-${connections.length}`,
+      id: connection.name || `connection-${connections.length}`,
       source,
       sourcePort,
       target,
       targetPort,
-      kind: 'other',
-      rawKind: 'unknown (static Tcl)',
+      kind: classifyConnection(rawKind),
+      rawKind: rawKind || 'unknown (static Tcl)',
       parameters: connection.parameters,
     });
   }
@@ -315,7 +202,7 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
     interfaces: {},
     metadata: {
       source: 'qsys-only',
-      label: 'Static Qsys Tcl view. Run qsys-script to resolve exact interface types and ports.',
+      label: 'Static Qsys Tcl view. Connections without an explicit kind remain unknown until qsys-script runs.',
     },
     warnings,
   };

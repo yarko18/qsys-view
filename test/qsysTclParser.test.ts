@@ -3,6 +3,7 @@
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { parseQsys } from '../parser/qsysParser';
 import { parseQsysTcl } from '../parser/qsysTclParser';
 
 describe('parseQsysTcl', () => {
@@ -37,6 +38,50 @@ describe('parseQsysTcl', () => {
       LABEL: 'hello world',
     });
     expect(graph.connections[0]?.parameters.baseAddress).toBe('0x20');
+  });
+
+  it('uses explicit connection kinds and exported interface declarations', () => {
+    const graph = parseQsysTcl(`
+      create_system demo
+      add_instance source source_type 1.0
+      add_instance conduit_sink conduit_type 1.0
+      add_instance stream_sink stream_type 1.0
+      add_interface stream_out avalon_streaming source
+      add_interface_port stream_out data data Output 24
+      set_interface_property stream_out EXPORT_OF source.out
+      add_connection source.out stream_sink.in
+      add_connection source.status conduit_sink.status conduit status_link
+    `);
+
+    expect(graph.connections).toMatchObject([
+      { id: 'connection-0', kind: 'avalon_streaming', rawKind: 'avalon_streaming' },
+      { id: 'status_link', kind: 'conduit', rawKind: 'conduit' },
+    ]);
+    expect(graph.warnings.join('\n')).not.toContain('add_interface');
+  });
+
+  it('builds the same internal topology as Qsys when Tcl connection kinds are explicit', () => {
+    const qsys = parseQsys(`
+      <system name="demo">
+        <module name="source" kind="source_type" enabled="1" />
+        <module name="sink" kind="sink_type" enabled="1" />
+        <connection name="stream" kind="avalon_streaming" start="source.out" end="sink.in">
+          <parameter name="latency" value="1" />
+        </connection>
+      </system>
+    `);
+    const tcl = parseQsysTcl(`
+      create_system demo
+      add_instance source source_type 1.0
+      add_instance sink sink_type 1.0
+      add_connection source.out sink.in avalon_streaming stream
+      set_connection_parameter_value source.out/sink.in latency 1
+    `);
+
+    expect(tcl.modules.map(({ id, type }) => ({ id, type }))).toEqual(
+      qsys.modules.map(({ id, type }) => ({ id, type })),
+    );
+    expect(tcl.connections).toEqual(qsys.connections);
   });
 
   it('warns about dynamic Tcl instead of pretending to evaluate it', () => {
