@@ -1,8 +1,11 @@
 // Copyright 2026 Yaroslav Mariukha
 // SPDX-License-Identifier: MIT
 
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { QsysConnection, QsysGraph, QsysModule } from '../parser/graph';
+import { parseQsys } from '../parser/qsysParser';
+import { parseQsysTcl } from '../parser/qsysTclParser';
 import { composeHierarchy } from '../webview/hierarchy';
 
 function module(id: string, type = 'ip'): QsysModule {
@@ -79,5 +82,27 @@ describe('composeHierarchy', () => {
       ['outer/inner', grandchild],
     ]));
     expect(recursive.modules.map((item) => item.id)).toEqual(['outer/inner/leaf', 'outer/peer']);
+  });
+
+  it.each(['qsys', 'tcl'] as const)('expands the real platform1.%s example through platform2 exports', (format) => {
+    const parse = format === 'qsys' ? parseQsys : parseQsysTcl;
+    const root = parse(readFileSync(new URL(`../example/platform1.${format}`, import.meta.url), 'utf8'), 'platform1');
+    const child = parse(readFileSync(new URL(`../example/platform2.${format}`, import.meta.url), 'utf8'), 'platform2');
+    const composed = composeHierarchy(root, new Map([['platform2_0', child]]));
+
+    expect(composed.modules.some((item) => item.id === 'platform2_0')).toBe(false);
+    expect(composed.modules.some((item) => item.id === 'platform2_0/sc_fifo_0')).toBe(true);
+    expect(composed.connections).toContainEqual(expect.objectContaining({
+      source: 'fir',
+      sourcePort: 'dout',
+      target: 'platform2_0/sc_fifo_0',
+      targetPort: 'in',
+    }));
+    expect(composed.connections).toContainEqual(expect.objectContaining({
+      source: 'platform2_0/scaler',
+      sourcePort: 'dout',
+      target: 'clipper',
+      targetPort: 'din',
+    }));
   });
 });
