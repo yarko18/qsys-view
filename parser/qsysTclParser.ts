@@ -1,7 +1,8 @@
 // Copyright 2026 Yaroslav Mariukha
 // SPDX-License-Identifier: MIT
 
-import type { QsysConnection, QsysGraph, QsysModule, QsysPort } from './graph';
+import type { QsysConnection, QsysDiagnostic, QsysGraph, QsysModule, QsysPort } from './graph';
+import { platformDesignerSystemCommands } from './platformDesignerCommands';
 import { classifyConnection } from './qsysParser';
 import { parseTclCommands } from './tclCommands';
 interface PendingConnection {
@@ -26,6 +27,50 @@ const ignoredCommands = new Set([
   'save_system',
   'sync_sysinfo_parameters',
 ]);
+
+const platformDesignerCommand = /^(?:add|create|delete|disable|enable|get|load|remove|save|set|sync)_/;
+const parsedCommands = new Set([
+  'create_system',
+  'add_instance',
+  'set_instance_parameter_value',
+  'add_interface',
+  'add_interface_port',
+  'set_interface_property',
+  'add_connection',
+  'set_connection_parameter_value',
+  ...ignoredCommands,
+]);
+const knownPlatformDesignerCommands = new Set([
+  ...platformDesignerSystemCommands,
+  ...parsedCommands,
+]);
+
+function editDistance(left: string, right: string): number {
+  let previous = [...Array(right.length + 1).keys()];
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex++) {
+    const current = [leftIndex];
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex++) {
+      current[rightIndex] = Math.min(
+        current[rightIndex - 1]! + 1,
+        previous[rightIndex]! + 1,
+        previous[rightIndex - 1]! + (left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1),
+      );
+    }
+    previous = current;
+  }
+  return previous[right.length]!;
+}
+
+function commandSuggestion(command: string): string | undefined {
+  if (!platformDesignerCommand.test(command) || knownPlatformDesignerCommands.has(command)) return undefined;
+  const candidates = [...knownPlatformDesignerCommands]
+    .map((candidate) => ({ candidate, distance: editDistance(command, candidate) }))
+    .sort((left, right) => left.distance - right.distance);
+  const best = candidates[0];
+  return best && best.distance <= Math.max(2, Math.floor(best.candidate.length * 0.25))
+    ? best.candidate
+    : undefined;
+}
 
 function splitEndpoint(endpoint: string): [string, string] {
   const separator = endpoint.lastIndexOf('.');
@@ -62,6 +107,7 @@ function connectionId(
 export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): QsysGraph {
   const commands = parseTclCommands(script);
   const warnings: string[] = [];
+  const diagnostics: QsysDiagnostic[] = [];
   const unsupported = new Set<string>();
   const modules: QsysModule[] = [];
   const moduleByName = new Map<string, QsysModule>();
@@ -70,6 +116,10 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
   const connectionByName = new Map<string, PendingConnection>();
   const declaredInterfaces = new Map<string, DeclaredInterface>();
   let systemName = fallbackName;
+  const report = (message: string, line?: number, severity: QsysDiagnostic['severity'] = 'warning') => {
+    warnings.push(message);
+    diagnostics.push({ severity, message, line });
+  };
 
   for (const command of commands) {
     if (command.name === 'create_system') {
@@ -79,11 +129,11 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
     if (command.name === 'add_instance') {
       const [name, type] = command.words;
       if (!name || !type || hasSubstitution(command.words)) {
-        warnings.push(`Skipped dynamic or incomplete add_instance at line ${command.line}.`);
+        report(`Skipped dynamic or incomplete add_instance at line ${command.line}.`, command.line);
         continue;
       }
       if (moduleByName.has(name)) {
-        warnings.push(`Skipped duplicate instance ${name} at line ${command.line}.`);
+        report(`Skipped duplicate instance ${name} at line ${command.line}.`, command.line);
         continue;
       }
       const module: QsysModule = {
@@ -101,7 +151,7 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
     if (command.name === 'set_instance_parameter_value') {
       const [instanceName, parameterName, parameterValue = ''] = command.words;
       if (!instanceName || !parameterName || hasSubstitution([instanceName, parameterName])) {
-        warnings.push(`Skipped dynamic or incomplete instance parameter at line ${command.line}.`);
+        report(`Skipped dynamic or incomplete instance parameter at line ${command.line}.`, command.line);
         continue;
       }
       const parameters = moduleByName.get(instanceName)?.parameters
@@ -114,7 +164,7 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
     if (command.name === 'add_interface') {
       const [name, kind, direction = ''] = command.words;
       if (!name || !kind || hasSubstitution([name, kind, direction])) {
-        warnings.push(`Skipped dynamic or incomplete add_interface at line ${command.line}.`);
+        report(`Skipped dynamic or incomplete add_interface at line ${command.line}.`, command.line);
         continue;
       }
       declaredInterfaces.set(name, { kind, direction });
@@ -123,7 +173,7 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
     if (command.name === 'add_interface_port') {
       const [interfaceName] = command.words;
       if (!interfaceName || hasSubstitution([interfaceName])) {
-        warnings.push(`Skipped dynamic or incomplete add_interface_port at line ${command.line}.`);
+        report(`Skipped dynamic or incomplete add_interface_port at line ${command.line}.`, command.line);
       }
       continue;
     }
@@ -133,14 +183,14 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
       if (property.toUpperCase() === 'EXPORT_OF') {
         const declared = declaredInterfaces.get(interfaceName);
         if (declared) declared.exportOf = value;
-        else warnings.push(`Interface property at line ${command.line} refers to unknown ${interfaceName}.`);
+        else report(`Interface property at line ${command.line} refers to unknown ${interfaceName}.`, command.line);
       }
       continue;
     }
     if (command.name === 'add_connection') {
       const [sourceEndpoint, targetEndpoint, rawKind, name] = command.words;
       if (!sourceEndpoint || !targetEndpoint || hasSubstitution([sourceEndpoint, targetEndpoint])) {
-        warnings.push(`Skipped dynamic or incomplete connection at line ${command.line}.`);
+        report(`Skipped dynamic or incomplete connection at line ${command.line}.`, command.line);
         continue;
       }
       const connection: PendingConnection = {
@@ -160,10 +210,23 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
       if (!connectionName || !parameterName) continue;
       const connection = connectionByName.get(connectionName);
       if (connection) connection.parameters[parameterName] = parameterValue;
-      else warnings.push(`Connection parameters at line ${command.line} refer to unknown ${connectionName}.`);
+      else report(`Connection parameters at line ${command.line} refer to unknown ${connectionName}.`, command.line);
       continue;
     }
-    if (!ignoredCommands.has(command.name)) unsupported.add(command.name);
+    if (!ignoredCommands.has(command.name)) {
+      const suggestion = commandSuggestion(command.name);
+      unsupported.add(command.name);
+      diagnostics.push({
+        severity: suggestion ? 'error' : 'warning',
+        message: suggestion
+          ? `Unknown Platform Designer command “${command.name}”. Did you mean “${suggestion}”?`
+          : platformDesignerCommand.test(command.name)
+            ? `Unsupported Platform Designer command “${command.name}” was ignored by the static viewer.`
+            : `Unsupported Tcl command “${command.name}” was ignored by the static viewer.`,
+        line: command.line,
+        command: command.name,
+      });
+    }
   }
 
   const exportedKinds = new Map<string, string>();
@@ -178,7 +241,10 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
     const sourceModule = moduleByName.get(source);
     const targetModule = moduleByName.get(target);
     if (!sourceModule || !targetModule) {
-      warnings.push(`Skipped connection ${connection.sourceEndpoint} → ${connection.targetEndpoint} at line ${connection.line}: module not found.`);
+      report(
+        `Skipped connection ${connection.sourceEndpoint} → ${connection.targetEndpoint} at line ${connection.line}: module not found.`,
+        connection.line,
+      );
       continue;
     }
     addPort(sourceModule, sourcePort);
@@ -200,12 +266,12 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
   }
 
   for (const instanceName of pendingParameters.keys()) {
-    if (!moduleByName.has(instanceName)) warnings.push(`Parameters refer to missing instance ${instanceName}.`);
+    if (!moduleByName.has(instanceName)) report(`Parameters refer to missing instance ${instanceName}.`);
   }
   if (unsupported.size > 0) {
     warnings.push(`Unsupported Tcl commands were ignored: ${[...unsupported].sort().join(', ')}.`);
   }
-  if (modules.length === 0) warnings.push('No instances were found in this Qsys Tcl file.');
+  if (modules.length === 0) report('No instances were found in this Qsys Tcl file.');
 
   return {
     name: systemName,
@@ -217,5 +283,6 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
       label: 'Static Qsys Tcl view. Connections without an explicit kind remain unknown until qsys-script runs.',
     },
     warnings,
+    diagnostics,
   };
 }

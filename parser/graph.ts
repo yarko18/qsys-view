@@ -42,6 +42,15 @@ export interface QsysMetadataStatus {
   path?: string;
 }
 
+export type QsysDiagnosticSeverity = 'error' | 'warning';
+
+export interface QsysDiagnostic {
+  severity: QsysDiagnosticSeverity;
+  message: string;
+  line?: number;
+  command?: string;
+}
+
 export interface QsysModule {
   id: string;
   name: string;
@@ -83,4 +92,5 @@ export interface QsysGraph {
   interfaces: Record<string, QsysInterface>;
   metadata: QsysMetadataStatus;
   warnings: string[];
+  diagnostics?: QsysDiagnostic[];
 }

@@ -1,7 +1,7 @@
 // Copyright 2026 Yaroslav Mariukha
 // SPDX-License-Identifier: MIT
 
-import { connectionKinds, type ConnectionKind, type QsysAdaptation, type QsysConnection, type QsysGraph, type QsysInterface, type QsysModule } from '../parser/graph';
+import { connectionKinds, type ConnectionKind, type QsysAdaptation, type QsysConnection, type QsysDiagnostic, type QsysGraph, type QsysInterface, type QsysModule } from '../parser/graph';
 import { streamParameters } from '../parser/streamMetadata';
 import { createInterfaceWaveform } from '../parser/waveform';
 import { layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, projectVisibleLayout, type LayoutPoint, type LayoutResult, type StableLayoutCache } from '../layout/elk';
@@ -90,6 +90,7 @@ app.innerHTML = `
       <label class="option"><input id="show-disconnected" type="checkbox"> All IP</label>
       <label class="option"><input id="show-disabled" type="checkbox"> Disabled IP</label>
       <input id="search" class="search" type="search" placeholder="Find IP…" aria-label="Find IP">
+      <button id="diagnostics-toggle" class="diagnostics-toggle hidden" title="Show Tcl parse problems"></button>
       <button id="quartus-metadata" title="Read exact interface metadata with qsys-script">Read interfaces…</button>
       <button id="open-platform-designer" title="Open this design in Intel Platform Designer">Open in Platform Designer</button>
       <button id="relayout" title="Recalculate the current layout">Relayout</button>
@@ -103,6 +104,10 @@ app.innerHTML = `
     </svg>
     <div id="interface-hubs" class="interface-hubs hidden"></div>
     <div id="status" class="status">Loading Qsys graph…</div>
+    <aside id="diagnostics" class="diagnostics hidden" aria-label="Tcl parse problems">
+      <header><strong>Tcl problems</strong><button id="diagnostics-close" title="Close">×</button></header>
+      <div id="diagnostics-list" class="diagnostics-list"></div>
+    </aside>
     <aside id="details" class="details hidden"></aside>
     <div class="legend">Drag to pan · Wheel to zoom · Click an IP for details</div>
   </main>`;
@@ -118,6 +123,9 @@ const viewMode = required<HTMLSelectElement>('view-mode');
 const quartusMetadata = required<HTMLButtonElement>('quartus-metadata');
 const interfaceHubs = required<HTMLElement>('interface-hubs');
 const inferClockResetNames = required<HTMLInputElement>('infer-clock-reset');
+const diagnosticsToggle = required<HTMLButtonElement>('diagnostics-toggle');
+const diagnosticsPanel = required<HTMLElement>('diagnostics');
+const diagnosticsList = required<HTMLElement>('diagnostics-list');
 
 const filterCheckboxes = new Map<ConnectionKind, { checkbox: HTMLInputElement; label: HTMLLabelElement }>();
 for (const kind of filterKinds) {
@@ -172,6 +180,8 @@ showDisabled.addEventListener('change', () => {
   void render();
 });
 required<HTMLButtonElement>('fit').addEventListener('click', fitView);
+diagnosticsToggle.addEventListener('click', () => diagnosticsPanel.classList.toggle('hidden'));
+required<HTMLButtonElement>('diagnostics-close').addEventListener('click', () => diagnosticsPanel.classList.add('hidden'));
 required<HTMLButtonElement>('relayout').addEventListener('click', () => {
   delete stableLayoutCaches[state.viewMode];
   activeHubId = undefined;
@@ -198,6 +208,7 @@ window.addEventListener('message', (event: MessageEvent) => {
     type?: string;
     graph?: QsysGraph;
     message?: string;
+    diagnostic?: QsysDiagnostic;
     rememberedViewState?: SavedViewState;
   };
   if (message.type === 'graph' && message.graph) {
@@ -212,9 +223,11 @@ window.addEventListener('message', (event: MessageEvent) => {
     required<HTMLElement>('system-name').textContent = graph.name;
     quartusMetadata.disabled = false;
     quartusMetadata.textContent = graph.metadata.source === 'quartus' ? 'Read interfaces again…' : 'Read interfaces…';
+    updateDiagnostics(graph.diagnostics ?? []);
     updateKindFilters();
     void render();
   } else if (message.type === 'error') {
+    updateDiagnostics(message.diagnostic ? [message.diagnostic] : []);
     showStatus(message.message ?? 'Unable to load Qsys file.', true);
   } else if (message.type === 'metadataError') {
     quartusMetadata.disabled = false;
@@ -848,6 +861,38 @@ function showStatus(message: string, error = false): void {
 }
 
 function hideStatus(): void { status.classList.add('hidden'); }
+function updateDiagnostics(diagnostics: QsysDiagnostic[]): void {
+  const wasOpen = !diagnosticsPanel.classList.contains('hidden');
+  diagnosticsList.replaceChildren();
+  const errorCount = diagnostics.filter((diagnostic) => diagnostic.severity === 'error').length;
+  const warningCount = diagnostics.length - errorCount;
+  diagnosticsToggle.classList.toggle('hidden', diagnostics.length === 0);
+  diagnosticsToggle.classList.toggle('has-errors', errorCount > 0);
+  diagnosticsToggle.textContent = [
+    errorCount > 0 ? `${errorCount} error${errorCount === 1 ? '' : 's'}` : '',
+    warningCount > 0 ? `${warningCount} warning${warningCount === 1 ? '' : 's'}` : '',
+  ].filter(Boolean).join(' · ');
+
+  for (const diagnostic of diagnostics) {
+    const item = document.createElement('button');
+    item.className = `diagnostic diagnostic-${diagnostic.severity}`;
+    const location = document.createElement('span');
+    location.textContent = diagnostic.line ? `Line ${diagnostic.line}` : diagnostic.severity;
+    const message = document.createElement('strong');
+    message.textContent = diagnostic.message;
+    item.append(location, message);
+    if (diagnostic.line) {
+      item.title = `Open source at line ${diagnostic.line}`;
+      item.addEventListener('click', () => {
+        vscode.postMessage({ type: 'revealDiagnostic', line: diagnostic.line });
+      });
+    } else {
+      item.disabled = true;
+    }
+    diagnosticsList.append(item);
+  }
+  diagnosticsPanel.classList.toggle('hidden', diagnostics.length === 0 || !wasOpen);
+}
 function clamp(value: number, min: number, max: number): number { return Math.min(max, Math.max(min, value)); }
 function truncate(value: string, length: number): string { return value.length > length ? `${value.slice(0, length - 1)}…` : value; }
 function saveState(): void {

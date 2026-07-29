@@ -48,7 +48,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
 
     const sendGraph = (loadQuartus = false, includeViewState = false) =>
       this.sendGraph(document.uri, panel.webview, loadQuartus, includeViewState);
-    panel.webview.onDidReceiveMessage(async (message: { type?: string; state?: unknown }) => {
+    panel.webview.onDidReceiveMessage(async (message: { type?: string; state?: unknown; line?: number }) => {
       if (message.type === 'ready') {
         await sendGraph(false, true);
       } else if (message.type === 'refresh') {
@@ -58,6 +58,8 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       } else if (message.type === 'openPlatformDesigner') {
         await this.openPlatformDesigner(document.uri);
         await panel.webview.postMessage({ type: 'platformDesignerFinished' });
+      } else if (message.type === 'revealDiagnostic' && Number.isInteger(message.line)) {
+        await this.revealSource(document.uri, message.line!);
       } else if (message.type === 'viewStateChanged' && message.state && typeof message.state === 'object') {
         await this.rememberViewState(document.uri, message.state);
       }
@@ -67,6 +69,19 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       if (event.document.uri.toString() === key) void sendGraph();
     });
     panel.onDidDispose(() => watcher.dispose());
+  }
+
+  private async revealSource(uri: vscode.Uri, oneBasedLine: number): Promise<void> {
+    const document = await vscode.workspace.openTextDocument(uri);
+    const line = Math.min(Math.max(0, oneBasedLine - 1), Math.max(0, document.lineCount - 1));
+    const position = new vscode.Position(line, 0);
+    const editor = await vscode.window.showTextDocument(document, {
+      viewColumn: vscode.ViewColumn.Beside,
+      preserveFocus: false,
+      preview: false,
+      selection: new vscode.Range(position, position),
+    });
+    editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
   }
 
   private async confirmAndLoadQuartus(uri: vscode.Uri, webview: vscode.Webview): Promise<void> {
@@ -145,9 +160,12 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
         : undefined;
       await webview.postMessage({ type: 'graph', graph, rememberedViewState });
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const line = /\bline\s+(\d+)\b/i.exec(message)?.[1];
       await webview.postMessage({
         type: 'error',
-        message: error instanceof Error ? error.message : String(error),
+        message,
+        diagnostic: line ? { severity: 'error', message, line: Number(line) } : undefined,
       });
     }
   }
