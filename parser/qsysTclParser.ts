@@ -20,6 +20,11 @@ interface DeclaredInterface {
   exportOf?: string;
 }
 
+interface PendingInstanceParameters {
+  values: Record<string, string>;
+  firstLine: number;
+}
+
 const ignoredCommands = new Set([
   'package',
   'set_project_property',
@@ -111,7 +116,7 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
   const unsupported = new Set<string>();
   const modules: QsysModule[] = [];
   const moduleByName = new Map<string, QsysModule>();
-  const pendingParameters = new Map<string, Record<string, string>>();
+  const pendingParameters = new Map<string, PendingInstanceParameters>();
   const rawConnections: PendingConnection[] = [];
   const connectionByName = new Map<string, PendingConnection>();
   const declaredInterfaces = new Map<string, DeclaredInterface>();
@@ -141,7 +146,7 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
         name,
         type,
         disabled: false,
-        parameters: pendingParameters.get(name) ?? {},
+        parameters: pendingParameters.get(name)?.values ?? {},
         ports: [],
       };
       modules.push(module);
@@ -154,11 +159,17 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
         report(`Skipped dynamic or incomplete instance parameter at line ${command.line}.`, command.line);
         continue;
       }
+      const pending = pendingParameters.get(instanceName);
       const parameters = moduleByName.get(instanceName)?.parameters
-        ?? pendingParameters.get(instanceName)
+        ?? pending?.values
         ?? {};
       parameters[parameterName] = parameterValue;
-      if (!moduleByName.has(instanceName)) pendingParameters.set(instanceName, parameters);
+      if (!moduleByName.has(instanceName)) {
+        pendingParameters.set(instanceName, {
+          values: parameters,
+          firstLine: pending?.firstLine ?? command.line,
+        });
+      }
       continue;
     }
     if (command.name === 'add_interface') {
@@ -265,8 +276,10 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
     });
   }
 
-  for (const instanceName of pendingParameters.keys()) {
-    if (!moduleByName.has(instanceName)) report(`Parameters refer to missing instance ${instanceName}.`);
+  for (const [instanceName, pending] of pendingParameters) {
+    if (!moduleByName.has(instanceName)) {
+      report(`Parameters refer to missing instance ${instanceName}.`, pending.firstLine);
+    }
   }
   if (unsupported.size > 0) {
     warnings.push(`Unsupported Tcl commands were ignored: ${[...unsupported].sort().join(', ')}.`);
