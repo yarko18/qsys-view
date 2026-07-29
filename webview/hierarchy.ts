@@ -7,6 +7,7 @@ interface ComposedParts {
   modules: QsysModule[];
   connections: QsysConnection[];
   interfaces: Record<string, QsysInterface>;
+  domainAliases: Record<string, string>;
 }
 
 interface Endpoint {
@@ -50,7 +51,7 @@ function composeParts(
   hierarchyPath: string[],
   expanded: ReadonlyMap<string, QsysGraph>,
 ): ComposedParts {
-  const parts: ComposedParts = { modules: [], connections: [], interfaces: {} };
+  const parts: ComposedParts = { modules: [], connections: [], interfaces: {}, domainAliases: {} };
 
   for (const module of graph.modules) {
     const child = expanded.get(qualified(prefix, module.id));
@@ -59,6 +60,7 @@ function composeParts(
       parts.modules.push(...nested.modules);
       parts.connections.push(...nested.connections);
       Object.assign(parts.interfaces, nested.interfaces);
+      Object.assign(parts.domainAliases, nested.domainAliases);
     } else {
       parts.modules.push({
         ...module,
@@ -79,6 +81,9 @@ function composeParts(
       target: target.module,
       targetPort: target.port,
     });
+
+    const alias = expandedDomainAlias(graph, prefix, connection, source, expanded);
+    if (alias) parts.domainAliases[alias.endpoint] = alias.canonical;
   }
 
   for (const [address, iface] of Object.entries(graph.interfaces)) {
@@ -105,5 +110,47 @@ export function composeHierarchy(
     modules: parts.modules,
     connections: parts.connections,
     interfaces: parts.interfaces,
+    domainAliases: parts.domainAliases,
+  };
+}
+
+/**
+ * A clock_source instance inside an expanded subsystem represents the same
+ * domain on both sides of its exported sink. Preserve that identity so the UI
+ * does not display a second domain merely because the hierarchy was expanded.
+ */
+function expandedDomainAlias(
+  graph: QsysGraph,
+  prefix: string,
+  connection: QsysConnection,
+  source: Endpoint,
+  expanded: ReadonlyMap<string, QsysGraph>,
+): { endpoint: string; canonical: string } | undefined {
+  if (connection.kind !== 'clock' && connection.kind !== 'reset') return undefined;
+  const instanceId = qualified(prefix, connection.target);
+  const child = expanded.get(instanceId);
+  const exported = child?.exportedInterfaces?.[connection.targetPort];
+  if (!child || !exported) return undefined;
+
+  const internalSink = splitEndpoint(exported);
+  const bridge = child.modules.find((module) => module.id === internalSink.module);
+  if (bridge?.type !== 'clock_source') return undefined;
+
+  const sourceEndpoints = [...new Set(child.connections
+    .filter((candidate) => candidate.kind === connection.kind && candidate.source === internalSink.module)
+    .map((candidate) => `${candidate.source}.${candidate.sourcePort}`))];
+  if (sourceEndpoints.length !== 1) return undefined;
+
+  const internalSource = splitEndpoint(sourceEndpoints[0]!);
+  const resolved = resolveEndpoint(
+    child,
+    childPrefix(prefix, connection.target),
+    internalSource.module,
+    internalSource.port,
+    expanded,
+  );
+  return {
+    endpoint: `${resolved.module}.${resolved.port}`,
+    canonical: `${source.module}.${source.port}`,
   };
 }

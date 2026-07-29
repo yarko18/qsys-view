@@ -37,10 +37,14 @@ export function createInterfaceHubs(
       || !allowedIds.has(connection.target)) continue;
 
     const incoming = connection.kind === 'interrupt';
-    const moduleId = incoming ? connection.target : connection.source;
-    const port = incoming ? connection.targetPort : connection.sourcePort;
+    const rawModuleId = incoming ? connection.target : connection.source;
+    const rawPort = incoming ? connection.targetPort : connection.sourcePort;
     const relatedModuleId = incoming ? connection.source : connection.target;
-    const endpoint = `${moduleId}.${port}`;
+    const rawEndpoint = `${rawModuleId}.${rawPort}`;
+    const endpoint = connection.kind === 'clock' || connection.kind === 'reset'
+      ? canonicalDomainEndpoint(graph, rawEndpoint)
+      : rawEndpoint;
+    const { moduleId, port } = splitEndpoint(endpoint);
     const id = `${connection.kind}:${endpoint}`;
     const existing = groups.get(id);
     if (existing) {
@@ -64,6 +68,23 @@ export function createInterfaceHubs(
     (kindOrder.get(left.kind) ?? 0) - (kindOrder.get(right.kind) ?? 0)
     || left.endpoint.localeCompare(right.endpoint),
   );
+}
+
+function canonicalDomainEndpoint(graph: QsysGraph, endpoint: string): string {
+  const visited = new Set<string>();
+  let current = endpoint;
+  while (graph.domainAliases?.[current] && !visited.has(current)) {
+    visited.add(current);
+    current = graph.domainAliases[current]!;
+  }
+  return current;
+}
+
+function splitEndpoint(endpoint: string): { moduleId: string; port: string } {
+  const separator = endpoint.lastIndexOf('.');
+  return separator < 0
+    ? { moduleId: endpoint, port: '' }
+    : { moduleId: endpoint.slice(0, separator), port: endpoint.slice(separator + 1) };
 }
 
 export function connectionAddress(connection: QsysConnection): string | undefined {

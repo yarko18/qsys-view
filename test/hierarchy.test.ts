@@ -25,6 +25,17 @@ function connection(id: string, source: string, sourcePort: string, target: stri
   };
 }
 
+function typedConnection(
+  id: string,
+  source: string,
+  sourcePort: string,
+  target: string,
+  targetPort: string,
+  kind: QsysConnection['kind'],
+): QsysConnection {
+  return { ...connection(id, source, sourcePort, target, targetPort), kind, rawKind: kind };
+}
+
 function graph(name: string, modules: QsysModule[], connections: QsysConnection[] = []): QsysGraph {
   return {
     name,
@@ -82,6 +93,27 @@ describe('composeHierarchy', () => {
       ['outer/inner', grandchild],
     ]));
     expect(recursive.modules.map((item) => item.id)).toEqual(['outer/inner/leaf', 'outer/peer']);
+  });
+
+  it('preserves clock and reset domain identity across an expanded clock_source', () => {
+    const root = graph('root', [module('root_clock', 'clock_source'), module('nested', 'child')], [
+      typedConnection('child-clock', 'root_clock', 'clk', 'nested', 'clock', 'clock'),
+      typedConnection('child-reset', 'root_clock', 'clk_reset', 'nested', 'reset', 'reset'),
+    ]);
+    const child = {
+      ...graph('child', [module('bridge', 'clock_source'), module('consumer')], [
+        typedConnection('clock', 'bridge', 'clk', 'consumer', 'clk', 'clock'),
+        typedConnection('reset', 'bridge', 'clk_reset', 'consumer', 'reset', 'reset'),
+      ]),
+      exportedInterfaces: { clock: 'bridge.clk_in', reset: 'bridge.clk_in_reset' },
+    };
+
+    const composed = composeHierarchy(root, new Map([['nested', child]]));
+
+    expect(composed.domainAliases).toEqual({
+      'nested/bridge.clk': 'root_clock.clk',
+      'nested/bridge.clk_reset': 'root_clock.clk_reset',
+    });
   });
 
   it.each(['qsys', 'tcl'] as const)('expands the real platform1.%s example through platform2 exports', (format) => {

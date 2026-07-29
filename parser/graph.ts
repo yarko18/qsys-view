@@ -101,4 +101,6 @@ export interface QsysGraph {
   warnings: string[];
   diagnostics?: QsysDiagnostic[];
   exportedInterfaces?: Record<string, string>;
+  /** Maps equivalent clock/reset source endpoints across expanded subsystem boundaries. */
+  domainAliases?: Record<string, string>;
 }
