@@ -68,6 +68,7 @@ let graph: QsysGraph | undefined;
 let layout: LayoutResult | undefined;
 const stableLayoutCaches: Partial<Record<GraphViewMode, StableLayoutCache>> = {};
 const expandedSubsystems = new Map<string, QsysGraph>();
+const expandedSubsystemResources = new Map<string, string>();
 const loadingSubsystems = new Set<string>();
 let activeHubId: string | undefined;
 let visibleHubs: InterfaceHub[] = [];
@@ -235,6 +236,7 @@ window.addEventListener('message', (event: MessageEvent) => {
     updateExpandedSubsystemControls();
     updateKindFilters();
     void render();
+    if (sourceGraph.metadata.source === 'quartus') analyzeExpandedSubsystems();
   } else if (message.type === 'subsystemGraph' && message.graph && message.instanceId) {
     loadingSubsystems.delete(message.instanceId);
     expandedSubsystems.set(message.instanceId, message.graph);
@@ -992,6 +994,7 @@ function subsystemExpandControl(module: QsysModule, nodeWidth: number): SVGGElem
 function requestSubsystemExpansion(module: QsysModule): void {
   if (!module.subsystem || loadingSubsystems.has(module.id)) return;
   loadingSubsystems.add(module.id);
+  expandedSubsystemResources.set(module.id, module.subsystem.resource);
   details.classList.add('hidden');
   if (layout) draw(layout);
   vscode.postMessage({
@@ -1004,9 +1007,21 @@ function requestSubsystemExpansion(module: QsysModule): void {
 
 function collapseSubsystem(instanceId: string): void {
   for (const id of [...expandedSubsystems.keys()]) {
-    if (id === instanceId || id.startsWith(`${instanceId}/`)) expandedSubsystems.delete(id);
+    if (id === instanceId || id.startsWith(`${instanceId}/`)) {
+      expandedSubsystems.delete(id);
+      expandedSubsystemResources.delete(id);
+    }
   }
   refreshComposedHierarchy();
+}
+
+function analyzeExpandedSubsystems(): void {
+  for (const [instanceId, child] of expandedSubsystems) {
+    const resource = expandedSubsystemResources.get(instanceId);
+    if (child.metadata.source === 'quartus' || !resource || loadingSubsystems.has(instanceId)) continue;
+    loadingSubsystems.add(instanceId);
+    vscode.postMessage({ type: 'loadSubsystem', instanceId, resource, analyze: true });
+  }
 }
 
 function refreshComposedHierarchy(): void {
