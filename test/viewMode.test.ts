@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, expect, it } from 'vitest';
-import type { ConnectionKind } from '../parser/graph';
-import { availableConnectionKinds, isDirectKind, isHubKind } from '../webview/viewMode';
+import type { ConnectionKind, QsysConnection } from '../parser/graph';
+import { availableConnectionKinds, inferClockResetConnections, isDirectKind, isHubKind } from '../webview/viewMode';
 
 const kinds: ConnectionKind[] = [
   'avalon_streaming',
@@ -38,5 +38,37 @@ describe('graph view modes', () => {
       'avalon_streaming', 'clock', 'reset',
     ]);
     expect(availableConnectionKinds(present, 'complete')).toEqual(present);
+  });
+});
+
+describe('clock and reset name inference', () => {
+  function unknown(sourcePort: string, targetPort: string): QsysConnection {
+    return {
+      id: `${sourcePort}-${targetPort}`,
+      source: 'source',
+      sourcePort,
+      target: 'target',
+      targetPort,
+      kind: 'other',
+      rawKind: 'unknown (static Tcl)',
+      parameters: {},
+    };
+  }
+
+  it.each(['reset', 'main_reset', 'reset_n', 'rst', 'rst_n', 'nrst', 'rstn', 'clk_reset'])(
+    'recognizes reset interface name %s',
+    (name) => expect(inferClockResetConnections([unknown('out', name)], true)[0]?.kind).toBe('reset'),
+  );
+
+  it.each(['clk', 'main_clk', 'clock', 'video_clock'])(
+    'recognizes clock interface name %s',
+    (name) => expect(inferClockResetConnections([unknown(name, 'input')], true)[0]?.kind).toBe('clock'),
+  );
+
+  it('can be disabled and never overrides an explicit type', () => {
+    const namedReset = unknown('reset_n', 'rst');
+    const explicit = { ...namedReset, kind: 'conduit' as const, rawKind: 'conduit' };
+    expect(inferClockResetConnections([namedReset], false)[0]?.kind).toBe('other');
+    expect(inferClockResetConnections([explicit], true)[0]?.kind).toBe('conduit');
   });
 });

@@ -1,7 +1,7 @@
 // Copyright 2026 Yaroslav Mariukha
 // SPDX-License-Identifier: MIT
 
-import type { ConnectionKind } from '../parser/graph';
+import type { ConnectionKind, QsysConnection } from '../parser/graph';
 
 export type GraphViewMode = 'pipeline' | 'complete';
 
@@ -29,4 +29,24 @@ export function availableConnectionKinds(
 ): ConnectionKind[] {
   const existing = new Set(kinds);
   return [...existing].filter((kind) => isDirectKind(kind, mode) || isHubKind(kind, mode));
+}
+
+const resetInterfaceName = /(?:^|[_-])(?:reset_n|rst_n|reset|nrst|rstn|rst)(?=$|[_-])/i;
+const clockInterfaceName = /(?:^|[_-])(?:clock|clk)(?=$|[_-])/i;
+
+export function inferClockResetConnections(
+  connections: readonly QsysConnection[],
+  enabled: boolean,
+): QsysConnection[] {
+  if (!enabled) return [...connections];
+  return connections.map((connection) => {
+    if (connection.kind !== 'other' || connection.rawKind !== 'unknown (static Tcl)') return connection;
+    const interfaceNames = [connection.sourcePort, connection.targetPort];
+    const inferredKind = interfaceNames.some((name) => resetInterfaceName.test(name))
+      ? 'reset'
+      : interfaceNames.some((name) => clockInterfaceName.test(name))
+        ? 'clock'
+        : undefined;
+    return inferredKind ? { ...connection, kind: inferredKind } : connection;
+  });
 }

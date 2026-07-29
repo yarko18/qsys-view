@@ -6,7 +6,7 @@ import { streamParameters } from '../parser/streamMetadata';
 import { createInterfaceWaveform } from '../parser/waveform';
 import { layoutAnchoredGraph, layoutGraph, pathMidpoint, projectVisibleLayout, type LayoutPoint, type LayoutResult } from '../layout/elk';
 import { connectionAddress, createInterfaceHubs, type HubKind, type InterfaceHub } from './interfaceHubs';
-import { availableConnectionKinds, isDirectKind, isHubKind, type GraphViewMode } from './viewMode';
+import { availableConnectionKinds, inferClockResetConnections, isDirectKind, isHubKind, type GraphViewMode } from './viewMode';
 import './styles.css';
 
 const vscode = acquireVsCodeApi();
@@ -38,6 +38,7 @@ interface ViewState {
   selectedKinds: Record<GraphViewMode, ConnectionKind[]>;
   showDisconnected: boolean;
   showDisabled: boolean;
+  inferClockResetNames: boolean;
 }
 
 interface SavedViewState {
@@ -45,23 +46,21 @@ interface SavedViewState {
   selectedKinds?: ConnectionKind[] | Partial<Record<GraphViewMode, ConnectionKind[]>>;
   showDisconnected?: boolean;
   showDisabled?: boolean;
+  inferClockResetNames?: boolean;
 }
 
 const saved = (vscode.getState() ?? {}) as SavedViewState;
-const savedPipelineKinds = Array.isArray(saved.selectedKinds)
-  ? saved.selectedKinds
-  : saved.selectedKinds?.pipeline;
 const state: ViewState = {
-  viewMode: saved.viewMode ?? 'pipeline',
+  viewMode: 'complete',
   selectedKinds: {
-    pipeline: savedPipelineKinds ?? ['avalon_streaming', 'conduit'],
-    complete: !Array.isArray(saved.selectedKinds) && saved.selectedKinds?.complete
-      ? saved.selectedKinds.complete
-      : [...connectionKinds],
+    pipeline: ['avalon_streaming', 'conduit'],
+    complete: [...connectionKinds],
   },
-  showDisconnected: saved.showDisconnected ?? false,
-  showDisabled: saved.showDisabled ?? true,
+  showDisconnected: false,
+  showDisabled: false,
+  inferClockResetNames: true,
 };
+applySavedViewState(saved);
 
 let graph: QsysGraph | undefined;
 let layout: LayoutResult | undefined;
@@ -85,6 +84,7 @@ app.innerHTML = `
       </select>
     </label>
     <div id="kind-filters" class="filters"></div>
+    <label class="option" title="Classify unknown Tcl interfaces from common clock and reset names"><input id="infer-clock-reset" type="checkbox"> Infer clk/reset</label>
     <label class="option"><input id="show-disconnected" type="checkbox"> All IP</label>
     <label class="option"><input id="show-disabled" type="checkbox"> Disabled IP</label>
     <input id="search" class="search" type="search" placeholder="Find IP…" aria-label="Find IP">
@@ -113,6 +113,7 @@ const filters = required<HTMLElement>('kind-filters');
 const viewMode = required<HTMLSelectElement>('view-mode');
 const quartusMetadata = required<HTMLButtonElement>('quartus-metadata');
 const interfaceHubs = required<HTMLElement>('interface-hubs');
+const inferClockResetNames = required<HTMLInputElement>('infer-clock-reset');
 
 const filterCheckboxes = new Map<ConnectionKind, { checkbox: HTMLInputElement; label: HTMLLabelElement }>();
 for (const kind of filterKinds) {
@@ -144,6 +145,14 @@ viewMode.addEventListener('change', () => {
   void render();
 });
 
+inferClockResetNames.checked = state.inferClockResetNames;
+inferClockResetNames.addEventListener('change', () => {
+  state.inferClockResetNames = inferClockResetNames.checked;
+  activeHubId = undefined;
+  updateKindFilters();
+  saveState();
+  void render();
+});
 const showDisconnected = required<HTMLInputElement>('show-disconnected');
 showDisconnected.checked = state.showDisconnected;
 showDisconnected.addEventListener('change', () => {
@@ -173,9 +182,20 @@ openPlatformDesigner.addEventListener('click', () => {
 });
 search.addEventListener('input', updateSearch);
 
+let receivedInitialState = false;
 window.addEventListener('message', (event: MessageEvent) => {
-  const message = event.data as { type?: string; graph?: QsysGraph; message?: string };
+  const message = event.data as {
+    type?: string;
+    graph?: QsysGraph;
+    message?: string;
+    rememberedViewState?: SavedViewState;
+  };
   if (message.type === 'graph' && message.graph) {
+    if (!receivedInitialState && message.rememberedViewState) {
+      applySavedViewState(message.rememberedViewState);
+      syncViewControls();
+    }
+    receivedInitialState = true;
     graph = message.graph;
     didInitialFit = false;
     required<HTMLElement>('system-name').textContent = graph.name;
@@ -234,14 +254,16 @@ async function render(): Promise<void> {
   details.classList.add('hidden');
   const allowedModules = graph.modules.filter((module) => state.showDisabled || !module.disabled);
   const allowedIds = new Set(allowedModules.map((module) => module.id));
-  const allowedConnections = graph.connections.filter((connection) =>
+  const inferredConnections = inferClockResetConnections(graph.connections, state.inferClockResetNames);
+  const renderedGraph = { ...graph, connections: inferredConnections };
+  const allowedConnections = inferredConnections.filter((connection) =>
     allowedIds.has(connection.source) && allowedIds.has(connection.target),
   );
   const enabledKinds = selectedKinds().filter((kind) => isDirectKind(kind, state.viewMode) || isHubKind(kind, state.viewMode));
   const selectedConnections = allowedConnections.filter((connection) => enabledKinds.includes(connection.kind));
   const connections = selectedConnections.filter((connection) => isDirectKind(connection.kind, state.viewMode));
   const selectedHubKinds = enabledKinds.filter((kind) => isHubKind(kind, state.viewMode));
-  const hubs = createInterfaceHubs(graph, selectedHubKinds, allowedIds);
+  const hubs = createInterfaceHubs(renderedGraph, selectedHubKinds, allowedIds);
   const connectedIds = new Set(connections.flatMap((connection) => [connection.source, connection.target]));
   for (const hub of hubs) {
     for (const moduleId of hub.relatedModuleIds) connectedIds.add(moduleId);
@@ -830,16 +852,43 @@ function showStatus(message: string, error = false): void {
 function hideStatus(): void { status.classList.add('hidden'); }
 function clamp(value: number, min: number, max: number): number { return Math.min(max, Math.max(min, value)); }
 function truncate(value: string, length: number): string { return value.length > length ? `${value.slice(0, length - 1)}…` : value; }
-function saveState(): void { vscode.setState(state); }
+function saveState(): void {
+  vscode.setState(state);
+  vscode.postMessage({ type: 'viewStateChanged', state });
+}
 
 function selectedKinds(): ConnectionKind[] { return state.selectedKinds[state.viewMode]; }
 
 function updateKindFilters(): void {
-  const available = new Set(availableConnectionKinds(graph?.connections.map((connection) => connection.kind) ?? [], state.viewMode));
+  const inferredConnections = inferClockResetConnections(graph?.connections ?? [], state.inferClockResetNames);
+  const available = new Set(availableConnectionKinds(inferredConnections.map((connection) => connection.kind), state.viewMode));
   for (const [kind, elements] of filterCheckboxes) {
     elements.checkbox.checked = selectedKinds().includes(kind);
     elements.label.classList.toggle('hidden', !available.has(kind));
   }
+}
+
+function applySavedViewState(value: SavedViewState): void {
+  if (value.viewMode === 'pipeline' || value.viewMode === 'complete') state.viewMode = value.viewMode;
+  const legacyPipeline = Array.isArray(value.selectedKinds) ? value.selectedKinds : value.selectedKinds?.pipeline;
+  const complete = Array.isArray(value.selectedKinds) ? undefined : value.selectedKinds?.complete;
+  if (legacyPipeline) state.selectedKinds.pipeline = validConnectionKinds(legacyPipeline);
+  if (complete) state.selectedKinds.complete = validConnectionKinds(complete);
+  if (typeof value.showDisconnected === 'boolean') state.showDisconnected = value.showDisconnected;
+  if (typeof value.showDisabled === 'boolean') state.showDisabled = value.showDisabled;
+  if (typeof value.inferClockResetNames === 'boolean') state.inferClockResetNames = value.inferClockResetNames;
+}
+
+function validConnectionKinds(values: readonly ConnectionKind[]): ConnectionKind[] {
+  return values.filter((kind): kind is ConnectionKind => connectionKinds.includes(kind));
+}
+
+function syncViewControls(): void {
+  viewMode.value = state.viewMode;
+  inferClockResetNames.checked = state.inferClockResetNames;
+  showDisconnected.checked = state.showDisconnected;
+  showDisabled.checked = state.showDisabled;
+  updateKindFilters();
 }
 
 vscode.postMessage({ type: 'ready' });
