@@ -13,6 +13,7 @@ Qsys View is a read-only Visual Studio Code viewer for Intel Platform Designer s
 
 - Opens `.qsys` directly and `.tcl` through **Reopen Editor With… → Qsys TCL Graph**.
 - Keeps hierarchical subsystems collapsed as single IP blocks.
+- Expands a selected subsystem in place or opens it as a complete graph without automatically expanding deeper levels.
 - Draws a left-to-right graph with orthogonal connections.
 - Shows IP and connection parameters on click.
 - Highlights clock, reset, Avalon-MM, and interrupt domains without filling the graph with their edges.
@@ -49,6 +50,12 @@ The static reader understands `add_instance`, instance parameters, `add_interfac
 
 Quartus analysis is user-triggered and runs on a disposable copy. It supplies exact types and ports, Avalon-ST format information, and automatic-adapter detection. The source file is never modified.
 
+## Hierarchical systems
+
+When an IP type matches a sibling `.qsys` or `.tcl` file, its block has a **+** control. Expanding replaces only that instance with its internal graph and reconnects parent links through the child's exported interfaces. Use the `− instance_name` toolbar chip to collapse it again.
+
+Choose **Open subsystem** in the IP details, or double-click its block, to open the child as a complete Qsys View. Nested children remain collapsed and can be expanded independently.
+
 ## Controls
 
 - **View** switches between Complete and Pipeline.
@@ -56,6 +63,7 @@ Quartus analysis is user-triggered and runs on a disposable copy. It supplies ex
 - **Disabled IP** includes disabled instances; off by default.
 - **Infer clk/reset** controls name inference; on by default.
 - **Errors/Warnings** appears when the static Tcl reader finds a problem; click an item to open its source line.
+- **+** expands a detected subsystem; **− instance_name** collapses it.
 - **Read interfaces…** requests exact Quartus metadata.
 - **Open in Platform Designer** opens or converts the system.
 - **Relayout** recalculates the active mode; **Fit** fits it to the viewport.
@@ -74,7 +82,7 @@ code --install-extension YaroslavMariukha.qsys-view
 A local package can be installed with:
 
 ```bash
-code --install-extension qsys-view-1.0.5.vsix --force
+code --install-extension qsys-view-1.0.6.vsix --force
 ```
 
 ## Settings

@@ -5,6 +5,14 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 1.0.6
+
+- Discover sibling Platform Designer systems used as IP and mark them as expandable subsystems.
+- Lazily expand a selected subsystem on the current canvas while leaving deeper hierarchy levels collapsed.
+- Reconnect parent connections through exported child interfaces for both Qsys and Tcl hierarchy sources.
+- Open a subsystem as a complete Qsys View from its details or by double-clicking the subsystem block.
+- Add sibling Qsys systems to the Quartus search path and suppress adapter guesses for unresolved interfaces, eliminating false `ready`/`valid` differences.
+
 ## 1.0.5
 
 - Keep unchanged Tcl connection routes fixed during live edits; removing one `add_connection` no longer reroutes the remaining graph.
