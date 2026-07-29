@@ -257,6 +257,7 @@ window.addEventListener('message', (event: MessageEvent) => {
       syncViewControls();
     }
     receivedInitialState = true;
+    if (message.resource) updateNavigationResourceGraph(message.resource, message.graph);
     activeResource = message.resource ?? activeResource;
     sourceGraph = message.graph;
     graph = composeHierarchy(sourceGraph, expandedSubsystems);
@@ -1192,6 +1193,11 @@ function updateInactiveResourceGraph(resource: string, nextGraph: QsysGraph): vo
     expandedSubsystems.set(instanceId, nextGraph);
     changedCurrentHierarchy = true;
   }
+  updateNavigationResourceGraph(resource, nextGraph);
+  if (changedCurrentHierarchy) refreshComposedHierarchy();
+}
+
+function updateNavigationResourceGraph(resource: string, nextGraph: QsysGraph): void {
   for (const frame of navigationStack) {
     if (frame.resource === resource) frame.sourceGraph = nextGraph;
     for (const [instanceId, expandedResource] of frame.expandedSubsystemResources) {
@@ -1200,7 +1206,6 @@ function updateInactiveResourceGraph(resource: string, nextGraph: QsysGraph): vo
       }
     }
   }
-  if (changedCurrentHierarchy) refreshComposedHierarchy();
 }
 
 function collapseSubsystem(instanceId: string): void {
