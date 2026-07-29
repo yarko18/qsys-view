@@ -12,24 +12,32 @@
 
 * { box-sizing: border-box; }
 html, body, #app { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+#app { display: flex; flex-direction: column; }
 body { user-select: none; }
 button, input { font: inherit; color: inherit; }
 
 .toolbar {
-  height: 48px;
-  padding: 7px 10px;
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex: none;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 7px 10px;
   border-bottom: 1px solid var(--vscode-panel-border);
   background: var(--vscode-sideBar-background);
   white-space: nowrap;
-  overflow-x: auto;
+}
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  min-width: 0;
 }
 .brand { display: flex; flex-direction: column; min-width: 145px; }
 .brand strong { overflow: hidden; text-overflow: ellipsis; max-width: 230px; }
 .brand span { font-size: 10px; opacity: .65; }
-.filters { display: flex; gap: 4px; }
+.filters { display: flex; flex-wrap: wrap; gap: 4px; }
 .kind-filter, .option {
   display: inline-flex;
   align-items: center;
@@ -68,7 +76,7 @@ button {
 }
 button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 
-.viewport { position: relative; height: calc(100% - 48px); overflow: hidden; }
+.viewport { position: relative; flex: 1; min-height: 0; overflow: hidden; }
 #canvas { width: 100%; height: 100%; cursor: grab; touch-action: none; }
 #canvas.panning { cursor: grabbing; }
 .status {

@@ -75,22 +75,26 @@ const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Qsys View root element is missing.');
 app.innerHTML = `
   <header class="toolbar">
-    <div class="brand"><strong id="system-name">Qsys View</strong><span id="summary"></span></div>
-    <label class="view-mode">View
-      <select id="view-mode" aria-label="Graph view mode">
-        <option value="pipeline">Pipeline</option>
-        <option value="complete">Complete</option>
-      </select>
-    </label>
-    <div id="kind-filters" class="filters"></div>
-    <label class="option" title="Classify unknown Tcl interfaces from common clock and reset names"><input id="infer-clock-reset" type="checkbox"> Infer clk/reset</label>
-    <label class="option"><input id="show-disconnected" type="checkbox"> All IP</label>
-    <label class="option"><input id="show-disabled" type="checkbox"> Disabled IP</label>
-    <input id="search" class="search" type="search" placeholder="Find IP…" aria-label="Find IP">
-    <button id="quartus-metadata" title="Read exact interface metadata with qsys-script">Read interfaces…</button>
-    <button id="open-platform-designer" title="Open this design in Intel Platform Designer">Open in Platform Designer</button>
-    <button id="relayout" title="Recalculate the current layout">Relayout</button>
-    <button id="fit" title="Fit graph to view">Fit</button>
+    <div class="toolbar-row toolbar-primary">
+      <div class="brand"><strong id="system-name">Qsys View</strong><span id="summary"></span></div>
+      <label class="view-mode">View
+        <select id="view-mode" aria-label="Graph view mode">
+          <option value="pipeline">Pipeline</option>
+          <option value="complete">Complete</option>
+        </select>
+      </label>
+      <div id="kind-filters" class="filters"></div>
+    </div>
+    <div class="toolbar-row toolbar-secondary">
+      <label class="option" title="Classify unknown Tcl interfaces from common clock and reset names"><input id="infer-clock-reset" type="checkbox"> Infer clk/reset</label>
+      <label class="option"><input id="show-disconnected" type="checkbox"> All IP</label>
+      <label class="option"><input id="show-disabled" type="checkbox"> Disabled IP</label>
+      <input id="search" class="search" type="search" placeholder="Find IP…" aria-label="Find IP">
+      <button id="quartus-metadata" title="Read exact interface metadata with qsys-script">Read interfaces…</button>
+      <button id="open-platform-designer" title="Open this design in Intel Platform Designer">Open in Platform Designer</button>
+      <button id="relayout" title="Recalculate the current layout">Relayout</button>
+      <button id="fit" title="Fit graph to view">Fit</button>
+    </div>
   </header>
   <main id="viewport" class="viewport">
     <svg id="canvas" aria-label="Qsys system graph">
