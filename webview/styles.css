@@ -40,6 +40,14 @@ button, input { font: inherit; color: inherit; }
 .filters { display: flex; flex-wrap: wrap; gap: 4px; }
 .expanded-subsystems { display: flex; flex-wrap: wrap; gap: 4px; }
 .expanded-subsystem { padding: 3px 7px; border-radius: 12px; font-size: 11px; }
+.subsystem-navigation { display: inline-flex; align-items: center; gap: 7px; }
+.subsystem-navigation span {
+  max-width: 280px;
+  overflow: hidden;
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  text-overflow: ellipsis;
+}
 .kind-filter, .option {
   display: inline-flex;
   align-items: center;
@@ -241,13 +249,13 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
   outline: none;
   pointer-events: all;
 }
-.node-subsystem-control circle, .hierarchy-collapse-control circle {
+.node-subsystem-control circle, .hierarchy-collapse-control circle, .hierarchy-enter-control circle {
   fill: var(--vscode-button-background);
   stroke: var(--vscode-button-foreground);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
-.node-subsystem-control text, .hierarchy-collapse-control text {
+.node-subsystem-control text, .hierarchy-collapse-control text, .hierarchy-enter-control text {
   fill: var(--vscode-button-foreground);
   font-size: 15px;
   font-weight: 700;
@@ -255,7 +263,8 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
   pointer-events: none;
 }
 .node-subsystem-control:hover circle, .node-subsystem-control:focus circle,
-.hierarchy-collapse-control:hover circle, .hierarchy-collapse-control:focus circle {
+.hierarchy-collapse-control:hover circle, .hierarchy-collapse-control:focus circle,
+.hierarchy-enter-control:hover circle, .hierarchy-enter-control:focus circle {
   fill: var(--vscode-button-hoverBackground);
   stroke-width: 2;
 }

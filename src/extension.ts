@@ -62,12 +62,12 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       } else if (message.type === 'refresh') {
         await sendGraph();
       } else if (message.type === 'loadQuartusMetadata') {
-        await this.confirmAndLoadQuartus(document.uri, panel.webview);
+        await this.confirmAndLoadQuartus(message.resource ? subsystemUri(message.resource) : document.uri, panel.webview);
       } else if (message.type === 'openPlatformDesigner') {
-        await this.openPlatformDesigner(document.uri);
+        await this.openPlatformDesigner(message.resource ? subsystemUri(message.resource) : document.uri);
         await panel.webview.postMessage({ type: 'platformDesignerFinished' });
       } else if (message.type === 'revealDiagnostic' && Number.isInteger(message.line)) {
-        await this.revealSource(document.uri, message.line!);
+        await this.revealSource(message.resource ? subsystemUri(message.resource) : document.uri, message.line!);
       } else if (message.type === 'loadSubsystem' && message.resource && message.instanceId) {
         await this.sendSubsystem(message.resource, message.instanceId, Boolean(message.analyze), panel.webview);
       } else if (message.type === 'openSubsystem' && message.resource) {
@@ -163,7 +163,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       const rememberedViewState = includeViewState && rememberLastViewState
         ? this.context.globalState.get<unknown>(lastViewStateKey)
         : undefined;
-      await webview.postMessage({ type: 'graph', graph, rememberedViewState });
+      await webview.postMessage({ type: 'graph', graph, resource: uri.toString(), rememberedViewState });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const line = /\bline\s+(\d+)\b/i.exec(message)?.[1];
@@ -235,7 +235,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
           };
         }
       }
-      await webview.postMessage({ type: 'subsystemGraph', instanceId, graph });
+      await webview.postMessage({ type: 'subsystemGraph', instanceId, resource: uri.toString(), graph });
     } catch (error) {
       await webview.postMessage({
         type: 'subsystemError',
