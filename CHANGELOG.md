@@ -10,6 +10,8 @@ SPDX-License-Identifier: MIT
 - Keep graph connections visually subdued while highlighting clock, reset, Avalon-MM, or interrupt domains.
 - Keep Platform Designer launch state out of the graph overlay and support direct process launch on Linux and Windows.
 - Convert exported Tcl for Platform Designer in a unique disposable folder beside the source script.
+- Parse explicit Tcl interface and connection kinds while leaving two-argument connections unknown until Quartus analysis.
+- Restrict Pipeline view edges to Avalon-ST and conduit, keep clock/reset as domain highlights, and hide filters for absent interface kinds.
 
 ## 1.0.2
 

@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { ConnectionKind } from '../parser/graph';
-import { isDirectKind, isHubKind } from '../webview/viewMode';
+import { availableConnectionKinds, isDirectKind, isHubKind } from '../webview/viewMode';
 
 const kinds: ConnectionKind[] = [
   'avalon_streaming',
@@ -16,9 +16,9 @@ const kinds: ConnectionKind[] = [
 ];
 
 describe('graph view modes', () => {
-  it('keeps the existing pipeline edges and high-fanout hubs', () => {
+  it('draws only Avalon-ST and conduit edges in pipeline mode', () => {
     expect(kinds.filter((kind) => isDirectKind(kind, 'pipeline'))).toEqual([
-      'avalon_streaming', 'conduit', 'other',
+      'avalon_streaming', 'conduit',
     ]);
     expect(kinds.filter((kind) => isHubKind(kind, 'pipeline'))).toEqual([
       'avalon_memory_mapped', 'clock', 'reset', 'interrupt',
@@ -30,5 +30,13 @@ describe('graph view modes', () => {
       'avalon_streaming', 'avalon_memory_mapped', 'interrupt', 'conduit', 'other',
     ]);
     expect(kinds.filter((kind) => isHubKind(kind, 'complete'))).toEqual(['clock', 'reset']);
+  });
+
+  it('offers filters only for kinds present in the graph and meaningful in the mode', () => {
+    const present: ConnectionKind[] = ['avalon_streaming', 'clock', 'reset', 'other'];
+    expect(availableConnectionKinds(present, 'pipeline')).toEqual([
+      'avalon_streaming', 'clock', 'reset',
+    ]);
+    expect(availableConnectionKinds(present, 'complete')).toEqual(present);
   });
 });

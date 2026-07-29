@@ -6,7 +6,7 @@ import type { ConnectionKind } from '../parser/graph';
 export type GraphViewMode = 'pipeline' | 'complete';
 
 const directKinds: Record<GraphViewMode, ReadonlySet<ConnectionKind>> = {
-  pipeline: new Set(['avalon_streaming', 'conduit', 'other']),
+  pipeline: new Set(['avalon_streaming', 'conduit']),
   complete: new Set(['avalon_streaming', 'avalon_memory_mapped', 'interrupt', 'conduit', 'other']),
 };
 
@@ -21,4 +21,12 @@ export function isDirectKind(kind: ConnectionKind, mode: GraphViewMode): boolean
 
 export function isHubKind(kind: ConnectionKind, mode: GraphViewMode): boolean {
   return hubKinds[mode].has(kind);
+}
+
+export function availableConnectionKinds(
+  kinds: readonly ConnectionKind[],
+  mode: GraphViewMode,
+): ConnectionKind[] {
+  const existing = new Set(kinds);
+  return [...existing].filter((kind) => isDirectKind(kind, mode) || isHubKind(kind, mode));
 }

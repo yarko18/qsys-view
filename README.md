@@ -54,7 +54,8 @@ Static graph viewing only requires VS Code 1.90 or newer. Intel Quartus Prime is
 - Separate filter selections are retained for Pipeline and Complete views.
 - Hover a hub to highlight all connected IP; click an MM master to show each slave's relative base address.
 - Known clock frequencies are shown directly on their source hubs.
-- Connections whose type cannot be determined are shown in grey.
+- Connections whose type cannot be determined are shown in grey in Complete view and are hidden in Pipeline view.
+- Interface filters are shown only for connection types present in the current system and supported by the selected view.
 - A red dot marks an Avalon-ST connection for which Quartus will insert timing, data-format, channel, or error adaptation. Hover or click the connection to see the endpoint differences.
 - Pan, zoom, and fit-to-window navigation.
 - Search by IP instance name or type.
@@ -67,23 +68,25 @@ Static graph viewing only requires VS Code 1.90 or newer. Intel Quartus Prime is
 - Hierarchical Platform Designer subsystems stay collapsed as individual IP blocks.
 - Automatically refreshes after the source document changes.
 
-By default Qsys View starts in **Pipeline** view with Avalon-ST and unknown links enabled. Enable **All IP**, select more connection types, or switch to **Complete** view to explore the rest of the system.
+By default Qsys View starts in **Pipeline** view with Avalon-ST and conduit links enabled. Enable **All IP**, select a domain filter, or switch to **Complete** view to explore the rest of the system.
 
 When Pipeline view contains at least one Avalon-ST link, Qsys View calculates that pipeline independently and places non-streaming-only IP in a separate stable area. Enabling hub interfaces does not add graph edges or change node positions. Systems without Avalon-ST links use the normal layered layout. Complete view always uses the full set of direct connections for layout.
 
 ## Interface visualization
 
-| Interface Type | 	Direction |
-|--|--|
-|avalon | 	master, slave |
-|axi | 	master, slave |
-|tristate_conduit | 	master, slave |
-|avalon_streaming | 	source, sink |
-|interrupt | 	sender, receiver |
-|conduit | 	end |
-|clock | 	source, sink |
-|reset | 	source, sink |
-|nios_custom_instruction | 	slave  |
+The static Tcl reader recognizes the Platform Designer interface declarations below. A two-argument `add_connection` has no serialized kind and therefore remains unknown until **Read interfaces…** runs `qsys-script`.
+
+| Tcl interface type | Directions |
+| --- | --- |
+| `avalon` | `master`, `slave` |
+| `axi` | `master`, `slave` |
+| `tristate_conduit` | `master`, `slave` |
+| `avalon_streaming` | `source`, `sink` |
+| `interrupt` | `sender`, `receiver` |
+| `conduit` | `end` |
+| `clock` | `source`, `sink` |
+| `reset` | `source`, `sink` |
+| `nios_custom_instruction` | `slave` |
 
 | Interface | Pipeline view | Complete view |
 | --- | --- | --- |
@@ -93,7 +96,7 @@ When Pipeline view contains at least one Avalon-ST link, Qsys View calculates th
 | Clock | Source hub | Source hub |
 | Reset | Source hub | Source hub |
 | Interrupt | Receiver hub | Directed edge |
-| Other/unknown | Grey directed edge | Grey directed edge |
+| Other/unknown | Hidden | Grey directed edge |
 
 Click an edge to inspect its connection and endpoint parameters. Avalon-ST details can include an illustrative transfer waveform and detected automatic adapters. Hover a hub to highlight related IP; click it to pin the highlighting. An Avalon-MM master hub also shows each slave's relative base address.
 
@@ -102,11 +105,11 @@ Click an edge to inspect its connection and endpoint parameters. Avalon-ST detai
 1. Open a `.qsys` file in VS Code. Qsys View is the default custom editor for this file type.
 2. For an exported Platform Designer `.tcl` file, use **Reopen Editor With… → Qsys TCL Graph** or right-click it and select **Open Qsys Graph**. Qsys View intentionally does not replace the normal editor for every Tcl file.
 3. Use the **View** selector to switch between Pipeline and Complete layouts.
-4. Click **Open in Platform Designer** to open a `.qsys` file directly. For exported Tcl, Qsys View converts a disposable copy to a temporary `.qsys` file first.
+4. Click **Open in Platform Designer** to open a `.qsys` file directly. For exported Tcl, Qsys View converts a disposable copy in a unique hidden folder beside the source script and removes that folder after Platform Designer exits.
 5. To inspect the source, use **Reopen Editor With… → Text Editor**.
 6. Click **Read interfaces…** to read exact interface types, ports, and parameters. The extension asks before running IP Tcl, works on a disposable copy in the OS temporary directory, and does not write to the source project.
 
-The static Tcl reader supports exported, declarative Platform Designer commands such as `add_instance`, `set_instance_parameter_value`, `add_connection`, and `set_connection_parameter_value`. It does not evaluate arbitrary Tcl expressions or source other scripts. Until Quartus elaborates the system, Tcl connection types are therefore intentionally shown as unknown grey links.
+The static Tcl reader supports declarative Platform Designer commands including `add_instance`, `set_instance_parameter_value`, `add_interface`, `add_interface_port`, `set_interface_property`, `add_connection`, and `set_connection_parameter_value`. An explicit `add_connection <start> <end> <kind> <name>` is classified immediately; the common exported two-argument form remains unknown until Quartus elaborates it. The reader does not evaluate arbitrary Tcl expressions or source other scripts.
 
 Qsys View finds `qsys-script` through `QUARTUS_ROOTDIR`, conventional Intel FPGA installation folders, or `PATH`. If necessary, set **Qsys View: Quartus Path**. Local `ip/*/component.ipx`, composition dependencies under `ip/common/**/*_hw.tcl`, the standard Quartus catalog, and paths from **Qsys View: IP Search Paths** are passed to Platform Designer. Relative search paths are resolved from the `.qsys` directory.
 
@@ -163,7 +166,7 @@ The extension is published under Marketplace publisher ID `YaroslavMariukha` (di
 
 ## Current scope
 
-Qsys View never writes to `.qsys`/`.tcl` source files or the project directory. Basic graph data comes from Qsys XML or static Tcl commands. Exact interface properties and automatic-adapter annotations come only from a fresh, user-triggered `qsys-script` elaboration in a temporary directory; `.sopcinfo` is not read and metadata is not cached. If Quartus or an IP definition cannot be resolved, unknown connections remain grey and no waveform or adapter annotation is shown. Waveforms are illustrative protocol examples, not simulation output.
+Qsys View never modifies `.qsys` or `.tcl` source files. Opening a Tcl design in Platform Designer creates a disposable sibling folder; interface analysis uses the OS temporary directory. Basic graph data comes from Qsys XML or static Tcl commands. Exact interface properties and automatic-adapter annotations come only from a fresh, user-triggered `qsys-script` elaboration; `.sopcinfo` is not read and metadata is not cached. If Quartus or an IP definition cannot be resolved, unknown connections remain grey in Complete view and no waveform or adapter annotation is shown. Waveforms are illustrative protocol examples, not simulation output.
 
 ## License
 

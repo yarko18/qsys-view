@@ -6,7 +6,7 @@ import { streamParameters } from '../parser/streamMetadata';
 import { createInterfaceWaveform } from '../parser/waveform';
 import { layoutAnchoredGraph, layoutGraph, pathMidpoint, projectVisibleLayout, type LayoutPoint, type LayoutResult } from '../layout/elk';
 import { connectionAddress, createInterfaceHubs, type HubKind, type InterfaceHub } from './interfaceHubs';
-import { isDirectKind, isHubKind, type GraphViewMode } from './viewMode';
+import { availableConnectionKinds, isDirectKind, isHubKind, type GraphViewMode } from './viewMode';
 import './styles.css';
 
 const vscode = acquireVsCodeApi();
@@ -54,7 +54,7 @@ const savedPipelineKinds = Array.isArray(saved.selectedKinds)
 const state: ViewState = {
   viewMode: saved.viewMode ?? 'pipeline',
   selectedKinds: {
-    pipeline: savedPipelineKinds ?? ['avalon_streaming', 'other'],
+    pipeline: savedPipelineKinds ?? ['avalon_streaming', 'conduit'],
     complete: !Array.isArray(saved.selectedKinds) && saved.selectedKinds?.complete
       ? saved.selectedKinds.complete
       : [...connectionKinds],
@@ -114,10 +114,10 @@ const viewMode = required<HTMLSelectElement>('view-mode');
 const quartusMetadata = required<HTMLButtonElement>('quartus-metadata');
 const interfaceHubs = required<HTMLElement>('interface-hubs');
 
-const filterCheckboxes = new Map<ConnectionKind, HTMLInputElement>();
+const filterCheckboxes = new Map<ConnectionKind, { checkbox: HTMLInputElement; label: HTMLLabelElement }>();
 for (const kind of filterKinds) {
   const label = document.createElement('label');
-  label.className = `kind-filter kind-${kind}`;
+  label.className = `kind-filter kind-${kind} hidden`;
   const checkbox = document.createElement('input');
   checkbox.type = 'checkbox';
   checkbox.checked = selectedKinds().includes(kind);
@@ -129,7 +129,7 @@ for (const kind of filterKinds) {
     saveState();
     void render();
   });
-  filterCheckboxes.set(kind, checkbox);
+  filterCheckboxes.set(kind, { checkbox, label });
   label.append(checkbox, document.createTextNode(labels[kind]));
   filters.append(label);
 }
@@ -137,7 +137,7 @@ for (const kind of filterKinds) {
 viewMode.value = state.viewMode;
 viewMode.addEventListener('change', () => {
   state.viewMode = viewMode.value as GraphViewMode;
-  for (const [kind, checkbox] of filterCheckboxes) checkbox.checked = selectedKinds().includes(kind);
+  updateKindFilters();
   activeHubId = undefined;
   didInitialFit = false;
   saveState();
@@ -181,6 +181,7 @@ window.addEventListener('message', (event: MessageEvent) => {
     required<HTMLElement>('system-name').textContent = graph.name;
     quartusMetadata.disabled = false;
     quartusMetadata.textContent = graph.metadata.source === 'quartus' ? 'Read interfaces again…' : 'Read interfaces…';
+    updateKindFilters();
     void render();
   } else if (message.type === 'error') {
     showStatus(message.message ?? 'Unable to load Qsys file.', true);
@@ -236,11 +237,10 @@ async function render(): Promise<void> {
   const allowedConnections = graph.connections.filter((connection) =>
     allowedIds.has(connection.source) && allowedIds.has(connection.target),
   );
-  const selectedConnections = allowedConnections.filter((connection) =>
-    selectedKinds().includes(connection.kind)
-  );
+  const enabledKinds = selectedKinds().filter((kind) => isDirectKind(kind, state.viewMode) || isHubKind(kind, state.viewMode));
+  const selectedConnections = allowedConnections.filter((connection) => enabledKinds.includes(connection.kind));
   const connections = selectedConnections.filter((connection) => isDirectKind(connection.kind, state.viewMode));
-  const selectedHubKinds = selectedKinds().filter((kind) => isHubKind(kind, state.viewMode));
+  const selectedHubKinds = enabledKinds.filter((kind) => isHubKind(kind, state.viewMode));
   const hubs = createInterfaceHubs(graph, selectedHubKinds, allowedIds);
   const connectedIds = new Set(connections.flatMap((connection) => [connection.source, connection.target]));
   for (const hub of hubs) {
@@ -833,5 +833,13 @@ function truncate(value: string, length: number): string { return value.length >
 function saveState(): void { vscode.setState(state); }
 
 function selectedKinds(): ConnectionKind[] { return state.selectedKinds[state.viewMode]; }
+
+function updateKindFilters(): void {
+  const available = new Set(availableConnectionKinds(graph?.connections.map((connection) => connection.kind) ?? [], state.viewMode));
+  for (const [kind, elements] of filterCheckboxes) {
+    elements.checkbox.checked = selectedKinds().includes(kind);
+    elements.label.classList.toggle('hidden', !available.has(kind));
+  }
+}
 
 vscode.postMessage({ type: 'ready' });
