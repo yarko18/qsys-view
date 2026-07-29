@@ -69,8 +69,10 @@ export function pathMidpoint(paths: LayoutPoint[][]): LayoutPoint | undefined {
 }
 
 /**
- * Keeps a flattened hierarchy readable by moving an expanded subsystem as one
- * block when its visual container would otherwise cover modules outside it.
+ * Keeps an expanded subsystem in the pipeline band chosen by ELK. If its
+ * visual container would cover unrelated modules, those overlapping modules
+ * are moved below the container instead of pushing the subsystem itself to a
+ * separate row.
  */
 export function separateHierarchyGroups(
   layout: LayoutResult,
@@ -95,12 +97,33 @@ export function separateHierarchyGroups(
       width: bounds.width + 36,
       height: bounds.height + 60,
     };
-    if (!outsiders.some((node) => rectanglesOverlap(frame, node))) continue;
+    const overlappingIds = new Set(outsiders
+      .filter((node) => rectanglesOverlap(frame, node))
+      .map((node) => node.id));
+    if (overlappingIds.size === 0) continue;
 
-    const outsideBottom = Math.max(0, ...outsiders.map((node) => node.y + node.height));
-    const dy = outsideBottom + 60 - bounds.y;
+    // Another expanded root is one visual unit too; do not split it when one
+    // of its descendants happens to overlap this frame.
+    for (const root of roots) {
+      if (root === instanceId) continue;
+      if (nodes.some((node) => overlappingIds.has(node.id) && node.id.startsWith(`${root}/`))) {
+        for (const node of nodes) {
+          if (node.id.startsWith(`${root}/`)) overlappingIds.add(node.id);
+        }
+      }
+    }
+    const overlapping = nodes.filter((node) => overlappingIds.has(node.id));
+    const overlapBounds = nodeBounds(overlapping);
+    let dy = frame.y + frame.height + 60 - overlapBounds.y;
+    const stationary = nodes.filter((node) => !overlappingIds.has(node.id));
+    for (;;) {
+      const translated = overlapping.map((node) => ({ ...node, y: node.y + dy }));
+      const collisions = stationary.filter((node) => translated.some((candidate) => rectanglesOverlap(candidate, node)));
+      if (collisions.length === 0) break;
+      dy = Math.max(...collisions.map((node) => node.y + node.height)) + 60 - overlapBounds.y;
+    }
     nodes = nodes.map((node) => {
-      if (!descendantIds.has(node.id)) return node;
+      if (!overlappingIds.has(node.id)) return node;
       const current = offsets.get(node.id)!;
       offsets.set(node.id, { x: current.x, y: current.y + dy });
       return { ...node, y: node.y + dy };

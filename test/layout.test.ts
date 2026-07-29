@@ -66,7 +66,7 @@ describe('pathMidpoint', () => {
 });
 
 describe('expanded hierarchy layout', () => {
-  it('moves a subsystem as one block when its frame covers a top-level node', () => {
+  it('keeps a subsystem inline and moves a covered top-level node away', () => {
     const top = { ...module('top'), x: 200, y: 50, width: 100, height: 70 };
     const first = { ...module('nested/first'), x: 100, y: 40, width: 100, height: 70 };
     const second = { ...module('nested/second'), x: 350, y: 40, width: 100, height: 70 };
@@ -78,11 +78,11 @@ describe('expanded hierarchy layout', () => {
       edges: [{ ...link, paths: [[{ x: 300, y: 85 }, { x: 100, y: 75 }]] }],
     }, ['nested']);
 
-    expect(separated.nodes.find((node) => node.id === 'top')?.y).toBe(50);
-    expect(separated.nodes.find((node) => node.id === 'nested/first')?.y).toBeGreaterThan(170);
+    expect(separated.nodes.find((node) => node.id === 'top')?.y).toBeGreaterThan(160);
+    expect(separated.nodes.find((node) => node.id === 'nested/first')?.y).toBe(40);
     expect(separated.nodes.find((node) => node.id === 'nested/second')?.y)
       .toBe(separated.nodes.find((node) => node.id === 'nested/first')?.y);
-    expect(separated.edges[0]?.paths[0]?.at(-1)?.y).toBeGreaterThan(170);
+    expect(separated.edges[0]?.paths[0]?.at(-1)?.y).toBe(110);
   });
 });
 
