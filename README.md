@@ -18,8 +18,9 @@ Qsys View is a read-only Visual Studio Code viewer for Intel Platform Designer s
 - Highlights clock, reset, Avalon-MM, and interrupt domains without filling the graph with their edges.
 - Detects Avalon-ST adapters after Quartus analysis and marks them with a red dot.
 - Shows elaborated interface ports, parameters, and an illustrative Avalon-ST waveform.
-- Updates connections while a Tcl file is edited without moving existing IP.
+- Updates a Tcl graph without moving existing IP or rerouting unchanged connections.
 - Adds new IP below the frozen graph; **Relayout** recalculates the active layout.
+- Reports static Tcl parser problems and opens the source line from the problems list.
 - Opens Qsys directly in Platform Designer or converts Tcl in a disposable sibling folder first.
 
 ## Views and interfaces
@@ -54,6 +55,7 @@ Quartus analysis is user-triggered and runs on a disposable copy. It supplies ex
 - **All IP** includes disconnected IP; off by default.
 - **Disabled IP** includes disabled instances; off by default.
 - **Infer clk/reset** controls name inference; on by default.
+- **Errors/Warnings** appears when the static Tcl reader finds a problem; click an item to open its source line.
 - **Read interfaces…** requests exact Quartus metadata.
 - **Open in Platform Designer** opens or converts the system.
 - **Relayout** recalculates the active mode; **Fit** fits it to the viewport.
@@ -72,7 +74,7 @@ code --install-extension YaroslavMariukha.qsys-view
 A local package can be installed with:
 
 ```bash
-code --install-extension qsys-view-1.0.4.vsix --force
+code --install-extension qsys-view-1.0.5.vsix --force
 ```
 
 ## Settings
@@ -99,7 +101,7 @@ npm run package
 
 ## Scope
 
-Qsys View does not edit Qsys or Tcl sources and does not replace Platform Designer validation. Unknown Tcl connections remain grey in Complete mode until their type is explicit, inferred, or resolved by Quartus. Waveforms are protocol illustrations, not simulation output.
+Qsys View does not edit Qsys or Tcl sources and its static diagnostics do not replace Platform Designer validation. Unknown Tcl connections remain grey in Complete mode until their type is explicit, inferred, or resolved by Quartus. Waveforms are protocol illustrations, not simulation output.
 
 ## License
 

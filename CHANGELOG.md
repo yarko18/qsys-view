@@ -5,6 +5,13 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 1.0.5
+
+- Keep unchanged Tcl connection routes fixed during live edits; removing one `add_connection` no longer reroutes the remaining graph.
+- Reorganize the toolbar into responsive rows that wrap instead of requiring horizontal scrolling.
+- Show static Tcl parser errors and warnings in Qsys View with source line navigation and suggestions for likely misspelled Platform Designer commands.
+- Keep known but unsupported Platform Designer commands as warnings to avoid false parser errors.
+
 ## 1.0.4
 
 - Start new viewers in Complete mode with All IP and Disabled IP turned off.
