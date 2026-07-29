@@ -5,7 +5,7 @@ import { connectionKinds, type ConnectionKind, type QsysAdaptation, type QsysCon
 import { streamParameters } from '../parser/streamMetadata';
 import { createInterfaceWaveform } from '../parser/waveform';
 import { layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, projectVisibleLayout, type LayoutPoint, type LayoutResult, type StableLayoutCache } from '../layout/elk';
-import { composeHierarchy } from './hierarchy';
+import { composeHierarchy, hierarchyBounds, type HierarchyBounds } from './hierarchy';
 import { connectionAddress, createInterfaceHubs, type HubKind, type InterfaceHub } from './interfaceHubs';
 import { availableConnectionKinds, inferClockResetConnections, isDirectKind, isHubKind, type GraphViewMode } from './viewMode';
 import './styles.css';
@@ -353,6 +353,11 @@ async function render(): Promise<void> {
 
 function draw(result: LayoutResult): void {
   scene.replaceChildren();
+  const hierarchyContainers = [...expandedSubsystems.keys()].flatMap((instanceId) => {
+    const bounds = hierarchyBounds(result.nodes, instanceId);
+    return bounds ? [{ instanceId, bounds }] : [];
+  });
+  for (const container of hierarchyContainers) drawHierarchyBackground(container.instanceId, container.bounds);
   for (const edge of result.edges) {
     const group = svg('g', {
       class: `edge edge-${edge.kind}`,
@@ -440,8 +445,54 @@ function draw(result: LayoutResult): void {
     }
     scene.append(group);
   }
+  for (const container of hierarchyContainers) drawHierarchyCollapseControl(container.instanceId, container.bounds);
   createMarkers();
   applyTransform();
+}
+
+function drawHierarchyBackground(instanceId: string, bounds: HierarchyBounds): void {
+  const group = svg('g', { class: 'hierarchy-container' });
+  group.append(svg('rect', {
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    rx: 14,
+  }));
+  const label = svg('text', {
+    x: bounds.x + 12,
+    y: bounds.y + 19,
+    class: 'hierarchy-container-label',
+  });
+  label.textContent = instanceId;
+  group.append(label);
+  scene.append(group);
+}
+
+function drawHierarchyCollapseControl(instanceId: string, bounds: HierarchyBounds): void {
+  const control = svg('g', {
+    class: 'hierarchy-collapse-control',
+    transform: `translate(${bounds.x + bounds.width - 32} ${bounds.y})`,
+    tabindex: '0',
+    role: 'button',
+    'aria-label': `Collapse subsystem ${instanceId}`,
+  });
+  const symbol = svg('text', { x: 16, y: 20 });
+  symbol.textContent = '−';
+  control.append(svg('circle', { cx: 16, cy: 16, r: 10 }), symbol);
+  const title = svg('title');
+  title.textContent = `Collapse ${instanceId}`;
+  control.append(title);
+  const collapse = (event: Event) => {
+    event.stopPropagation();
+    collapseSubsystem(instanceId);
+  };
+  control.addEventListener('click', collapse);
+  control.addEventListener('keydown', (event) => {
+    const key = (event as KeyboardEvent).key;
+    if (key === 'Enter' || key === ' ') collapse(event);
+  });
+  scene.append(control);
 }
 
 function drawInterfaceHubs(hubs: InterfaceHub[]): void {

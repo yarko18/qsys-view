@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import type { QsysConnection, QsysGraph, QsysModule } from '../parser/graph';
 import { parseQsys } from '../parser/qsysParser';
 import { parseQsysTcl } from '../parser/qsysTclParser';
-import { composeHierarchy } from '../webview/hierarchy';
+import { composeHierarchy, hierarchyBounds } from '../webview/hierarchy';
 
 function module(id: string, type = 'ip'): QsysModule {
   return { id, name: id, type, disabled: false, parameters: {}, ports: [] };
@@ -136,5 +136,23 @@ describe('composeHierarchy', () => {
       target: 'clipper',
       targetPort: 'din',
     }));
+  });
+});
+
+describe('hierarchyBounds', () => {
+  it('surrounds visible descendants without including neighbouring modules', () => {
+    const nodes = [
+      { id: 'nested/a', x: 100, y: 80, width: 150, height: 70 },
+      { id: 'nested/deeper/b', x: 300, y: 160, width: 180, height: 70 },
+      { id: 'outside', x: 20, y: 20, width: 500, height: 300 },
+    ];
+
+    expect(hierarchyBounds(nodes, 'nested')).toEqual({
+      x: 82,
+      y: 38,
+      width: 416,
+      height: 210,
+    });
+    expect(hierarchyBounds(nodes, 'missing')).toBeUndefined();
   });
 });

@@ -214,7 +214,6 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
   vector-effect: non-scaling-stroke;
 }
 .node:hover rect, .node:focus rect { stroke-width: 2.5; filter: brightness(1.08); }
-.node.nested > rect { stroke-dasharray: 4 2; }
 .node.disabled { opacity: .48; }
 .node.disabled rect { stroke-dasharray: 5 4; }
 .node.match rect { stroke: var(--vscode-charts-yellow); stroke-width: 4; }
@@ -225,21 +224,35 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .node-name { fill: var(--vscode-editor-foreground); font-size: 15px; font-weight: 600; }
 .node-kind { fill: var(--vscode-descriptionForeground); font-size: 10px; }
 .node-hierarchy { fill: var(--vscode-descriptionForeground); font-size: 8px; text-transform: uppercase; }
-.node-subsystem-control { outline: none; }
-.node-subsystem-control circle {
+.hierarchy-container rect {
+  fill: color-mix(in srgb, var(--vscode-focusBorder) 4%, transparent);
+  stroke: var(--vscode-descriptionForeground);
+  stroke-width: 1.5;
+  stroke-dasharray: 7 5;
+  vector-effect: non-scaling-stroke;
+}
+.hierarchy-container-label {
+  fill: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  font-weight: 600;
+  pointer-events: none;
+}
+.node-subsystem-control, .hierarchy-collapse-control { outline: none; }
+.node-subsystem-control circle, .hierarchy-collapse-control circle {
   fill: var(--vscode-button-background);
   stroke: var(--vscode-button-foreground);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
-.node-subsystem-control text {
+.node-subsystem-control text, .hierarchy-collapse-control text {
   fill: var(--vscode-button-foreground);
   font-size: 15px;
   font-weight: 700;
   text-anchor: middle;
   pointer-events: none;
 }
-.node-subsystem-control:hover circle, .node-subsystem-control:focus circle {
+.node-subsystem-control:hover circle, .node-subsystem-control:focus circle,
+.hierarchy-collapse-control:hover circle, .hierarchy-collapse-control:focus circle {
   fill: var(--vscode-button-hoverBackground);
   stroke-width: 2;
 }

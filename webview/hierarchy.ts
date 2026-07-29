@@ -15,6 +15,21 @@ interface Endpoint {
   port: string;
 }
 
+export interface PositionedHierarchyNode {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface HierarchyBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 function splitEndpoint(endpoint: string): Endpoint {
   const separator = endpoint.lastIndexOf('.');
   return separator < 0
@@ -152,5 +167,26 @@ function expandedDomainAlias(
   return {
     endpoint: `${resolved.module}.${resolved.port}`,
     canonical: `${source.module}.${source.port}`,
+  };
+}
+
+/** Bounds all currently visible descendants of one expanded subsystem. */
+export function hierarchyBounds(
+  nodes: readonly PositionedHierarchyNode[],
+  instanceId: string,
+  padding = 18,
+  headerHeight = 24,
+): HierarchyBounds | undefined {
+  const descendants = nodes.filter((node) => node.id.startsWith(`${instanceId}/`));
+  if (descendants.length === 0) return undefined;
+  const left = Math.min(...descendants.map((node) => node.x));
+  const top = Math.min(...descendants.map((node) => node.y));
+  const right = Math.max(...descendants.map((node) => node.x + node.width));
+  const bottom = Math.max(...descendants.map((node) => node.y + node.height));
+  return {
+    x: left - padding,
+    y: top - padding - headerHeight,
+    width: right - left + padding * 2,
+    height: bottom - top + padding * 2 + headerHeight,
   };
 }
