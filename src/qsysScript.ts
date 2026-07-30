@@ -3,6 +3,13 @@
 
 import * as path from 'node:path';
 
+export function platformDesignerArguments(systemFilePath: string, searchPath: string): string[] {
+  return [
+    systemFilePath,
+    `--search-path=${searchPath}`,
+  ];
+}
+
 export function qsysScriptArguments(
   systemFilePath: string,
   searchPath: string,

@@ -5,6 +5,11 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 1.0.8
+
+- Preserve the original exported Tcl location during disposable conversion so sibling `source` files resolve through `info script`.
+- Pass the configured and automatically discovered IP search paths to Platform Designer when opening both Qsys and converted Tcl systems.
+
 ## 1.0.7
 - Update media and Readme
 

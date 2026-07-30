@@ -2,7 +2,19 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, expect, it } from 'vitest';
-import { platformDesignerTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclScriptArguments, siblingQsysSearchPattern } from '../src/qsysScript';
+import { platformDesignerArguments, platformDesignerTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclScriptArguments, siblingQsysSearchPattern } from '../src/qsysScript';
+
+describe('platformDesignerArguments', () => {
+  it('keeps the original IP search path when opening a disposable Qsys file', () => {
+    expect(platformDesignerArguments(
+      '/work/quartus/.qsys-view-video-AbCd12/video.qsys',
+      '/work/quartus/ip/*/component.ipx,$',
+    )).toEqual([
+      '/work/quartus/.qsys-view-video-AbCd12/video.qsys',
+      '--search-path=/work/quartus/ip/*/component.ipx,$',
+    ]);
+  });
+});
 
 describe('qsysScriptArguments', () => {
   it.each([
@@ -47,6 +59,17 @@ describe('qsysTclExportWrapper', () => {
     expect(qsysTclExportWrapper('/tmp/$source[0].tcl', '/tmp/output[0]$.qsys')).toEqual([
       'source "/tmp/\\$source\\[0].tcl"',
       'save_system "/tmp/output\\[0]\\$.qsys"',
+      '',
+    ].join('\n'));
+  });
+
+  it('sources the original Tcl path so sibling includes resolve through info script', () => {
+    expect(qsysTclExportWrapper(
+      '/work/quartus/video.tcl',
+      '/work/quartus/.qsys-view-video-AbCd12/video.qsys',
+    )).toEqual([
+      'source "/work/quartus/video.tcl"',
+      'save_system "/work/quartus/.qsys-view-video-AbCd12/video.qsys"',
       '',
     ].join('\n'));
   });
