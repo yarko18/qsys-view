@@ -5,6 +5,14 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 1.0.10
+
+- Resolve `source`, namespaces, procedures, substitutions, `if`, `switch`, and loops automatically in a restricted safe Tcl interpreter, without starting Quartus.
+- Display resolved dynamic instance parameters and conditional connections immediately when a Tcl graph opens.
+- Restrict sourced files to the workspace, block unsafe file operations and external commands, cap trace output, and terminate slow static evaluation.
+- Add `qsysView.tclshPath` and retain the lexical parser as a fallback when `tclsh` or unsupported Tcl capabilities prevent safe resolution.
+- Keep **Read interfaces…** as the explicit action for exact Quartus elaboration only.
+
 ## 1.0.9
 
 - Build Tcl graphs from the Qsys system actually produced by `qsys-script`, so parameters, instances, and connections created through `source`, `if`, `switch`, loops, and substitutions are displayed after evaluation.

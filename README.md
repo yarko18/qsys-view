@@ -50,7 +50,9 @@ The Tcl reader accepts Platform Designer declarations for `avalon`, `axi`, `tris
 
 ## Tcl and Quartus analysis
 
-The static reader understands `add_instance`, instance parameters, `add_interface`, `add_interface_port`, `EXPORT_OF`, `add_connection`, and connection parameters. An explicit connection kind is available immediately. For Tcl systems that use `source`, variables, procedures, `if`, `switch`, or loops, choose **Evaluate Tcl…**. Qsys View then runs `qsys-script` in a disposable directory and replaces the static approximation with the evaluated instances, parameter values, connections, and exact interfaces.
+In a trusted workspace, Qsys View automatically runs the system in a restricted safe `tclsh` interpreter. Platform Designer commands only record their resolved arguments, so `source`, namespaces, procedures, substitutions, `if`, `switch`, and loops appear immediately without starting Quartus. File access and external commands remain blocked; sourced Tcl is restricted to the current workspace and the resolver has a short timeout. If `tclsh` is unavailable or the script needs unsupported capabilities, Qsys View falls back to the lexical reader and reports a warning.
+
+The **Read interfaces…** action still runs `qsys-script` on demand. Use it when exact elaborated interfaces, ports, streaming formats, or automatic adapters are required.
 
 Use `qsysView.tclVariables` to select a configuration before evaluation or before opening the Tcl system in Platform Designer. For example:
 
@@ -111,6 +113,7 @@ code --install-extension qsys-view-1.0.6.vsix --force
 | `qsysView.platformDesignerPath` | Direct path to `qsys-edit` or `qsys.exe` |
 | `qsysView.ipSearchPaths` | Additional Platform Designer IP search paths |
 | `qsysView.tclVariables` | Global variables set before evaluating a Tcl system |
+| `qsysView.tclshPath` | Tcl interpreter used for automatic safe control-flow resolution |
 | `qsysView.rememberLastViewState` | Remember toolbar choices across editors |
 
 ## Development

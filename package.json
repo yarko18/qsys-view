@@ -2,7 +2,7 @@
   "name": "qsys-view",
   "displayName": "Qsys View",
   "description": "Explore Intel Platform Designer .qsys systems and exported Tcl scripts as readable layered graphs.",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "publisher": "YaroslavMariukha",
   "author": {
     "name": "Mariukha Yaroslav"
@@ -72,6 +72,12 @@
             "type": ["string", "number", "boolean"]
           },
           "description": "Global Tcl variables to set before evaluating or opening a Platform Designer Tcl system, for example {\"PLATFORM_CONFIG\": \"WHC\"}."
+        },
+        "qsysView.tclshPath": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "Path to tclsh for automatic safe resolution of source, procedures, substitutions, loops, if, and switch. Leave empty to use tclsh from PATH."
         },
         "qsysView.rememberLastViewState": {
           "type": "boolean",

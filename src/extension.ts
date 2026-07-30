@@ -13,6 +13,7 @@ import { parseQsys } from '../parser/qsysParser';
 import { parseEvaluatedQsysTcl } from '../parser/qsysTclEvaluation';
 import { parseQsysTcl } from '../parser/qsysTclParser';
 import { platformDesignerArguments, platformDesignerTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclInspectionWrapper, qsysTclScriptArguments, siblingQsysSearchPattern, type TclVariableValue } from './qsysScript';
+import { traceQsysTcl } from './staticTcl';
 import { subsystemCandidatePaths, tclSubsystemBuildOrder } from './subsystems';
 
 const lastViewStateKey = 'qsysView.lastViewState';
@@ -188,14 +189,49 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       ? Buffer.from(openDocument.getText())
       : await vscode.workspace.fs.readFile(uri);
     const fileName = uri.path.split('/').pop()?.replace(/\.(?:qsys|tcl)$/i, '') || 'Qsys system';
+    const source = bytes.toString('utf8');
     const parsed = isQsysTcl(uri)
-      ? parseQsysTcl(bytes.toString('utf8'), fileName)
-      : parseQsys(bytes.toString('utf8'), fileName);
+      ? await this.parseTclGraph(uri, source, fileName)
+      : parseQsys(source, fileName);
     const modules = await Promise.all(parsed.modules.map(async (module) => {
       const subsystem = await this.findSubsystem(uri, module.type);
       return subsystem ? { ...module, subsystem } : module;
     }));
     return { bytes, fileName, graph: { ...parsed, modules } };
+  }
+
+  private async parseTclGraph(uri: vscode.Uri, source: string, fallbackName: string): Promise<QsysGraph> {
+    const lexical = parseQsysTcl(source, fallbackName);
+    if (!vscode.workspace.isTrusted || uri.scheme !== 'file') return lexical;
+    const configuration = vscode.workspace.getConfiguration('qsysView', uri);
+    const executable = configuration.get<string>('tclshPath', '').trim()
+      || (process.platform === 'win32' ? 'tclsh.exe' : 'tclsh');
+    const workspaceRoot = vscode.workspace.getWorkspaceFolder(uri)?.uri.fsPath ?? path.dirname(uri.fsPath);
+    const controller = path.join(this.context.extensionUri.fsPath, 'quartus', 'trace-system.tcl');
+    try {
+      const trace = await traceQsysTcl({
+        executable,
+        controllerPath: controller,
+        sourcePath: uri.fsPath,
+        allowedRoot: workspaceRoot,
+        source,
+        variables: this.tclVariables(uri),
+      });
+      const resolved = parseQsysTcl(trace, fallbackName);
+      return {
+        ...resolved,
+        metadata: {
+          source: 'qsys-only',
+          label: 'Tcl control flow and substitutions were resolved in a safe interpreter. Run Quartus only for exact interface metadata.',
+        },
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        ...lexical,
+        warnings: [...lexical.warnings, `Safe Tcl resolution unavailable: ${message}`],
+      };
+    }
   }
 
   private async findSubsystem(parent: vscode.Uri, moduleType: string) {

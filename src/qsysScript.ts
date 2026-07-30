@@ -80,12 +80,16 @@ function normalizeTclPath(value: string): string {
 }
 
 function tclVariableAssignments(variables: Record<string, TclVariableValue>): string[] {
+  return tclVariableEntries(variables).map(([name, value]) => `set ${name} ${quoteTclValue(value)}`);
+}
+
+export function tclVariableEntries(variables: Record<string, TclVariableValue>): Array<[string, string]> {
   return Object.entries(variables).sort(([left], [right]) => left.localeCompare(right)).map(([rawName, value]) => {
     if (!/^(?:::)?[A-Za-z_][A-Za-z0-9_]*$/.test(rawName)) {
       throw new Error(`Invalid global Tcl variable name “${rawName}”.`);
     }
     const name = rawName.startsWith('::') ? rawName : `::${rawName}`;
-    return `set ${name} ${quoteTclValue(String(value))}`;
+    return [name, String(value)];
   });
 }
 
