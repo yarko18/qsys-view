@@ -5,6 +5,12 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 1.0.11
+
+- Build sibling exported Tcl subsystems in dependency order before converting a top-level Tcl system for Platform Designer.
+- Keep the generated subsystem Qsys files on the Platform Designer search path for the lifetime of the disposable system.
+- Source subsystem Tcl files from their original locations during exact analysis so relative configuration includes continue to resolve through `info script`.
+
 ## 1.0.10
 
 - Resolve `source`, namespaces, procedures, substitutions, `if`, `switch`, and loops automatically in a restricted safe Tcl interpreter, without starting Quartus.

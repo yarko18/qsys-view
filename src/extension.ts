@@ -340,34 +340,13 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     const evaluatedSystem = path.join(temporaryDirectory, 'evaluated.qsys');
     const inspector = path.join(this.context.extensionUri.fsPath, 'quartus', 'inspect-interfaces.tcl');
     try {
-      const dependencySources = new Map<string, { bytes: Uint8Array; graph: QsysGraph }>();
-      const dependencyOrder = await tclSubsystemBuildOrder(uri.toString(), graph, async (resource) => {
-        const source = await this.readGraph(subsystemUri(resource));
-        dependencySources.set(resource, source);
-        return source.graph;
-      });
-      const temporarySearchPath = `${path.join(temporaryDirectory, '*.qsys')},${searchPath}`;
-      for (const [index, resource] of dependencyOrder.entries()) {
-        const source = dependencySources.get(resource)!;
-        const dependencyPath = path.join(temporaryDirectory, path.basename(subsystemUri(resource).fsPath));
-        const generatedSystemPath = dependencyPath.replace(/\.tcl$/i, '.qsys');
-        const dependencyWrapper = path.join(temporaryDirectory, `build-subsystem-${index}.tcl`);
-        await fs.writeFile(dependencyPath, source.bytes);
-        await fs.writeFile(dependencyWrapper, qsysTclExportWrapper(
-          dependencyPath,
-          generatedSystemPath,
-          this.tclVariables(uri),
-        ));
-        try {
-          await runQsysScript(
-            executable,
-            qsysTclScriptArguments(temporarySearchPath, dependencyWrapper),
-            temporaryDirectory,
-          );
-        } catch (error) {
-          throw new Error(`Unable to prepare subsystem ${path.basename(resource)}: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      }
+      const temporarySearchPath = await this.prepareTclSubsystems(
+        uri,
+        graph,
+        executable,
+        temporaryDirectory,
+        searchPath,
+      );
       // Source the original path so [info script] keeps pointing at the design
       // directory and sibling config/source files resolve correctly.
       await fs.writeFile(wrapper, qsysTclInspectionWrapper(
@@ -391,6 +370,46 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     } finally {
       await fs.rm(temporaryDirectory, { recursive: true, force: true });
     }
+  }
+
+  private async prepareTclSubsystems(
+    rootUri: vscode.Uri,
+    rootGraph: QsysGraph,
+    executable: string,
+    temporaryDirectory: string,
+    searchPath: string,
+    progress?: vscode.Progress<{ message?: string }>,
+  ): Promise<string> {
+    const dependencyOrder = await tclSubsystemBuildOrder(
+      rootUri.toString(),
+      rootGraph,
+      async (resource) => (await this.readGraph(subsystemUri(resource))).graph,
+    );
+    const temporarySearchPath = `${path.join(temporaryDirectory, '*.qsys')},${searchPath}`;
+    for (const [index, resource] of dependencyOrder.entries()) {
+      const dependencyUri = subsystemUri(resource);
+      const systemName = path.basename(dependencyUri.fsPath, path.extname(dependencyUri.fsPath));
+      const generatedSystemPath = path.join(temporaryDirectory, `${systemName}.qsys`);
+      const dependencyWrapper = path.join(temporaryDirectory, `build-subsystem-${index}.tcl`);
+      progress?.report({ message: `Preparing subsystem ${systemName}…` });
+      // Source the original dependency so its [info script] keeps pointing at
+      // the design directory and sibling config/source files remain visible.
+      await fs.writeFile(dependencyWrapper, qsysTclExportWrapper(
+        dependencyUri.fsPath,
+        generatedSystemPath,
+        this.tclVariables(rootUri),
+      ));
+      try {
+        await runQsysScript(
+          executable,
+          qsysTclScriptArguments(temporarySearchPath, dependencyWrapper),
+          temporaryDirectory,
+        );
+      } catch (error) {
+        throw new Error(`Unable to prepare subsystem ${systemName}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    return temporarySearchPath;
   }
 
   private ipSearchPath(uri: vscode.Uri, projectDirectory: string): string {
@@ -484,12 +503,16 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
         async (progress) => {
           const launchTarget = isQsysTcl(uri)
             ? await this.prepareTemporaryQsys(uri, await this.findQsysScript(uri), progress)
-            : { filePath: uri.fsPath, cleanup: undefined as (() => Promise<void>) | undefined };
+            : {
+              filePath: uri.fsPath,
+              searchPath,
+              cleanup: undefined as (() => Promise<void>) | undefined,
+            };
           progress.report({ message: 'Launching Platform Designer…' });
           await this.launchPlatformDesigner(
             platformDesignerExecutable,
             launchTarget.filePath,
-            searchPath,
+            launchTarget.searchPath,
             launchTarget.cleanup,
           );
         },
@@ -505,11 +528,20 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     uri: vscode.Uri,
     executable: string,
     progress?: vscode.Progress<{ message?: string }>,
-  ): Promise<{ filePath: string; cleanup?: () => Promise<void> }> {
+  ): Promise<{ filePath: string; searchPath: string; cleanup?: () => Promise<void> }> {
     const temporaryDirectory = await fs.mkdtemp(platformDesignerTemporaryPrefix(uri.fsPath));
     const temporaryQsys = path.join(temporaryDirectory, `${path.basename(uri.fsPath, path.extname(uri.fsPath))}.qsys`);
     const wrapper = path.join(temporaryDirectory, 'export-system.tcl');
     try {
+      const graph = (await this.readGraph(uri)).graph;
+      const searchPath = await this.prepareTclSubsystems(
+        uri,
+        graph,
+        executable,
+        temporaryDirectory,
+        this.ipSearchPath(uri, path.dirname(uri.fsPath)),
+        progress,
+      );
       progress?.report({ message: 'Converting Tcl to temporary Qsys…' });
       // Source the original script while qsys-script runs in the disposable
       // directory. This preserves [info script], allowing relative includes
@@ -520,10 +552,10 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
         temporaryQsys,
         this.tclVariables(uri),
       ));
-      const searchPath = this.ipSearchPath(uri, path.dirname(uri.fsPath));
       await runQsysScript(executable, qsysTclScriptArguments(searchPath, wrapper), temporaryDirectory);
       return {
         filePath: temporaryQsys,
+        searchPath,
         cleanup: async () => {
           await fs.rm(temporaryDirectory, { recursive: true, force: true });
         },
