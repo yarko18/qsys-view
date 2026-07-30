@@ -7,7 +7,13 @@ SPDX-License-Identifier: MIT
 
 Qsys View is a read-only Visual Studio Code viewer for Intel Platform Designer systems. It opens `.qsys` files and exported Platform Designer `.tcl` scripts as compact layered graphs.
 
-![Qsys View compared with Platform Designer](media/compare.png)
+Open tcl with Qsys View:
+![Open tcl with Qsys View](media/tcl_view.png)
+
+Show base addresses:
+![Show base addresses](media/avmm.png)
+
+and much more!
 
 ## What it does
 
