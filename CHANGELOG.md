@@ -5,6 +5,12 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 1.0.9
+
+- Build Tcl graphs from the Qsys system actually produced by `qsys-script`, so parameters, instances, and connections created through `source`, `if`, `switch`, loops, and substitutions are displayed after evaluation.
+- Source the original Tcl path during analysis so sibling configuration files resolve through `info script`.
+- Rename the Tcl analysis action to **Evaluate Tcl…** to distinguish exact execution from the static approximation.
+
 ## 1.0.8
 
 - Preserve the original exported Tcl location during disposable conversion so sibling `source` files resolve through `info script`.

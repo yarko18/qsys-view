@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, expect, it } from 'vitest';
-import { platformDesignerArguments, platformDesignerTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclScriptArguments, siblingQsysSearchPattern } from '../src/qsysScript';
+import { platformDesignerArguments, platformDesignerTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclInspectionWrapper, qsysTclScriptArguments, siblingQsysSearchPattern } from '../src/qsysScript';
 
 describe('platformDesignerArguments', () => {
   it('keeps the original IP search path when opening a disposable Qsys file', () => {
@@ -70,6 +70,43 @@ describe('qsysTclExportWrapper', () => {
     )).toEqual([
       'source "/work/quartus/video.tcl"',
       'save_system "/work/quartus/.qsys-view-video-AbCd12/video.qsys"',
+      '',
+    ].join('\n'));
+  });
+
+  it('sets configured global variables before sourcing the design', () => {
+    expect(qsysTclExportWrapper(
+      '/work/quartus/video.tcl',
+      '/tmp/video.qsys',
+      { PLATFORM_CONFIG: 'WTC', FEATURE_DEBUG: false },
+    )).toEqual([
+      'set ::FEATURE_DEBUG "false"',
+      'set ::PLATFORM_CONFIG "WTC"',
+      'source "/work/quartus/video.tcl"',
+      'save_system "/tmp/video.qsys"',
+      '',
+    ].join('\n'));
+  });
+
+  it('rejects Tcl variable names that could inject commands', () => {
+    expect(() => qsysTclExportWrapper('/work/video.tcl', '/tmp/video.qsys', {
+      'PLATFORM_CONFIG;error': 'WTC',
+    })).toThrow(/invalid global Tcl variable name/i);
+  });
+});
+
+describe('qsysTclInspectionWrapper', () => {
+  it('saves the evaluated system before running the interface inspector', () => {
+    expect(qsysTclInspectionWrapper(
+      '/work/quartus/video.tcl',
+      '/tmp/evaluated.qsys',
+      '/extension/inspect-interfaces.tcl',
+      { PLATFORM_CONFIG: 'WHC' },
+    )).toEqual([
+      'set ::PLATFORM_CONFIG "WHC"',
+      'source "/work/quartus/video.tcl"',
+      'save_system "/tmp/evaluated.qsys"',
+      'source "/extension/inspect-interfaces.tcl"',
       '',
     ].join('\n'));
   });

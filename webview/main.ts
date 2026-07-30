@@ -224,7 +224,9 @@ required<HTMLButtonElement>('relayout').addEventListener('click', () => {
 quartusMetadata.addEventListener('click', () => {
   quartusMetadata.disabled = true;
   quartusMetadata.textContent = 'Running qsys-script…';
-  showStatus('Quartus is elaborating a temporary copy of this Qsys system…');
+  showStatus(isActiveTcl()
+    ? 'Quartus is evaluating this Tcl system in a disposable directory…'
+    : 'Quartus is elaborating a temporary copy of this Qsys system…');
   vscode.postMessage({ type: 'loadQuartusMetadata', resource: activeResource });
 });
 const openPlatformDesigner = required<HTMLButtonElement>('open-platform-designer');
@@ -1161,8 +1163,15 @@ function updateAnalysisControls(): void {
   quartusMetadata.classList.toggle('hidden', Boolean(exact));
   inferClockResetOption.classList.toggle('hidden', Boolean(exact));
   quartusMetadata.disabled = false;
-  quartusMetadata.textContent = 'Read interfaces…';
+  quartusMetadata.textContent = isActiveTcl() ? 'Evaluate Tcl…' : 'Read interfaces…';
+  quartusMetadata.title = isActiveTcl()
+    ? 'Execute the Tcl with qsys-script and show its evaluated instances, parameters, connections, and interfaces'
+    : 'Read exact interface metadata with qsys-script';
   updateViewAvailability();
+}
+
+function isActiveTcl(): boolean {
+  return /\.tcl$/i.test(activeResource ?? '');
 }
 
 function updateViewAvailability(): void {

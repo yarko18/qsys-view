@@ -3,6 +3,8 @@
 
 import * as path from 'node:path';
 
+export type TclVariableValue = string | number | boolean;
+
 export function platformDesignerArguments(systemFilePath: string, searchPath: string): string[] {
   return [
     systemFilePath,
@@ -35,10 +37,30 @@ export function qsysTclScriptArguments(searchPath: string, wrapperPath: string):
   ];
 }
 
-export function qsysTclExportWrapper(sourcePath: string, generatedSystemPath: string): string {
+export function qsysTclExportWrapper(
+  sourcePath: string,
+  generatedSystemPath: string,
+  variables: Record<string, TclVariableValue> = {},
+): string {
   return [
+    ...tclVariableAssignments(variables),
     `source ${quoteTclValue(normalizeTclPath(sourcePath))}`,
     `save_system ${quoteTclValue(normalizeTclPath(generatedSystemPath))}`,
+    '',
+  ].join('\n');
+}
+
+export function qsysTclInspectionWrapper(
+  sourcePath: string,
+  generatedSystemPath: string,
+  inspectorPath: string,
+  variables: Record<string, TclVariableValue> = {},
+): string {
+  return [
+    ...tclVariableAssignments(variables),
+    `source ${quoteTclValue(normalizeTclPath(sourcePath))}`,
+    `save_system ${quoteTclValue(normalizeTclPath(generatedSystemPath))}`,
+    `source ${quoteTclValue(normalizeTclPath(inspectorPath))}`,
     '',
   ].join('\n');
 }
@@ -55,6 +77,16 @@ export function siblingQsysSearchPattern(projectDirectory: string): string {
 
 function normalizeTclPath(value: string): string {
   return value.replaceAll('\\', '/');
+}
+
+function tclVariableAssignments(variables: Record<string, TclVariableValue>): string[] {
+  return Object.entries(variables).sort(([left], [right]) => left.localeCompare(right)).map(([rawName, value]) => {
+    if (!/^(?:::)?[A-Za-z_][A-Za-z0-9_]*$/.test(rawName)) {
+      throw new Error(`Invalid global Tcl variable name “${rawName}”.`);
+    }
+    const name = rawName.startsWith('::') ? rawName : `::${rawName}`;
+    return `set ${name} ${quoteTclValue(String(value))}`;
+  });
 }
 
 function quoteTclValue(value: string): string {

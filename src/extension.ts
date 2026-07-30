@@ -10,8 +10,9 @@ import * as vscode from 'vscode';
 import type { QsysGraph } from '../parser/graph';
 import { applyQuartusMetadata } from '../parser/quartusMetadataParser';
 import { parseQsys } from '../parser/qsysParser';
+import { parseEvaluatedQsysTcl } from '../parser/qsysTclEvaluation';
 import { parseQsysTcl } from '../parser/qsysTclParser';
-import { platformDesignerArguments, platformDesignerTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclScriptArguments, siblingQsysSearchPattern } from './qsysScript';
+import { platformDesignerArguments, platformDesignerTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclInspectionWrapper, qsysTclScriptArguments, siblingQsysSearchPattern, type TclVariableValue } from './qsysScript';
 import { subsystemCandidatePaths, tclSubsystemBuildOrder } from './subsystems';
 
 const lastViewStateKey = 'qsysView.lastViewState';
@@ -150,7 +151,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       if (loadQuartus) {
         try {
           graph = isQsysTcl(uri)
-            ? await this.withTclQuartusMetadata(uri, graph, bytes)
+            ? await this.withTclQuartusMetadata(uri, graph)
             : await this.withQsysQuartusMetadata(uri, graph, bytes, fileName);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -228,7 +229,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       if (analyze) {
         try {
           graph = isQsysTcl(uri)
-            ? await this.withTclQuartusMetadata(uri, graph, source.bytes)
+            ? await this.withTclQuartusMetadata(uri, graph)
             : await this.withQsysQuartusMetadata(uri, graph, source.bytes, source.fileName);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -293,15 +294,14 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
   private async withTclQuartusMetadata(
     uri: vscode.Uri,
     graph: QsysGraph,
-    scriptBytes: Uint8Array,
   ): Promise<QsysGraph> {
     if (uri.scheme !== 'file') throw new Error('qsys-script metadata is available only for local files.');
     const executable = await this.findQsysScript(uri);
     const projectDirectory = path.dirname(uri.fsPath);
     const searchPath = this.ipSearchPath(uri, projectDirectory);
     const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'qsys-view-tcl-'));
-    const temporaryScript = path.join(temporaryDirectory, 'design.tcl');
     const wrapper = path.join(temporaryDirectory, 'inspect-exported-system.tcl');
+    const evaluatedSystem = path.join(temporaryDirectory, 'evaluated.qsys');
     const inspector = path.join(this.context.extensionUri.fsPath, 'quartus', 'inspect-interfaces.tcl');
     try {
       const dependencySources = new Map<string, { bytes: Uint8Array; graph: QsysGraph }>();
@@ -317,7 +317,11 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
         const generatedSystemPath = dependencyPath.replace(/\.tcl$/i, '.qsys');
         const dependencyWrapper = path.join(temporaryDirectory, `build-subsystem-${index}.tcl`);
         await fs.writeFile(dependencyPath, source.bytes);
-        await fs.writeFile(dependencyWrapper, qsysTclExportWrapper(dependencyPath, generatedSystemPath));
+        await fs.writeFile(dependencyWrapper, qsysTclExportWrapper(
+          dependencyPath,
+          generatedSystemPath,
+          this.tclVariables(uri),
+        ));
         try {
           await runQsysScript(
             executable,
@@ -328,18 +332,26 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
           throw new Error(`Unable to prepare subsystem ${path.basename(resource)}: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
-      await fs.writeFile(temporaryScript, scriptBytes);
-      await fs.writeFile(wrapper, [
-        'source [file join [file dirname [info script]] design.tcl]',
-        `source ${tclQuoted(inspector)}`,
-        '',
-      ].join('\n'));
+      // Source the original path so [info script] keeps pointing at the design
+      // directory and sibling config/source files resolve correctly.
+      await fs.writeFile(wrapper, qsysTclInspectionWrapper(
+        uri.fsPath,
+        evaluatedSystem,
+        inspector,
+        this.tclVariables(uri),
+      ));
       const output = await runQsysScript(
         executable,
         qsysTclScriptArguments(temporarySearchPath, wrapper),
         temporaryDirectory,
       );
-      return applyQuartusMetadata(graph, output, executable);
+      const evaluatedXml = await fs.readFile(evaluatedSystem, 'utf8');
+      const evaluatedGraph = parseEvaluatedQsysTcl(evaluatedXml, graph.name, output, executable);
+      const modules = await Promise.all(evaluatedGraph.modules.map(async (module) => {
+        const subsystem = await this.findSubsystem(uri, module.type);
+        return subsystem ? { ...module, subsystem } : module;
+      }));
+      return { ...evaluatedGraph, modules };
     } finally {
       await fs.rm(temporaryDirectory, { recursive: true, force: true });
     }
@@ -363,6 +375,19 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       path.join(projectDirectory, '*', 'component.ipx'),
       '$',
     ].filter(Boolean))].join(',');
+  }
+
+  private tclVariables(uri: vscode.Uri): Record<string, TclVariableValue> {
+    const configured = vscode.workspace.getConfiguration('qsysView', uri)
+      .get<Record<string, unknown>>('tclVariables', {});
+    const variables: Record<string, TclVariableValue> = {};
+    for (const [name, value] of Object.entries(configured)) {
+      if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+        throw new Error(`Qsys View Tcl variable “${name}” must be a string, number, or boolean.`);
+      }
+      variables[name] = value;
+    }
+    return variables;
   }
 
   private async findQsysScript(uri: vscode.Uri): Promise<string> {
@@ -454,7 +479,11 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       // directory. This preserves [info script], allowing relative includes
       // such as a sibling config.tcl to resolve without redirecting relative
       // save_system output into the source project.
-      await fs.writeFile(wrapper, qsysTclExportWrapper(uri.fsPath, temporaryQsys));
+      await fs.writeFile(wrapper, qsysTclExportWrapper(
+        uri.fsPath,
+        temporaryQsys,
+        this.tclVariables(uri),
+      ));
       const searchPath = this.ipSearchPath(uri, path.dirname(uri.fsPath));
       await runQsysScript(executable, qsysTclScriptArguments(searchPath, wrapper), temporaryDirectory);
       return {
@@ -671,10 +700,6 @@ function subsystemUri(resource: string): vscode.Uri {
     throw new Error('Subsystem must be a local .qsys or .tcl file.');
   }
   return uri;
-}
-
-function tclQuoted(value: string): string {
-  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('$', '\\$').replaceAll('[', '\\[')}"`;
 }
 
 export function activate(context: vscode.ExtensionContext): void {

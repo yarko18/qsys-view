@@ -50,7 +50,17 @@ The Tcl reader accepts Platform Designer declarations for `avalon`, `axi`, `tris
 
 ## Tcl and Quartus analysis
 
-The static reader understands `add_instance`, instance parameters, `add_interface`, `add_interface_port`, `EXPORT_OF`, `add_connection`, and connection parameters. An explicit connection kind is available immediately. The usual two-argument exported `add_connection` remains unknown until **Read interfaces…** runs `qsys-script`.
+The static reader understands `add_instance`, instance parameters, `add_interface`, `add_interface_port`, `EXPORT_OF`, `add_connection`, and connection parameters. An explicit connection kind is available immediately. For Tcl systems that use `source`, variables, procedures, `if`, `switch`, or loops, choose **Evaluate Tcl…**. Qsys View then runs `qsys-script` in a disposable directory and replaces the static approximation with the evaluated instances, parameter values, connections, and exact interfaces.
+
+Use `qsysView.tclVariables` to select a configuration before evaluation or before opening the Tcl system in Platform Designer. For example:
+
+```json
+{
+  "qsysView.tclVariables": {
+    "PLATFORM_CONFIG": "WHC"
+  }
+}
+```
 
 **Infer clk/reset** classifies only unknown static Tcl connections by interface names. It recognizes `clock`, `clk`, `reset`, `reset_n`, `rst`, `rst_n`, `nrst`, and `rstn`. Reset takes priority for names such as `clk_reset`. Disable the checkbox if a project uses those words for unrelated interfaces. Explicit Qsys/Tcl kinds and Quartus results are never overridden.
 
@@ -100,6 +110,7 @@ code --install-extension qsys-view-1.0.6.vsix --force
 | `qsysView.quartusPath` | Quartus directory or direct path to `qsys-script` |
 | `qsysView.platformDesignerPath` | Direct path to `qsys-edit` or `qsys.exe` |
 | `qsysView.ipSearchPaths` | Additional Platform Designer IP search paths |
+| `qsysView.tclVariables` | Global variables set before evaluating a Tcl system |
 | `qsysView.rememberLastViewState` | Remember toolbar choices across editors |
 
 ## Development
