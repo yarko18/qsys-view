@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import type { ConnectionKind, QsysConnection } from '../parser/graph';
+import type { InterfaceHub } from './interfaceHubs';
 
 export type GraphViewMode = 'pipeline' | 'complete';
 
@@ -29,6 +30,28 @@ export function availableConnectionKinds(
 ): ConnectionKind[] {
   const existing = new Set(kinds);
   return [...existing].filter((kind) => isDirectKind(kind, mode) || isHubKind(kind, mode));
+}
+
+/** Modules with a visible edge or a non-clock/reset highlight relationship. */
+export function connectedModuleIds(
+  directConnections: readonly QsysConnection[],
+  hubs: readonly Pick<InterfaceHub, 'kind' | 'moduleId' | 'relatedModuleIds'>[],
+): Set<string> {
+  const result = new Set(directConnections.flatMap((connection) => [connection.source, connection.target]));
+  for (const hub of hubs) {
+    if (hub.kind === 'clock' || hub.kind === 'reset') continue;
+    result.add(hub.moduleId);
+    for (const moduleId of hub.relatedModuleIds) result.add(moduleId);
+  }
+  return result;
+}
+
+export function canUsePipelineView(
+  resources: readonly { resource?: string; exactMetadata: boolean }[],
+): boolean {
+  return resources.every(({ resource, exactMetadata }) =>
+    !resource?.toLowerCase().endsWith('.tcl') || exactMetadata,
+  );
 }
 
 const resetInterfaceName = /(?:^|[_-])(?:reset_n|rst_n|reset|nrst|rstn|rst)(?=$|[_-])/i;

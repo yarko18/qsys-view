@@ -5,6 +5,26 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 1.0.6
+
+- Discover sibling Platform Designer systems used as IP and mark them as expandable subsystems.
+- Lazily expand a selected subsystem on the current canvas while leaving deeper hierarchy levels collapsed.
+- Reconnect parent connections through exported child interfaces for both Qsys and Tcl hierarchy sources.
+- Open a subsystem as a complete Qsys View from its details or by double-clicking the subsystem block.
+- Add sibling Qsys systems to the Quartus search path and suppress adapter guesses for unresolved interfaces, eliminating false `ready`/`valid` differences.
+- Analyze each expanded subsystem with Quartus when the parent has exact metadata, so nested Tcl pipelines retain their real interface types.
+- Preserve one clock/reset highlight domain across exported `clock_source` boundaries instead of duplicating it after expansion.
+- Draw expanded subsystems inside rounded dashed containers with an on-canvas collapse control.
+- Draw interrupt arrows in signal-flow order from sender to receiver and group IRQ highlights by the actual receiver.
+- Keep expanded subsystem containers clear of top-level IP and prevent canvas panning from intercepting their controls.
+- Enter a subsystem in the same canvas and return through a breadcrumb Back control while preserving the parent layout and zoom.
+- Hide interface-analysis controls while metadata is current and invalidate it when a loaded Qsys or Tcl source changes.
+- Hide clock/reset-only IP unless All IP is enabled, while retaining functional Avalon-MM and IRQ hub endpoints.
+- Disable Pipeline view for Tcl until every visible hierarchy level has exact Quartus interface metadata.
+- Recursively prepare sibling Tcl subsystems before analyzing a top-level export and retain the first useful Quartus errors instead of a noisy log tail.
+- Keep an expanded subsystem inline with its parent pipeline while moving only top-level IP that would overlap its container.
+- Rename the user-facing Complete mode to Classic mode.
+
 ## 1.0.5
 
 - Keep unchanged Tcl connection routes fixed during live edits; removing one `add_connection` no longer reroutes the remaining graph.

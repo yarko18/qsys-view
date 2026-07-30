@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import type { QsysGraph, QsysInterface } from './graph';
-import { classifyConnection } from './qsysParser';
+import { classifyConnection, orientPlatformDesignerConnection } from './qsysParser';
 import { annotateStreamingAdapters } from './streamAdapters';
 
 const prefix = 'QSYS_VIEWER\t';
@@ -70,11 +70,14 @@ export function applyQuartusMetadata(graph: QsysGraph, output: string, executabl
     const rawKind = candidates.find((kind) => classifyConnection(kind) !== 'other')
       ?? candidates[0]
       ?? connection.rawKind;
-    return {
+    const resolved = {
       ...connection,
       kind: classifyConnection(rawKind),
       rawKind,
     };
+    return resolved.kind === 'interrupt' && connection.kind !== 'interrupt'
+      ? orientPlatformDesignerConnection(resolved)
+      : resolved;
   });
   return annotateStreamingAdapters({
     ...graph,

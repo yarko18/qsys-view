@@ -77,6 +77,20 @@ function collectInterfaces(module: XmlNode): { ports: QsysPort[]; kinds: Map<str
   return { ports, kinds };
 }
 
+function collectExportedInterfaces(system: XmlNode): Record<string, string> {
+  const exportedInterfaces: Record<string, string> = {};
+  const interfaces = [
+    ...arrayOf(system.interface),
+    ...arrayOf((system.interfaces as XmlNode | undefined)?.interface),
+  ];
+  for (const iface of interfaces) {
+    const name = text(iface.name);
+    const internal = text(iface.internal);
+    if (name && internal) exportedInterfaces[name] = internal;
+  }
+  return exportedInterfaces;
+}
+
 function splitEndpoint(endpoint: string): [string, string] {
   const separator = endpoint.lastIndexOf('.');
   return separator < 0
@@ -94,6 +108,22 @@ export function classifyConnection(rawKind: string): ConnectionKind {
   if (/conduit|export|wire/.test(kind)) return 'conduit';
   if (kind === 'avalon') return 'avalon_memory_mapped';
   return 'other';
+}
+
+/**
+ * Platform Designer serializes interrupt links as receiver -> sender, unlike
+ * their signal flow and unlike the other supported interfaces. Qsys View keeps
+ * all graph connections in signal-flow order so arrows and receiver hubs agree.
+ */
+export function orientPlatformDesignerConnection(connection: QsysConnection): QsysConnection {
+  if (connection.kind !== 'interrupt') return connection;
+  return {
+    ...connection,
+    source: connection.target,
+    sourcePort: connection.targetPort,
+    target: connection.source,
+    targetPort: connection.sourcePort,
+  };
 }
 
 function findSystem(document: XmlNode): XmlNode {
@@ -168,7 +198,7 @@ export function parseQsys(xml: string, fallbackName = 'Qsys system'): QsysGraph 
       || interfaceKinds.get(sourceEndpoint)
       || interfaceKinds.get(targetEndpoint)
       || '';
-    connections.push({
+    connections.push(orientPlatformDesignerConnection({
       id: text(connection.name) || `connection-${index}`,
       source,
       sourcePort,
@@ -177,7 +207,7 @@ export function parseQsys(xml: string, fallbackName = 'Qsys system'): QsysGraph 
       kind: classifyConnection(rawKind),
       rawKind: rawKind || 'unknown',
       parameters: collectParameters(connection),
-    });
+    }));
   }
 
   if (modules.length === 0) warnings.push('No modules were found in this Qsys file.');
@@ -192,5 +222,6 @@ export function parseQsys(xml: string, fallbackName = 'Qsys system'): QsysGraph 
       label: 'Exact interface metadata is not loaded. Run qsys-script from the viewer; values are never guessed.',
     },
     warnings,
+    exportedInterfaces: collectExportedInterfaces(system),
   };
 }

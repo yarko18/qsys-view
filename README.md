@@ -13,6 +13,7 @@ Qsys View is a read-only Visual Studio Code viewer for Intel Platform Designer s
 
 - Opens `.qsys` directly and `.tcl` through **Reopen Editor With… → Qsys TCL Graph**.
 - Keeps hierarchical subsystems collapsed as single IP blocks.
+- Expands a selected subsystem in place, enters it in the same canvas, or opens it in a new editor without automatically expanding deeper levels.
 - Draws a left-to-right graph with orthogonal connections.
 - Shows IP and connection parameters on click.
 - Highlights clock, reset, Avalon-MM, and interrupt domains without filling the graph with their edges.
@@ -27,7 +28,7 @@ Qsys View is a read-only Visual Studio Code viewer for Intel Platform Designer s
 
 Qsys View has two modes:
 
-| Interface | Pipeline | Complete |
+| Interface | Pipeline | Classic |
 | --- | --- | --- |
 | Avalon-ST | Directed edge and layout anchor | Directed edge |
 | Conduit | Directed edge | Directed edge |
@@ -37,7 +38,7 @@ Qsys View has two modes:
 | Reset | Highlight hub | Highlight hub |
 | Other or unknown | Hidden | Grey directed edge |
 
-Only interface filters present in the current system are shown. Pipeline layout is anchored exclusively by Avalon-ST when streaming connections exist.
+Only interface filters present in the current system are shown. Pipeline layout is anchored exclusively by Avalon-ST when streaming connections exist. For exported Tcl, Pipeline remains disabled until **Read interfaces…** resolves the real interface types for every visible hierarchy level.
 
 The Tcl reader accepts Platform Designer declarations for `avalon`, `axi`, `tristate_conduit`, `avalon_streaming`, `interrupt`, `conduit`, `clock`, `reset`, and `nios_custom_instruction`.
 
@@ -47,21 +48,30 @@ The static reader understands `add_instance`, instance parameters, `add_interfac
 
 **Infer clk/reset** classifies only unknown static Tcl connections by interface names. It recognizes `clock`, `clk`, `reset`, `reset_n`, `rst`, `rst_n`, `nrst`, and `rstn`. Reset takes priority for names such as `clk_reset`. Disable the checkbox if a project uses those words for unrelated interfaces. Explicit Qsys/Tcl kinds and Quartus results are never overridden.
 
-Quartus analysis is user-triggered and runs on a disposable copy. It supplies exact types and ports, Avalon-ST format information, and automatic-adapter detection. The source file is never modified.
+Quartus analysis is user-triggered and runs on a disposable copy. It supplies exact types and ports, Avalon-ST format information, and automatic-adapter detection. While this metadata is current, **Read interfaces…** and **Infer clk/reset** are hidden. Editing any loaded source invalidates its metadata and shows the controls again. The source file is never modified.
+
+## Hierarchical systems
+
+When an IP type matches a sibling `.qsys` or `.tcl` file, its block has a **+** control. Expanding replaces only that instance with its internal graph, reconnects parent links through exported interfaces, and surrounds the child with a dashed container kept clear of top-level IP. Use **−** to collapse the container or **↘** to enter it as the full canvas.
+
+If the parent was read with **Read interfaces…**, expanded children are analyzed too. Nested Tcl connections therefore keep their exact interface types in Pipeline view, while exported clock and reset bridges remain part of the parent domain.
+
+Choose **Enter subsystem** in the IP details to navigate within the current viewer; **← Back** restores the parent layout and zoom. Choose **Open in new editor**, or double-click the block, for a separate Qsys View. Nested children remain collapsed and can be expanded independently.
 
 ## Controls
 
-- **View** switches between Complete and Pipeline.
-- **All IP** includes disconnected IP; off by default.
+- **View** switches between Classic and Pipeline.
+- **All IP** includes IP without visible functional connections; off by default. Clock/reset highlighting alone does not make an IP visible.
 - **Disabled IP** includes disabled instances; off by default.
 - **Infer clk/reset** controls name inference; on by default.
 - **Errors/Warnings** appears when the static Tcl reader finds a problem; click an item to open its source line.
+- **+** expands a detected subsystem; **−** collapses its container; **↘** enters it; **← Back** returns to the parent.
 - **Read interfaces…** requests exact Quartus metadata.
 - **Open in Platform Designer** opens or converts the system.
 - **Relayout** recalculates the active mode; **Fit** fits it to the viewport.
 - Drag to pan, use the wheel to zoom, and search by instance name or IP type.
 
-New viewers start in Complete mode. With **Remember Last View State** enabled, Qsys View reuses the last mode, interface filters, IP visibility options, and name-inference choice across editors.
+New viewers start in Classic mode. With **Remember Last View State** enabled, Qsys View reuses the last mode, interface filters, IP visibility options, and name-inference choice across editors.
 
 ## Installation
 
@@ -74,7 +84,7 @@ code --install-extension YaroslavMariukha.qsys-view
 A local package can be installed with:
 
 ```bash
-code --install-extension qsys-view-1.0.5.vsix --force
+code --install-extension qsys-view-1.0.6.vsix --force
 ```
 
 ## Settings
@@ -101,7 +111,7 @@ npm run package
 
 ## Scope
 
-Qsys View does not edit Qsys or Tcl sources and its static diagnostics do not replace Platform Designer validation. Unknown Tcl connections remain grey in Complete mode until their type is explicit, inferred, or resolved by Quartus. Waveforms are protocol illustrations, not simulation output.
+Qsys View does not edit Qsys or Tcl sources and its static diagnostics do not replace Platform Designer validation. Unknown Tcl connections remain grey in Classic mode until their type is explicit, inferred, or resolved by Quartus. Waveforms are protocol illustrations, not simulation output.
 
 ## License
 

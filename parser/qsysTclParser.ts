@@ -3,7 +3,7 @@
 
 import type { QsysConnection, QsysDiagnostic, QsysGraph, QsysModule, QsysPort } from './graph';
 import { platformDesignerSystemCommands } from './platformDesignerCommands';
-import { classifyConnection } from './qsysParser';
+import { classifyConnection, orientPlatformDesignerConnection } from './qsysParser';
 import { parseTclCommands } from './tclCommands';
 interface PendingConnection {
   sourceEndpoint: string;
@@ -264,7 +264,7 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
       || exportedKinds.get(connection.sourceEndpoint)
       || exportedKinds.get(connection.targetEndpoint)
       || '';
-    connections.push({
+    connections.push(orientPlatformDesignerConnection({
       id: connectionId(connection, duplicateConnectionCounts),
       source,
       sourcePort,
@@ -273,7 +273,7 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
       kind: classifyConnection(rawKind),
       rawKind: rawKind || 'unknown (static Tcl)',
       parameters: connection.parameters,
-    });
+    }));
   }
 
   for (const [instanceName, pending] of pendingParameters) {
@@ -297,5 +297,10 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
     },
     warnings,
     diagnostics,
+    exportedInterfaces: Object.fromEntries(
+      [...declaredInterfaces]
+        .filter(([, declared]) => Boolean(declared.exportOf))
+        .map(([name, declared]) => [name, declared.exportOf!]),
+    ),
   };
 }

@@ -4,9 +4,10 @@
 import { connectionKinds, type ConnectionKind, type QsysAdaptation, type QsysConnection, type QsysDiagnostic, type QsysGraph, type QsysInterface, type QsysModule } from '../parser/graph';
 import { streamParameters } from '../parser/streamMetadata';
 import { createInterfaceWaveform } from '../parser/waveform';
-import { layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, projectVisibleLayout, type LayoutPoint, type LayoutResult, type StableLayoutCache } from '../layout/elk';
+import { layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, projectVisibleLayout, separateHierarchyGroups, type LayoutPoint, type LayoutResult, type StableLayoutCache } from '../layout/elk';
+import { composeHierarchy, hierarchyBounds, type HierarchyBounds } from './hierarchy';
 import { connectionAddress, createInterfaceHubs, type HubKind, type InterfaceHub } from './interfaceHubs';
-import { availableConnectionKinds, inferClockResetConnections, isDirectKind, isHubKind, type GraphViewMode } from './viewMode';
+import { availableConnectionKinds, canUsePipelineView, connectedModuleIds, inferClockResetConnections, isDirectKind, isHubKind, type GraphViewMode } from './viewMode';
 import './styles.css';
 
 const vscode = acquireVsCodeApi();
@@ -49,6 +50,19 @@ interface SavedViewState {
   inferClockResetNames?: boolean;
 }
 
+interface CanvasTransform { x: number; y: number; scale: number }
+
+interface NavigationFrame {
+  sourceGraph: QsysGraph;
+  resource?: string;
+  expandedSubsystems: Map<string, QsysGraph>;
+  expandedSubsystemResources: Map<string, string>;
+  stableLayoutCaches: Partial<Record<GraphViewMode, StableLayoutCache>>;
+  transform: CanvasTransform;
+  didInitialFit: boolean;
+  activeHubId?: string;
+}
+
 const saved = (vscode.getState() ?? {}) as SavedViewState;
 const state: ViewState = {
   viewMode: 'complete',
@@ -62,13 +76,20 @@ const state: ViewState = {
 };
 applySavedViewState(saved);
 
+let sourceGraph: QsysGraph | undefined;
 let graph: QsysGraph | undefined;
+let activeResource: string | undefined;
 let layout: LayoutResult | undefined;
-const stableLayoutCaches: Partial<Record<GraphViewMode, StableLayoutCache>> = {};
+let stableLayoutCaches: Partial<Record<GraphViewMode, StableLayoutCache>> = {};
+let expandedSubsystems = new Map<string, QsysGraph>();
+let expandedSubsystemResources = new Map<string, string>();
+const loadingSubsystems = new Set<string>();
+const pendingSubsystemActions = new Map<string, 'expand' | 'enter'>();
+const navigationStack: NavigationFrame[] = [];
 let activeHubId: string | undefined;
 let visibleHubs: InterfaceHub[] = [];
 let renderVersion = 0;
-let transform = { x: 20, y: 20, scale: 1 };
+let transform: CanvasTransform = { x: 20, y: 20, scale: 1 };
 let didInitialFit = false;
 
 const app = document.querySelector<HTMLDivElement>('#app');
@@ -80,15 +101,20 @@ app.innerHTML = `
       <label class="view-mode">View
         <select id="view-mode" aria-label="Graph view mode">
           <option value="pipeline">Pipeline</option>
-          <option value="complete">Complete</option>
+          <option value="complete">Classic</option>
         </select>
       </label>
       <div id="kind-filters" class="filters"></div>
     </div>
     <div class="toolbar-row toolbar-secondary">
-      <label class="option" title="Classify unknown Tcl interfaces from common clock and reset names"><input id="infer-clock-reset" type="checkbox"> Infer clk/reset</label>
+      <div id="subsystem-navigation" class="subsystem-navigation hidden">
+        <button id="subsystem-back" title="Return to the parent system">← Back</button>
+        <span id="subsystem-path"></span>
+      </div>
+      <label id="infer-clock-reset-option" class="option" title="Classify unknown Tcl interfaces from common clock and reset names"><input id="infer-clock-reset" type="checkbox"> Infer clk/reset</label>
       <label class="option"><input id="show-disconnected" type="checkbox"> All IP</label>
       <label class="option"><input id="show-disabled" type="checkbox"> Disabled IP</label>
+      <div id="expanded-subsystems" class="expanded-subsystems hidden"></div>
       <input id="search" class="search" type="search" placeholder="Find IP…" aria-label="Find IP">
       <button id="diagnostics-toggle" class="diagnostics-toggle hidden" title="Show Tcl parse problems"></button>
       <button id="quartus-metadata" title="Read exact interface metadata with qsys-script">Read interfaces…</button>
@@ -120,9 +146,15 @@ const details = required<HTMLElement>('details');
 const search = required<HTMLInputElement>('search');
 const filters = required<HTMLElement>('kind-filters');
 const viewMode = required<HTMLSelectElement>('view-mode');
+const pipelineViewOption = viewMode.querySelector<HTMLOptionElement>('option[value="pipeline"]')!;
+if (!pipelineViewOption) throw new Error('Missing Pipeline view option.');
 const quartusMetadata = required<HTMLButtonElement>('quartus-metadata');
 const interfaceHubs = required<HTMLElement>('interface-hubs');
 const inferClockResetNames = required<HTMLInputElement>('infer-clock-reset');
+const inferClockResetOption = required<HTMLElement>('infer-clock-reset-option');
+const expandedSubsystemControls = required<HTMLElement>('expanded-subsystems');
+const subsystemNavigation = required<HTMLElement>('subsystem-navigation');
+const subsystemPath = required<HTMLElement>('subsystem-path');
 const diagnosticsToggle = required<HTMLButtonElement>('diagnostics-toggle');
 const diagnosticsPanel = required<HTMLElement>('diagnostics');
 const diagnosticsList = required<HTMLElement>('diagnostics-list');
@@ -180,6 +212,7 @@ showDisabled.addEventListener('change', () => {
   void render();
 });
 required<HTMLButtonElement>('fit').addEventListener('click', fitView);
+required<HTMLButtonElement>('subsystem-back').addEventListener('click', leaveSubsystem);
 diagnosticsToggle.addEventListener('click', () => diagnosticsPanel.classList.toggle('hidden'));
 required<HTMLButtonElement>('diagnostics-close').addEventListener('click', () => diagnosticsPanel.classList.add('hidden'));
 required<HTMLButtonElement>('relayout').addEventListener('click', () => {
@@ -192,13 +225,13 @@ quartusMetadata.addEventListener('click', () => {
   quartusMetadata.disabled = true;
   quartusMetadata.textContent = 'Running qsys-script…';
   showStatus('Quartus is elaborating a temporary copy of this Qsys system…');
-  vscode.postMessage({ type: 'loadQuartusMetadata' });
+  vscode.postMessage({ type: 'loadQuartusMetadata', resource: activeResource });
 });
 const openPlatformDesigner = required<HTMLButtonElement>('open-platform-designer');
 openPlatformDesigner.addEventListener('click', () => {
   openPlatformDesigner.disabled = true;
   openPlatformDesigner.textContent = 'Opening Platform Designer…';
-  vscode.postMessage({ type: 'openPlatformDesigner' });
+  vscode.postMessage({ type: 'openPlatformDesigner', resource: activeResource });
 });
 search.addEventListener('input', updateSearch);
 
@@ -209,23 +242,50 @@ window.addEventListener('message', (event: MessageEvent) => {
     graph?: QsysGraph;
     message?: string;
     diagnostic?: QsysDiagnostic;
+    instanceId?: string;
+    resource?: string;
     rememberedViewState?: SavedViewState;
   };
   if (message.type === 'graph' && message.graph) {
-    const firstGraph = !graph;
+    if (activeResource && message.resource && message.resource !== activeResource) {
+      updateInactiveResourceGraph(message.resource, message.graph);
+      return;
+    }
+    const firstGraph = !sourceGraph;
     if (!receivedInitialState && message.rememberedViewState) {
       applySavedViewState(message.rememberedViewState);
       syncViewControls();
     }
     receivedInitialState = true;
-    graph = message.graph;
+    if (message.resource) updateNavigationResourceGraph(message.resource, message.graph);
+    activeResource = message.resource ?? activeResource;
+    sourceGraph = message.graph;
+    graph = composeHierarchy(sourceGraph, expandedSubsystems);
     if (firstGraph) didInitialFit = false;
-    required<HTMLElement>('system-name').textContent = graph.name;
-    quartusMetadata.disabled = false;
-    quartusMetadata.textContent = graph.metadata.source === 'quartus' ? 'Read interfaces again…' : 'Read interfaces…';
+    required<HTMLElement>('system-name').textContent = sourceGraph.name;
+    updateAnalysisControls();
     updateDiagnostics(graph.diagnostics ?? []);
+    updateExpandedSubsystemControls();
+    updateSubsystemNavigation();
     updateKindFilters();
     void render();
+    if (sourceGraph.metadata.source === 'quartus') analyzeExpandedSubsystems();
+  } else if (message.type === 'subsystemGraph' && message.graph && message.instanceId) {
+    loadingSubsystems.delete(message.instanceId);
+    const action = pendingSubsystemActions.get(message.instanceId) ?? 'expand';
+    pendingSubsystemActions.delete(message.instanceId);
+    const resource = message.resource ?? expandedSubsystemResources.get(message.instanceId);
+    if (action === 'enter' && resource) {
+      enterSubsystem(message.graph, resource);
+    } else {
+      expandedSubsystems.set(message.instanceId, message.graph);
+      refreshComposedHierarchy();
+    }
+  } else if (message.type === 'subsystemError' && message.instanceId) {
+    loadingSubsystems.delete(message.instanceId);
+    pendingSubsystemActions.delete(message.instanceId);
+    showStatus(message.message ?? `Unable to load subsystem ${message.instanceId}.`, true);
+    if (layout) draw(layout);
   } else if (message.type === 'error') {
     updateDiagnostics(message.diagnostic ? [message.diagnostic] : []);
     showStatus(message.message ?? 'Unable to load Qsys file.', true);
@@ -234,8 +294,7 @@ window.addEventListener('message', (event: MessageEvent) => {
     quartusMetadata.textContent = 'Retry Quartus metadata';
     showStatus(message.message ?? 'Unable to read interface metadata with Quartus.', true);
   } else if (message.type === 'metadataCancelled') {
-    quartusMetadata.disabled = false;
-    quartusMetadata.textContent = graph?.metadata.source === 'quartus' ? 'Read interfaces again…' : 'Read interfaces…';
+    updateAnalysisControls();
     hideStatus();
   } else if (message.type === 'platformDesignerFinished') {
     openPlatformDesigner.disabled = false;
@@ -245,7 +304,7 @@ window.addEventListener('message', (event: MessageEvent) => {
 
 let pointer: { id: number; startX: number; startY: number; originX: number; originY: number } | undefined;
 canvas.addEventListener('pointerdown', (event) => {
-  if ((event.target as Element).closest('.node, .edge')) return;
+  if ((event.target as Element).closest('.node, .edge, .hierarchy-collapse-control, .hierarchy-enter-control')) return;
   pointer = { id: event.pointerId, startX: event.clientX, startY: event.clientY, originX: transform.x, originY: transform.y };
   canvas.setPointerCapture(event.pointerId);
   canvas.classList.add('panning');
@@ -288,10 +347,7 @@ async function render(): Promise<void> {
   const connections = selectedConnections.filter((connection) => isDirectKind(connection.kind, state.viewMode));
   const selectedHubKinds = enabledKinds.filter((kind) => isHubKind(kind, state.viewMode));
   const hubs = createInterfaceHubs(renderedGraph, selectedHubKinds, allowedIds);
-  const connectedIds = new Set(connections.flatMap((connection) => [connection.source, connection.target]));
-  for (const hub of hubs) {
-    for (const moduleId of hub.relatedModuleIds) connectedIds.add(moduleId);
-  }
+  const connectedIds = connectedModuleIds(connections, hubs);
   const modules = state.showDisconnected
     ? allowedModules
     : allowedModules.filter((module) => connectedIds.has(module.id));
@@ -301,13 +357,17 @@ async function render(): Promise<void> {
     if (!stableLayoutCaches[mode]) {
       showStatus(state.viewMode === 'pipeline' && structuralConnections.some((connection) => connection.kind === 'avalon_streaming')
         ? 'Calculating Avalon-ST anchored layout…'
-        : `Calculating ${state.viewMode} layout…`);
+        : `Calculating ${state.viewMode === 'complete' ? 'Classic' : 'Pipeline'} layout…`);
     }
+    const baseLayout = mode === 'pipeline' ? layoutAnchoredGraph : layoutGraph;
     const stable = await layoutStableGraph(
       allowedModules,
       structuralConnections,
       stableLayoutCaches[mode],
-      mode === 'pipeline' ? layoutAnchoredGraph : layoutGraph,
+      async (layoutModules, layoutConnections) => separateHierarchyGroups(
+        await baseLayout(layoutModules, layoutConnections),
+        [...expandedSubsystems.keys()],
+      ),
     );
     if (version !== renderVersion) return;
     stableLayoutCaches[mode] = stable.cache;
@@ -336,6 +396,11 @@ async function render(): Promise<void> {
 
 function draw(result: LayoutResult): void {
   scene.replaceChildren();
+  const hierarchyContainers = [...expandedSubsystems.keys()].flatMap((instanceId) => {
+    const bounds = hierarchyBounds(result.nodes, instanceId);
+    return bounds ? [{ instanceId, bounds }] : [];
+  });
+  for (const container of hierarchyContainers) drawHierarchyBackground(container.instanceId, container.bounds);
   for (const edge of result.edges) {
     const group = svg('g', {
       class: `edge edge-${edge.kind}`,
@@ -388,7 +453,7 @@ function draw(result: LayoutResult): void {
   }
   for (const node of result.nodes) {
     const group = svg('g', {
-      class: `node${node.disabled ? ' disabled' : ''}`,
+      class: `node${node.disabled ? ' disabled' : ''}${node.hierarchyPath ? ' nested' : ''}${node.subsystem ? ' subsystem' : ''}`,
       transform: `translate(${node.x} ${node.y})`,
       'data-module-id': node.id,
       'data-search': `${node.name} ${node.type}`.toLowerCase(),
@@ -396,11 +461,17 @@ function draw(result: LayoutResult): void {
       role: 'button',
     });
     group.append(svg('rect', { width: node.width, height: node.height, rx: 7 }));
-    const name = svg('text', { x: 14, y: 29, class: 'node-name' });
+    if (node.hierarchyPath) {
+      const hierarchy = svg('text', { x: 14, y: 15, class: 'node-hierarchy' });
+      hierarchy.textContent = truncate(node.hierarchyPath.join(' › '), 32);
+      group.append(hierarchy);
+    }
+    const name = svg('text', { x: 14, y: node.hierarchyPath ? 35 : 29, class: 'node-name' });
     name.textContent = truncate(node.name, 28);
-    const kind = svg('text', { x: 14, y: 51, class: 'node-kind' });
+    const kind = svg('text', { x: 14, y: node.hierarchyPath ? 56 : 51, class: 'node-kind' });
     kind.textContent = truncate(node.type, 34);
     group.append(name, kind);
+    if (node.subsystem) group.append(subsystemExpandControl(node, node.width));
     const openDetails = (event: Event) => {
       event.stopPropagation();
       showModuleDetails(node);
@@ -409,10 +480,93 @@ function draw(result: LayoutResult): void {
     group.addEventListener('keydown', (event) => {
       if ((event as KeyboardEvent).key === 'Enter') openDetails(event);
     });
+    if (node.subsystem) {
+      group.addEventListener('dblclick', (event) => {
+        event.stopPropagation();
+        vscode.postMessage({ type: 'openSubsystem', resource: node.subsystem!.resource });
+      });
+    }
     scene.append(group);
+  }
+  for (const container of hierarchyContainers) {
+    drawHierarchyEnterControl(container.instanceId, container.bounds);
+    drawHierarchyCollapseControl(container.instanceId, container.bounds);
   }
   createMarkers();
   applyTransform();
+}
+
+function drawHierarchyBackground(instanceId: string, bounds: HierarchyBounds): void {
+  const group = svg('g', { class: 'hierarchy-container' });
+  group.append(svg('rect', {
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    rx: 14,
+  }));
+  const label = svg('text', {
+    x: bounds.x + 12,
+    y: bounds.y + 19,
+    class: 'hierarchy-container-label',
+  });
+  label.textContent = instanceId;
+  group.append(label);
+  scene.append(group);
+}
+
+function drawHierarchyCollapseControl(instanceId: string, bounds: HierarchyBounds): void {
+  const control = svg('g', {
+    class: 'hierarchy-collapse-control',
+    transform: `translate(${bounds.x + bounds.width - 32} ${bounds.y})`,
+    tabindex: '0',
+    role: 'button',
+    'aria-label': `Collapse subsystem ${instanceId}`,
+  });
+  const symbol = svg('text', { x: 16, y: 20 });
+  symbol.textContent = '−';
+  control.append(svg('circle', { cx: 16, cy: 16, r: 10 }), symbol);
+  const title = svg('title');
+  title.textContent = `Collapse ${instanceId}`;
+  control.append(title);
+  const collapse = (event: Event) => {
+    event.stopPropagation();
+    collapseSubsystem(instanceId);
+  };
+  control.addEventListener('click', collapse);
+  control.addEventListener('keydown', (event) => {
+    const key = (event as KeyboardEvent).key;
+    if (key === 'Enter' || key === ' ') collapse(event);
+  });
+  scene.append(control);
+}
+
+function drawHierarchyEnterControl(instanceId: string, bounds: HierarchyBounds): void {
+  const control = svg('g', {
+    class: 'hierarchy-enter-control',
+    transform: `translate(${bounds.x + bounds.width - 60} ${bounds.y})`,
+    tabindex: '0',
+    role: 'button',
+    'aria-label': `Enter subsystem ${instanceId}`,
+  });
+  const symbol = svg('text', { x: 16, y: 20 });
+  symbol.textContent = '↘';
+  control.append(svg('circle', { cx: 16, cy: 16, r: 10 }), symbol);
+  const title = svg('title');
+  title.textContent = `Enter ${instanceId}`;
+  control.append(title);
+  const enter = (event: Event) => {
+    event.stopPropagation();
+    const child = expandedSubsystems.get(instanceId);
+    const resource = expandedSubsystemResources.get(instanceId);
+    if (child && resource) enterSubsystem(child, resource);
+  };
+  control.addEventListener('click', enter);
+  control.addEventListener('keydown', (event) => {
+    const key = (event as KeyboardEvent).key;
+    if (key === 'Enter' || key === ' ') enter(event);
+  });
+  scene.append(control);
 }
 
 function drawInterfaceHubs(hubs: InterfaceHub[]): void {
@@ -543,7 +697,31 @@ function showModuleDetails(module: QsysModule): void {
   const type = document.createElement('div');
   type.className = 'details-type';
   type.textContent = `${module.type}${module.disabled ? ' · disabled' : ''}`;
-  details.append(close, heading, type, parameterTable('Parameters', module.parameters));
+  details.append(close, heading, type);
+  if (module.hierarchyPath) {
+    const hierarchy = document.createElement('p');
+    hierarchy.className = 'details-note';
+    hierarchy.textContent = `Inside ${module.hierarchyPath.join(' › ')}`;
+    details.append(hierarchy);
+  }
+  if (module.subsystem) {
+    const actions = document.createElement('div');
+    actions.className = 'details-actions';
+    const enter = document.createElement('button');
+    enter.textContent = 'Enter subsystem';
+    enter.addEventListener('click', () => requestSubsystemEntry(module));
+    const expand = document.createElement('button');
+    expand.textContent = 'Expand on canvas';
+    expand.addEventListener('click', () => requestSubsystemExpansion(module));
+    const open = document.createElement('button');
+    open.textContent = 'Open in new editor';
+    open.addEventListener('click', () => {
+      vscode.postMessage({ type: 'openSubsystem', resource: module.subsystem!.resource });
+    });
+    actions.append(enter, expand, open);
+    details.append(actions);
+  }
+  details.append(parameterTable('Parameters', module.parameters));
   details.classList.remove('hidden');
 }
 
@@ -861,6 +1039,221 @@ function showStatus(message: string, error = false): void {
 }
 
 function hideStatus(): void { status.classList.add('hidden'); }
+function subsystemExpandControl(module: QsysModule, nodeWidth: number): SVGGElement {
+  const control = svg('g', {
+    class: 'node-subsystem-control',
+    transform: `translate(${Math.max(0, nodeWidth - 32)} 0)`,
+    tabindex: '0',
+    role: 'button',
+    'aria-label': `Expand subsystem ${module.name}`,
+  });
+  const symbol = svg('text', { x: 16, y: 20 });
+  symbol.textContent = loadingSubsystems.has(module.id) ? '…' : '+';
+  control.append(svg('circle', { cx: 16, cy: 16, r: 10 }), symbol);
+  const title = svg('title');
+  title.textContent = `Expand ${module.name} on the current canvas`;
+  control.append(title);
+  const expand = (event: Event) => {
+    event.stopPropagation();
+    requestSubsystemExpansion(module);
+  };
+  control.addEventListener('click', expand);
+  control.addEventListener('dblclick', (event) => event.stopPropagation());
+  control.addEventListener('keydown', (event) => {
+    const key = (event as KeyboardEvent).key;
+    if (key === 'Enter' || key === ' ') expand(event);
+  });
+  return control;
+}
+
+function requestSubsystemExpansion(module: QsysModule): void {
+  requestSubsystem(module, 'expand');
+}
+
+function requestSubsystemEntry(module: QsysModule): void {
+  requestSubsystem(module, 'enter');
+}
+
+function requestSubsystem(module: QsysModule, action: 'expand' | 'enter'): void {
+  if (!module.subsystem || loadingSubsystems.has(module.id)) return;
+  loadingSubsystems.add(module.id);
+  pendingSubsystemActions.set(module.id, action);
+  if (action === 'expand') expandedSubsystemResources.set(module.id, module.subsystem.resource);
+  details.classList.add('hidden');
+  if (layout) draw(layout);
+  vscode.postMessage({
+    type: 'loadSubsystem',
+    instanceId: module.id,
+    resource: module.subsystem.resource,
+    analyze: sourceGraph?.metadata.source === 'quartus',
+  });
+}
+
+function enterSubsystem(child: QsysGraph, resource: string): void {
+  if (!sourceGraph) return;
+  navigationStack.push({
+    sourceGraph,
+    resource: activeResource,
+    expandedSubsystems,
+    expandedSubsystemResources,
+    stableLayoutCaches,
+    transform: { ...transform },
+    didInitialFit,
+    activeHubId,
+  });
+  sourceGraph = child;
+  graph = child;
+  activeResource = resource;
+  expandedSubsystems = new Map();
+  expandedSubsystemResources = new Map();
+  stableLayoutCaches = {};
+  layout = undefined;
+  transform = { x: 20, y: 20, scale: 1 };
+  didInitialFit = false;
+  activeHubId = undefined;
+  loadingSubsystems.clear();
+  pendingSubsystemActions.clear();
+  details.classList.add('hidden');
+  required<HTMLElement>('system-name').textContent = sourceGraph.name;
+  updateAnalysisControls();
+  updateDiagnostics(sourceGraph.diagnostics ?? []);
+  updateExpandedSubsystemControls();
+  updateSubsystemNavigation();
+  updateKindFilters();
+  void render();
+}
+
+function leaveSubsystem(): void {
+  const parent = navigationStack.pop();
+  if (!parent) return;
+  sourceGraph = parent.sourceGraph;
+  activeResource = parent.resource;
+  expandedSubsystems = parent.expandedSubsystems;
+  expandedSubsystemResources = parent.expandedSubsystemResources;
+  stableLayoutCaches = parent.stableLayoutCaches;
+  transform = parent.transform;
+  didInitialFit = parent.didInitialFit;
+  activeHubId = parent.activeHubId;
+  graph = composeHierarchy(sourceGraph, expandedSubsystems);
+  layout = undefined;
+  loadingSubsystems.clear();
+  pendingSubsystemActions.clear();
+  details.classList.add('hidden');
+  required<HTMLElement>('system-name').textContent = sourceGraph.name;
+  updateAnalysisControls();
+  updateDiagnostics(sourceGraph.diagnostics ?? []);
+  updateExpandedSubsystemControls();
+  updateSubsystemNavigation();
+  updateKindFilters();
+  void render();
+}
+
+function updateSubsystemNavigation(): void {
+  subsystemNavigation.classList.toggle('hidden', navigationStack.length === 0);
+  subsystemPath.textContent = sourceGraph
+    ? [...navigationStack.map((frame) => frame.sourceGraph.name), sourceGraph.name].join(' › ')
+    : '';
+}
+
+function updateAnalysisControls(): void {
+  const exact = sourceGraph?.metadata.source === 'quartus'
+    && [...expandedSubsystems.values()].every((child) => child.metadata.source === 'quartus');
+  quartusMetadata.classList.toggle('hidden', Boolean(exact));
+  inferClockResetOption.classList.toggle('hidden', Boolean(exact));
+  quartusMetadata.disabled = false;
+  quartusMetadata.textContent = 'Read interfaces…';
+  updateViewAvailability();
+}
+
+function updateViewAvailability(): void {
+  const available = canUsePipelineView([
+    { resource: activeResource, exactMetadata: sourceGraph?.metadata.source === 'quartus' },
+    ...[...expandedSubsystemResources].map(([instanceId, resource]) => ({
+      resource,
+      exactMetadata: expandedSubsystems.get(instanceId)?.metadata.source === 'quartus',
+    })),
+  ]);
+  const unavailable = !available;
+  pipelineViewOption.disabled = unavailable;
+  viewMode.title = unavailable
+    ? 'Pipeline view requires Read interfaces for this Tcl hierarchy.'
+    : '';
+  if (unavailable && state.viewMode === 'pipeline') {
+    state.viewMode = 'complete';
+    viewMode.value = 'complete';
+    activeHubId = undefined;
+    didInitialFit = false;
+  }
+}
+
+function updateInactiveResourceGraph(resource: string, nextGraph: QsysGraph): void {
+  let changedCurrentHierarchy = false;
+  for (const [instanceId, expandedResource] of expandedSubsystemResources) {
+    if (expandedResource !== resource || !expandedSubsystems.has(instanceId)) continue;
+    expandedSubsystems.set(instanceId, nextGraph);
+    changedCurrentHierarchy = true;
+  }
+  updateNavigationResourceGraph(resource, nextGraph);
+  if (changedCurrentHierarchy) refreshComposedHierarchy();
+}
+
+function updateNavigationResourceGraph(resource: string, nextGraph: QsysGraph): void {
+  for (const frame of navigationStack) {
+    if (frame.resource === resource) frame.sourceGraph = nextGraph;
+    for (const [instanceId, expandedResource] of frame.expandedSubsystemResources) {
+      if (expandedResource === resource && frame.expandedSubsystems.has(instanceId)) {
+        frame.expandedSubsystems.set(instanceId, nextGraph);
+      }
+    }
+  }
+}
+
+function collapseSubsystem(instanceId: string): void {
+  for (const id of [...expandedSubsystems.keys()]) {
+    if (id === instanceId || id.startsWith(`${instanceId}/`)) {
+      expandedSubsystems.delete(id);
+      expandedSubsystemResources.delete(id);
+    }
+  }
+  refreshComposedHierarchy();
+}
+
+function analyzeExpandedSubsystems(): void {
+  for (const [instanceId, child] of expandedSubsystems) {
+    const resource = expandedSubsystemResources.get(instanceId);
+    if (child.metadata.source === 'quartus' || !resource || loadingSubsystems.has(instanceId)) continue;
+    loadingSubsystems.add(instanceId);
+    vscode.postMessage({ type: 'loadSubsystem', instanceId, resource, analyze: true });
+  }
+}
+
+function refreshComposedHierarchy(): void {
+  if (!sourceGraph) return;
+  graph = composeHierarchy(sourceGraph, expandedSubsystems);
+  delete stableLayoutCaches.pipeline;
+  delete stableLayoutCaches.complete;
+  activeHubId = undefined;
+  didInitialFit = false;
+  details.classList.add('hidden');
+  updateExpandedSubsystemControls();
+  updateAnalysisControls();
+  updateKindFilters();
+  void render();
+}
+
+function updateExpandedSubsystemControls(): void {
+  expandedSubsystemControls.replaceChildren();
+  expandedSubsystemControls.classList.toggle('hidden', expandedSubsystems.size === 0);
+  for (const instanceId of expandedSubsystems.keys()) {
+    const collapse = document.createElement('button');
+    collapse.className = 'expanded-subsystem';
+    collapse.textContent = `− ${instanceId}`;
+    collapse.title = `Collapse subsystem ${instanceId}`;
+    collapse.addEventListener('click', () => collapseSubsystem(instanceId));
+    expandedSubsystemControls.append(collapse);
+  }
+}
+
 function updateDiagnostics(diagnostics: QsysDiagnostic[]): void {
   const wasOpen = !diagnosticsPanel.classList.contains('hidden');
   diagnosticsList.replaceChildren();
@@ -884,7 +1277,7 @@ function updateDiagnostics(diagnostics: QsysDiagnostic[]): void {
     if (diagnostic.line) {
       item.title = `Open source at line ${diagnostic.line}`;
       item.addEventListener('click', () => {
-        vscode.postMessage({ type: 'revealDiagnostic', line: diagnostic.line });
+        vscode.postMessage({ type: 'revealDiagnostic', line: diagnostic.line, resource: activeResource });
       });
     } else {
       item.disabled = true;

@@ -1,0 +1,450 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Copyright 2026 Yaroslav Mariukha
+SPDX-License-Identifier: MIT
+-->
+<system name="$${FILENAME}">
+ <component
+   name="$${FILENAME}"
+   displayName="$${FILENAME}"
+   version="1.0"
+   description=""
+   tags=""
+   categories="System" />
+ <parameter name="bonusData"><![CDATA[bonusData 
+{
+   element clipper
+   {
+      datum _sortIndex
+      {
+         value = "5";
+         type = "int";
+      }
+   }
+   element clipper.control
+   {
+      datum baseAddress
+      {
+         value = "525312";
+         type = "String";
+      }
+   }
+   element clk_memory
+   {
+      datum _sortIndex
+      {
+         value = "2";
+         type = "int";
+      }
+   }
+   element clk_mono_video
+   {
+      datum _sortIndex
+      {
+         value = "1";
+         type = "int";
+      }
+   }
+   element fir
+   {
+      datum _sortIndex
+      {
+         value = "4";
+         type = "int";
+      }
+   }
+   element frame_buffer_mono
+   {
+      datum _sortIndex
+      {
+         value = "6";
+         type = "int";
+      }
+   }
+   element mm_bridge
+   {
+      datum _sortIndex
+      {
+         value = "0";
+         type = "int";
+      }
+   }
+   element sc_fifo_0
+   {
+      datum _sortIndex
+      {
+         value = "3";
+         type = "int";
+      }
+   }
+   element scaler
+   {
+      datum _sortIndex
+      {
+         value = "7";
+         type = "int";
+      }
+   }
+}
+]]></parameter>
+ <parameter name="clockCrossingAdapter" value="HANDSHAKE" />
+ <parameter name="device" value="5CGXFC3B6F23C6" />
+ <parameter name="deviceFamily" value="Cyclone V" />
+ <parameter name="deviceSpeedGrade" value="6_H6" />
+ <parameter name="fabricMode" value="QSYS" />
+ <parameter name="generateLegacySim" value="false" />
+ <parameter name="generationId" value="0" />
+ <parameter name="globalResetBus" value="false" />
+ <parameter name="hdlLanguage" value="VERILOG" />
+ <parameter name="hideFromIPCatalog" value="false" />
+ <parameter name="lockedInterfaceDefinition" value="" />
+ <parameter name="maxAdditionalLatency" value="1" />
+ <parameter name="projectName" value="" />
+ <parameter name="sopcBorderPoints" value="false" />
+ <parameter name="systemHash" value="0" />
+ <parameter name="testBenchDutName" value="" />
+ <parameter name="timeStamp" value="0" />
+ <parameter name="useTestBenchNamingPattern" value="false" />
+ <instanceScript></instanceScript>
+ <interface name="clk_memory" internal="clk_memory.clk_in" type="clock" dir="end" />
+ <interface
+   name="clk_mono_video"
+   internal="clk_mono_video.clk_in"
+   type="clock"
+   dir="end" />
+ <interface name="din" internal="sc_fifo_0.in" type="avalon_streaming" dir="end" />
+ <interface
+   name="dout"
+   internal="scaler.dout"
+   type="avalon_streaming"
+   dir="start" />
+ <interface
+   name="frame_buffer_mono_mem_master_rd"
+   internal="frame_buffer_mono.mem_master_rd"
+   type="avalon"
+   dir="start" />
+ <interface
+   name="frame_buffer_mono_mem_master_wr"
+   internal="frame_buffer_mono.mem_master_wr"
+   type="avalon"
+   dir="start" />
+ <interface name="mm_bridge_s" internal="mm_bridge.s0" type="avalon" dir="end" />
+ <interface
+   name="reset_memory"
+   internal="clk_memory.clk_in_reset"
+   type="reset"
+   dir="end" />
+ <interface
+   name="reset_mono_video"
+   internal="clk_mono_video.clk_in_reset"
+   type="reset"
+   dir="end" />
+ <module name="clipper" kind="alt_vip_cl_clp" version="23.1" enabled="1">
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="BITS_PER_SYMBOL" value="16" />
+  <parameter name="BOTTOM_OFFSET" value="0" />
+  <parameter name="CLIPPING_METHOD" value="OFFSETS" />
+  <parameter name="COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="EXTRA_PIPELINING" value="0" />
+  <parameter name="FAMILY" value="Cyclone V" />
+  <parameter name="LEFT_OFFSET" value="0" />
+  <parameter name="LIMITED_READBACK" value="0" />
+  <parameter name="MAX_IN_HEIGHT" value="720" />
+  <parameter name="MAX_IN_WIDTH" value="1280" />
+  <parameter name="NUMBER_OF_COLOR_PLANES" value="1" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="RECTANGLE_HEIGHT" value="32" />
+  <parameter name="RECTANGLE_WIDTH" value="32" />
+  <parameter name="RIGHT_OFFSET" value="0" />
+  <parameter name="RUNTIME_CONTROL" value="1" />
+  <parameter name="TOP_OFFSET" value="0" />
+  <parameter name="USER_PACKET_FIFO_DEPTH" value="0" />
+  <parameter name="USER_PACKET_SUPPORT" value="PASSTHROUGH" />
+ </module>
+ <module name="clk_memory" kind="clock_source" version="23.1" enabled="1">
+  <parameter name="clockFrequency" value="100000000" />
+  <parameter name="clockFrequencyKnown" value="true" />
+  <parameter name="inputClockFrequency" value="0" />
+  <parameter name="resetSynchronousEdges" value="DEASSERT" />
+ </module>
+ <module name="clk_mono_video" kind="clock_source" version="23.1" enabled="1">
+  <parameter name="clockFrequency" value="50000000" />
+  <parameter name="clockFrequencyKnown" value="true" />
+  <parameter name="inputClockFrequency" value="0" />
+  <parameter name="resetSynchronousEdges" value="DEASSERT" />
+ </module>
+ <module name="fir" kind="alt_vip_cl_2dfir" version="23.1" enabled="1">
+  <parameter name="ALGORITHM_NAME">EDGE_ADAPTIVE_SHARPEN</parameter>
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="BITS_PER_SYMBOL_IN" value="16" />
+  <parameter name="BITS_PER_SYMBOL_OUT" value="8" />
+  <parameter name="COEFF_FRACTION_BITS" value="7" />
+  <parameter name="COEFF_INTEGER_BITS" value="1" />
+  <parameter name="COEFF_SIGNED" value="1" />
+  <parameter name="COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="DEFAULT_LOWER_BLUR" value="0" />
+  <parameter name="DEFAULT_UPPER_BLUR" value="15" />
+  <parameter name="DIAG_SYMMETRIC" value="0" />
+  <parameter name="DO_MIRRORING" value="1" />
+  <parameter name="ENABLE_WIDE_BLUR_SHARPEN" value="1" />
+  <parameter name="EXTRA_PIPELINING" value="0" />
+  <parameter name="FAMILY" value="Cyclone V" />
+  <parameter name="FIXED_COEFF_FILE"><![CDATA[<enter file name (including full path)>]]></parameter>
+  <parameter name="H_SYMMETRIC" value="0" />
+  <parameter name="H_TAPS" value="8" />
+  <parameter name="INPUT_GUARD_BANDS_ENABLE" value="0" />
+  <parameter name="INPUT_GUARD_BAND_LOWER" value="0" />
+  <parameter name="INPUT_GUARD_BAND_UPPER" value="255" />
+  <parameter name="IS_422" value="0" />
+  <parameter name="LIMITED_READBACK" value="0" />
+  <parameter name="MAX_HEIGHT" value="720" />
+  <parameter name="MAX_WIDTH" value="1280" />
+  <parameter name="MOVE_BINARY_POINT_RIGHT" value="0" />
+  <parameter name="NO_BLANKING" value="0" />
+  <parameter name="NUMBER_OF_COLOR_PLANES" value="1" />
+  <parameter name="OUTPUT_GUARD_BANDS_ENABLE" value="0" />
+  <parameter name="OUTPUT_GUARD_BAND_LOWER" value="0" />
+  <parameter name="OUTPUT_GUARD_BAND_UPPER" value="255" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="ROUNDING_METHOD" value="ROUND_HALF_UP" />
+  <parameter name="RUNTIME_CONTROL" value="0" />
+  <parameter name="USER_PACKET_SUPPORT" value="PASSTHROUGH" />
+  <parameter name="V_SYMMETRIC" value="0" />
+  <parameter name="V_TAPS" value="8" />
+ </module>
+ <module
+   name="frame_buffer_mono"
+   kind="alt_vip_cl_vfb"
+   version="23.1"
+   enabled="1">
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="BITS_PER_SYMBOL" value="16" />
+  <parameter name="BURST_ALIGNMENT" value="1" />
+  <parameter name="CLOCKS_ARE_SEPARATE" value="1" />
+  <parameter name="COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="CONTROLLED_DROP_REPEAT" value="0" />
+  <parameter name="DROP_FRAMES" value="1" />
+  <parameter name="DROP_INVALID_FIELDS" value="0" />
+  <parameter name="DROP_REPEAT_USER" value="0" />
+  <parameter name="FAMILY" value="Cyclone V" />
+  <parameter name="INTERLACED_SUPPORT" value="0" />
+  <parameter name="IS_FRAME_READER" value="0" />
+  <parameter name="IS_FRAME_WRITER" value="0" />
+  <parameter name="IS_SYNC_MASTER" value="0" />
+  <parameter name="IS_SYNC_SLAVE" value="0" />
+  <parameter name="LINE_BASED_BUFFERING" value="0" />
+  <parameter name="MAX_HEIGHT" value="720" />
+  <parameter name="MAX_SYMBOLS_PER_PACKET" value="10" />
+  <parameter name="MAX_WIDTH" value="1280" />
+  <parameter name="MEM_BASE_ADDR" value="0" />
+  <parameter name="MEM_BUFFER_OFFSET" value="16777216" />
+  <parameter name="MEM_PORT_WIDTH" value="256" />
+  <parameter name="MULTI_FRAME_DELAY" value="1" />
+  <parameter name="NUMBER_OF_COLOR_PLANES" value="1" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="PRIORITIZE_FMAX" value="0" />
+  <parameter name="READER_RUNTIME_CONTROL" value="0" />
+  <parameter name="READY_LATENCY" value="1" />
+  <parameter name="READ_BURST_TARGET" value="32" />
+  <parameter name="READ_FIFO_DEPTH" value="64" />
+  <parameter name="REPEAT_FRAMES" value="1" />
+  <parameter name="TEST_INIT" value="0" />
+  <parameter name="USER_PACKETS_MAX_STORAGE" value="0" />
+  <parameter name="USE_BUFFER_OFFSET" value="0" />
+  <parameter name="WRITER_RUNTIME_CONTROL" value="0" />
+  <parameter name="WRITE_BURST_TARGET" value="32" />
+  <parameter name="WRITE_FIFO_DEPTH" value="64" />
+ </module>
+ <module
+   name="mm_bridge"
+   kind="altera_avalon_mm_bridge"
+   version="23.1"
+   enabled="1">
+  <parameter name="ADDRESS_UNITS" value="WORDS" />
+  <parameter name="ADDRESS_WIDTH" value="10" />
+  <parameter name="DATA_WIDTH" value="32" />
+  <parameter name="LINEWRAPBURSTS" value="0" />
+  <parameter name="MAX_BURST_SIZE" value="1" />
+  <parameter name="MAX_PENDING_RESPONSES" value="4" />
+  <parameter name="PIPELINE_COMMAND" value="1" />
+  <parameter name="PIPELINE_RESPONSE" value="1" />
+  <parameter name="SYMBOL_WIDTH" value="8" />
+  <parameter name="SYSINFO_ADDR_WIDTH" value="20" />
+  <parameter name="USE_AUTO_ADDRESS_WIDTH" value="1" />
+  <parameter name="USE_RESPONSE" value="0" />
+ </module>
+ <module
+   name="sc_fifo_0"
+   kind="altera_avalon_sc_fifo"
+   version="23.1"
+   enabled="1">
+  <parameter name="BITS_PER_SYMBOL" value="16" />
+  <parameter name="CHANNEL_WIDTH" value="0" />
+  <parameter name="EMPTY_LATENCY" value="3" />
+  <parameter name="ENABLE_EXPLICIT_MAXCHANNEL" value="false" />
+  <parameter name="ERROR_WIDTH" value="0" />
+  <parameter name="EXPLICIT_MAXCHANNEL" value="0" />
+  <parameter name="FIFO_DEPTH" value="16" />
+  <parameter name="SYMBOLS_PER_BEAT" value="1" />
+  <parameter name="USE_ALMOST_EMPTY_IF" value="0" />
+  <parameter name="USE_ALMOST_FULL_IF" value="0" />
+  <parameter name="USE_FILL_LEVEL" value="0" />
+  <parameter name="USE_MEMORY_BLOCKS" value="1" />
+  <parameter name="USE_PACKETS" value="1" />
+  <parameter name="USE_STORE_FORWARD" value="0" />
+ </module>
+ <module name="scaler" kind="alt_vip_cl_scl" version="23.1" enabled="1">
+  <parameter name="ALGORITHM_NAME" value="BICUBIC" />
+  <parameter name="ALWAYS_DOWNSCALE" value="0" />
+  <parameter name="ARE_IDENTICAL" value="0" />
+  <parameter name="AUTO_DEVICE" value="5CGXFC3B6F23C6" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="6_H6" />
+  <parameter name="BITS_PER_SYMBOL" value="16" />
+  <parameter name="DEFAULT_EDGE_THRESH" value="7" />
+  <parameter name="DEFAULT_LOWER_BLUR" value="0" />
+  <parameter name="DEFAULT_UPPER_BLUR" value="0" />
+  <parameter name="ENABLE_FIR" value="0" />
+  <parameter name="EXTRA_PIPELINING" value="1" />
+  <parameter name="FAMILY" value="Cyclone V" />
+  <parameter name="H_BANKS" value="1" />
+  <parameter name="H_COEFF_FILE"><![CDATA[<enter file name (including full path)>]]></parameter>
+  <parameter name="H_FRACTION_BITS" value="7" />
+  <parameter name="H_FUNCTION" value="LANCZOS_2" />
+  <parameter name="H_INTEGER_BITS" value="1" />
+  <parameter name="H_PHASES" value="16" />
+  <parameter name="H_SIGNED" value="1" />
+  <parameter name="H_SYMMETRIC" value="0" />
+  <parameter name="H_TAPS" value="8" />
+  <parameter name="IS_420" value="0" />
+  <parameter name="IS_422" value="0" />
+  <parameter name="LIMITED_READBACK" value="0" />
+  <parameter name="LOAD_AT_RUNTIME" value="0" />
+  <parameter name="MAX_IN_HEIGHT" value="720" />
+  <parameter name="MAX_IN_WIDTH" value="1280" />
+  <parameter name="MAX_OUT_HEIGHT" value="1080" />
+  <parameter name="MAX_OUT_WIDTH" value="1920" />
+  <parameter name="NO_BLANKING" value="0" />
+  <parameter name="PIXELS_IN_PARALLEL" value="1" />
+  <parameter name="PRESERVE_BITS" value="0" />
+  <parameter name="RUNTIME_CONTROL" value="0" />
+  <parameter name="SYMBOLS_IN_PAR" value="1" />
+  <parameter name="SYMBOLS_IN_SEQ" value="1" />
+  <parameter name="USER_PACKET_FIFO_DEPTH" value="0" />
+  <parameter name="USER_PACKET_SUPPORT" value="PASSTHROUGH" />
+  <parameter name="V_BANKS" value="1" />
+  <parameter name="V_COEFF_FILE"><![CDATA[<enter file name (including full path)>]]></parameter>
+  <parameter name="V_FRACTION_BITS" value="7" />
+  <parameter name="V_FUNCTION" value="LANCZOS_2" />
+  <parameter name="V_INTEGER_BITS" value="1" />
+  <parameter name="V_PHASES" value="16" />
+  <parameter name="V_SIGNED" value="1" />
+  <parameter name="V_SYMMETRIC" value="0" />
+  <parameter name="V_TAPS" value="8" />
+ </module>
+ <connection
+   kind="avalon"
+   version="23.1"
+   start="mm_bridge.m0"
+   end="clipper.control">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x00080400" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="fir.dout"
+   end="clipper.din" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="clipper.dout"
+   end="frame_buffer_mono.din" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="frame_buffer_mono.dout"
+   end="scaler.din" />
+ <connection
+   kind="avalon_streaming"
+   version="23.1"
+   start="sc_fifo_0.out"
+   end="fir.din" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="mm_bridge.clk" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="sc_fifo_0.clk" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="fir.main_clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="frame_buffer_mono.main_clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="clipper.main_clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_mono_video.clk"
+   end="scaler.main_clock" />
+ <connection
+   kind="clock"
+   version="23.1"
+   start="clk_memory.clk"
+   end="frame_buffer_mono.mem_clock" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="sc_fifo_0.clk_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="fir.main_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="frame_buffer_mono.main_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="clipper.main_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="scaler.main_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_memory.clk_reset"
+   end="frame_buffer_mono.mem_reset" />
+ <connection
+   kind="reset"
+   version="23.1"
+   start="clk_mono_video.clk_reset"
+   end="mm_bridge.reset" />
+ <interconnectRequirement for="$system" name="qsys_mm.clockCrossingAdapter" value="HANDSHAKE" />
+ <interconnectRequirement for="$system" name="qsys_mm.enableEccProtection" value="FALSE" />
+ <interconnectRequirement for="$system" name="qsys_mm.insertDefaultSlave" value="FALSE" />
+ <interconnectRequirement for="$system" name="qsys_mm.maxAdditionalLatency" value="1" />
+</system>

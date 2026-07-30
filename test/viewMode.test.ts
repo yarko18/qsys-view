@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { ConnectionKind, QsysConnection } from '../parser/graph';
-import { availableConnectionKinds, inferClockResetConnections, isDirectKind, isHubKind } from '../webview/viewMode';
+import { availableConnectionKinds, canUsePipelineView, connectedModuleIds, inferClockResetConnections, isDirectKind, isHubKind } from '../webview/viewMode';
 
 const kinds: ConnectionKind[] = [
   'avalon_streaming',
@@ -38,6 +38,48 @@ describe('graph view modes', () => {
       'avalon_streaming', 'clock', 'reset',
     ]);
     expect(availableConnectionKinds(present, 'complete')).toEqual(present);
+  });
+});
+
+describe('connected module visibility', () => {
+  it('ignores clock/reset-only relationships but keeps direct and functional hub endpoints', () => {
+    const direct: QsysConnection[] = [{
+      id: 'stream',
+      source: 'video_in',
+      sourcePort: 'out',
+      target: 'scaler',
+      targetPort: 'in',
+      kind: 'avalon_streaming',
+      rawKind: 'avalon_streaming',
+      parameters: {},
+    }];
+    const visible = connectedModuleIds(direct, [
+      { kind: 'clock', moduleId: 'clock_source', relatedModuleIds: ['clock_only_bridge'] },
+      { kind: 'avalon_memory_mapped', moduleId: 'cpu', relatedModuleIds: ['control_slave'] },
+    ]);
+
+    expect([...visible].sort()).toEqual([
+      'control_slave', 'cpu', 'scaler', 'video_in',
+    ]);
+  });
+});
+
+describe('Pipeline availability', () => {
+  it('requires exact metadata for every Tcl level but not for Qsys', () => {
+    expect(canUsePipelineView([
+      { resource: 'file:///design.qsys', exactMetadata: false },
+    ])).toBe(true);
+    expect(canUsePipelineView([
+      { resource: 'file:///design.tcl', exactMetadata: false },
+    ])).toBe(false);
+    expect(canUsePipelineView([
+      { resource: 'file:///design.tcl', exactMetadata: true },
+      { resource: 'file:///child.tcl', exactMetadata: true },
+    ])).toBe(true);
+    expect(canUsePipelineView([
+      { resource: 'file:///design.qsys', exactMetadata: false },
+      { resource: 'file:///child.tcl', exactMetadata: false },
+    ])).toBe(false);
   });
 });
 

@@ -54,4 +54,32 @@ describe('interface hubs', () => {
     expect(hubs.find((hub) => hub.endpoint === 'clk_unknown.clk')?.frequency).toBeUndefined();
     expect(hubs.find((hub) => hub.id === 'interrupt:cpu.irq')?.relatedModuleIds).toEqual(['irq_a', 'irq_b']);
   });
+
+  it('groups equivalent domains on both sides of an expanded subsystem boundary', () => {
+    const modules = [module('root_clock'), module('nested/bridge'), module('nested/consumer')];
+    const connections = [
+      connection('boundary-clock', 'root_clock', 'clk', 'nested/bridge', 'clk_in', 'clock'),
+      connection('inner-clock', 'nested/bridge', 'clk', 'nested/consumer', 'clk', 'clock'),
+      connection('boundary-reset', 'root_clock', 'clk_reset', 'nested/bridge', 'clk_in_reset', 'reset'),
+      connection('inner-reset', 'nested/bridge', 'clk_reset', 'nested/consumer', 'reset', 'reset'),
+    ];
+    const graph: QsysGraph = {
+      name: 'test', modules, connections, interfaces: {}, warnings: [],
+      metadata: { source: 'qsys-only', label: 'test' },
+      domainAliases: {
+        'nested/bridge.clk': 'root_clock.clk',
+        'nested/bridge.clk_reset': 'root_clock.clk_reset',
+      },
+    };
+
+    const hubs = createInterfaceHubs(graph, ['clock', 'reset'], new Set(modules.map((item) => item.id)));
+
+    expect(hubs.filter((hub) => hub.kind === 'clock')).toHaveLength(1);
+    expect(hubs.find((hub) => hub.kind === 'clock')).toMatchObject({
+      endpoint: 'root_clock.clk',
+      relatedModuleIds: ['nested/bridge', 'nested/consumer'],
+    });
+    expect(hubs.filter((hub) => hub.kind === 'reset')).toHaveLength(1);
+    expect(hubs.find((hub) => hub.kind === 'reset')?.endpoint).toBe('root_clock.clk_reset');
+  });
 });

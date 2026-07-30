@@ -83,4 +83,26 @@ describe('detectStreamingAdaptations', () => {
 
     expect(annotateStreamingAdapters(graph).connections[0]?.adaptations).toBeUndefined();
   });
+
+  it('does not infer adapters from an unresolved nested-system interface', () => {
+    const graph: QsysGraph = {
+      name: 'demo',
+      modules: [
+        { id: 'source', name: 'source', type: 'ip', disabled: false, parameters: {}, ports: [] },
+        { id: 'nested', name: 'nested', type: 'platform2', disabled: false, parameters: {}, ports: [] },
+      ],
+      connections: [{
+        id: 'connection-0', source: 'source', sourcePort: 'out', target: 'nested', targetPort: 'in',
+        kind: 'avalon_streaming', rawKind: 'avalon_streaming', parameters: {},
+      }],
+      interfaces: {
+        'source.out': iface({ readyLatency: '1' }),
+        'nested.in': { ...iface({}), kind: 'missing', ports: [] },
+      },
+      metadata: { source: 'quartus', label: 'Quartus' },
+      warnings: [],
+    };
+
+    expect(annotateStreamingAdapters(graph).connections[0]?.adaptations).toBeUndefined();
+  });
 });

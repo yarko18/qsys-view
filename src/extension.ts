@@ -1,7 +1,7 @@
 // Copyright 2026 Yaroslav Mariukha
 // SPDX-License-Identifier: MIT
 
-import { execFile, spawn } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { constants as fsConstants } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
@@ -11,7 +11,8 @@ import type { QsysGraph } from '../parser/graph';
 import { applyQuartusMetadata } from '../parser/quartusMetadataParser';
 import { parseQsys } from '../parser/qsysParser';
 import { parseQsysTcl } from '../parser/qsysTclParser';
-import { platformDesignerTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclScriptArguments } from './qsysScript';
+import { platformDesignerTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclScriptArguments, siblingQsysSearchPattern } from './qsysScript';
+import { subsystemCandidatePaths, tclSubsystemBuildOrder } from './subsystems';
 
 const lastViewStateKey = 'qsysView.lastViewState';
 
@@ -38,6 +39,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     panel.webview.html = this.getHtml(panel.webview);
 
     const key = document.uri.toString();
+    const loadedResources = new Set([key]);
     const documentPanels = this.panels.get(key) ?? new Set<vscode.WebviewPanel>();
     documentPanels.add(panel);
     this.panels.set(key, documentPanels);
@@ -48,25 +50,39 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
 
     const sendGraph = (loadQuartus = false, includeViewState = false) =>
       this.sendGraph(document.uri, panel.webview, loadQuartus, includeViewState);
-    panel.webview.onDidReceiveMessage(async (message: { type?: string; state?: unknown; line?: number }) => {
+    panel.webview.onDidReceiveMessage(async (message: {
+      type?: string;
+      state?: unknown;
+      line?: number;
+      resource?: string;
+      instanceId?: string;
+      analyze?: boolean;
+    }) => {
       if (message.type === 'ready') {
         await sendGraph(false, true);
       } else if (message.type === 'refresh') {
         await sendGraph();
       } else if (message.type === 'loadQuartusMetadata') {
-        await this.confirmAndLoadQuartus(document.uri, panel.webview);
+        await this.confirmAndLoadQuartus(message.resource ? subsystemUri(message.resource) : document.uri, panel.webview);
       } else if (message.type === 'openPlatformDesigner') {
-        await this.openPlatformDesigner(document.uri);
+        await this.openPlatformDesigner(message.resource ? subsystemUri(message.resource) : document.uri);
         await panel.webview.postMessage({ type: 'platformDesignerFinished' });
       } else if (message.type === 'revealDiagnostic' && Number.isInteger(message.line)) {
-        await this.revealSource(document.uri, message.line!);
+        await this.revealSource(message.resource ? subsystemUri(message.resource) : document.uri, message.line!);
+      } else if (message.type === 'loadSubsystem' && message.resource && message.instanceId) {
+        loadedResources.add(message.resource);
+        await this.sendSubsystem(message.resource, message.instanceId, Boolean(message.analyze), panel.webview);
+      } else if (message.type === 'openSubsystem' && message.resource) {
+        await this.openSubsystem(message.resource);
       } else if (message.type === 'viewStateChanged' && message.state && typeof message.state === 'object') {
         await this.rememberViewState(document.uri, message.state);
       }
     });
 
     const watcher = vscode.workspace.onDidChangeTextDocument((event) => {
-      if (event.document.uri.toString() === key) void sendGraph();
+      if (loadedResources.has(event.document.uri.toString())) {
+        void this.sendGraph(event.document.uri, panel.webview);
+      }
     });
     panel.onDidDispose(() => watcher.dispose());
   }
@@ -128,16 +144,9 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     includeViewState = false,
   ): Promise<void> {
     try {
-      const openDocument = vscode.workspace.textDocuments.find(
-        (document) => document.uri.toString() === uri.toString(),
-      );
-      const bytes = openDocument
-        ? Buffer.from(openDocument.getText())
-        : await vscode.workspace.fs.readFile(uri);
-      const fileName = uri.path.split('/').pop()?.replace(/\.(?:qsys|tcl)$/i, '') || 'Qsys system';
-      let graph: QsysGraph = isQsysTcl(uri)
-        ? parseQsysTcl(bytes.toString('utf8'), fileName)
-        : parseQsys(bytes.toString('utf8'), fileName);
+      const source = await this.readGraph(uri);
+      const { bytes, fileName } = source;
+      let { graph } = source;
       if (loadQuartus) {
         try {
           graph = isQsysTcl(uri)
@@ -158,7 +167,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       const rememberedViewState = includeViewState && rememberLastViewState
         ? this.context.globalState.get<unknown>(lastViewStateKey)
         : undefined;
-      await webview.postMessage({ type: 'graph', graph, rememberedViewState });
+      await webview.postMessage({ type: 'graph', graph, resource: uri.toString(), rememberedViewState });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const line = /\bline\s+(\d+)\b/i.exec(message)?.[1];
@@ -168,6 +177,85 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
         diagnostic: line ? { severity: 'error', message, line: Number(line) } : undefined,
       });
     }
+  }
+
+  private async readGraph(uri: vscode.Uri): Promise<{ bytes: Uint8Array; fileName: string; graph: QsysGraph }> {
+    const openDocument = vscode.workspace.textDocuments.find(
+      (document) => document.uri.toString() === uri.toString(),
+    );
+    const bytes = openDocument
+      ? Buffer.from(openDocument.getText())
+      : await vscode.workspace.fs.readFile(uri);
+    const fileName = uri.path.split('/').pop()?.replace(/\.(?:qsys|tcl)$/i, '') || 'Qsys system';
+    const parsed = isQsysTcl(uri)
+      ? parseQsysTcl(bytes.toString('utf8'), fileName)
+      : parseQsys(bytes.toString('utf8'), fileName);
+    const modules = await Promise.all(parsed.modules.map(async (module) => {
+      const subsystem = await this.findSubsystem(uri, module.type);
+      return subsystem ? { ...module, subsystem } : module;
+    }));
+    return { bytes, fileName, graph: { ...parsed, modules } };
+  }
+
+  private async findSubsystem(parent: vscode.Uri, moduleType: string) {
+    if (parent.scheme !== 'file') return undefined;
+    for (const candidate of subsystemCandidatePaths(parent.fsPath, moduleType)) {
+      try {
+        const stat = await vscode.workspace.fs.stat(vscode.Uri.file(candidate));
+        if ((stat.type & vscode.FileType.File) !== 0) {
+          return {
+            resource: vscode.Uri.file(candidate).toString(),
+            format: candidate.toLowerCase().endsWith('.tcl') ? 'tcl' as const : 'qsys' as const,
+          };
+        }
+      } catch {
+        // Most IP kinds do not have a sibling Platform Designer system.
+      }
+    }
+    return undefined;
+  }
+
+  private async sendSubsystem(
+    resource: string,
+    instanceId: string,
+    analyze: boolean,
+    webview: vscode.Webview,
+  ): Promise<void> {
+    try {
+      const uri = subsystemUri(resource);
+      const source = await this.readGraph(uri);
+      let { graph } = source;
+      if (analyze) {
+        try {
+          graph = isQsysTcl(uri)
+            ? await this.withTclQuartusMetadata(uri, graph, source.bytes)
+            : await this.withQsysQuartusMetadata(uri, graph, source.bytes, source.fileName);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          graph = {
+            ...graph,
+            warnings: [...graph.warnings, `Quartus metadata unavailable: ${message}`],
+            metadata: { source: 'qsys-only', label: `Quartus metadata unavailable: ${message}` },
+          };
+        }
+      }
+      await webview.postMessage({ type: 'subsystemGraph', instanceId, resource: uri.toString(), graph });
+    } catch (error) {
+      await webview.postMessage({
+        type: 'subsystemError',
+        instanceId,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  private async openSubsystem(resource: string): Promise<void> {
+    const uri = subsystemUri(resource);
+    await vscode.commands.executeCommand(
+      'vscode.openWith',
+      uri,
+      isQsysTcl(uri) ? 'qsysView.tclGraph' : 'qsysView.graph',
+    );
   }
 
   private async rememberViewState(uri: vscode.Uri, state: unknown): Promise<void> {
@@ -216,6 +304,30 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     const wrapper = path.join(temporaryDirectory, 'inspect-exported-system.tcl');
     const inspector = path.join(this.context.extensionUri.fsPath, 'quartus', 'inspect-interfaces.tcl');
     try {
+      const dependencySources = new Map<string, { bytes: Uint8Array; graph: QsysGraph }>();
+      const dependencyOrder = await tclSubsystemBuildOrder(uri.toString(), graph, async (resource) => {
+        const source = await this.readGraph(subsystemUri(resource));
+        dependencySources.set(resource, source);
+        return source.graph;
+      });
+      const temporarySearchPath = `${path.join(temporaryDirectory, '*.qsys')},${searchPath}`;
+      for (const [index, resource] of dependencyOrder.entries()) {
+        const source = dependencySources.get(resource)!;
+        const dependencyPath = path.join(temporaryDirectory, path.basename(subsystemUri(resource).fsPath));
+        const generatedSystemPath = dependencyPath.replace(/\.tcl$/i, '.qsys');
+        const dependencyWrapper = path.join(temporaryDirectory, `build-subsystem-${index}.tcl`);
+        await fs.writeFile(dependencyPath, source.bytes);
+        await fs.writeFile(dependencyWrapper, qsysTclExportWrapper(dependencyPath, generatedSystemPath));
+        try {
+          await runQsysScript(
+            executable,
+            qsysTclScriptArguments(temporarySearchPath, dependencyWrapper),
+            temporaryDirectory,
+          );
+        } catch (error) {
+          throw new Error(`Unable to prepare subsystem ${path.basename(resource)}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
       await fs.writeFile(temporaryScript, scriptBytes);
       await fs.writeFile(wrapper, [
         'source [file join [file dirname [info script]] design.tcl]',
@@ -224,7 +336,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       ].join('\n'));
       const output = await runQsysScript(
         executable,
-        qsysTclScriptArguments(searchPath, wrapper),
+        qsysTclScriptArguments(temporarySearchPath, wrapper),
         temporaryDirectory,
       );
       return applyQuartusMetadata(graph, output, executable);
@@ -245,6 +357,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     };
     return [...new Set([
       ...configured.map(expand),
+      siblingQsysSearchPattern(projectDirectory),
       path.join(projectDirectory, 'ip', '*', 'component.ipx'),
       path.join(projectDirectory, 'ip', 'common', '**', '*_hw.tcl'),
       path.join(projectDirectory, '*', 'component.ipx'),
@@ -467,27 +580,65 @@ function platformDesignerCandidates(location: string): string[] {
 
 function runQsysScript(executable: string, args: string[], cwd: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(executable, args, {
-      cwd,
-      encoding: 'utf8',
-      maxBuffer: 64 * 1024 * 1024,
-      timeout: 120_000,
-    }, (error, stdout, stderr) => {
-      const output = `${stdout}\n${stderr}`;
-      if (!error) {
-        resolve(output);
+    // Large exported systems can spend several minutes elaborating IP before
+    // the inspector starts. Keep a guard for genuinely stuck Quartus runs,
+    // but do not abort normal camera-sized systems at the old two-minute mark.
+    const timeoutMs = 30 * 60_000;
+    const child = spawn(executable, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+    const metadataLines: string[] = [];
+    const diagnostics: string[] = [];
+    const tail: string[] = [];
+    let stdoutPending = '';
+    let stderrPending = '';
+    let timedOut = false;
+    let settled = false;
+
+    const recordLine = (line: string) => {
+      if (line.startsWith('QSYS_VIEWER\t')) metadataLines.push(line);
+      if (/\b(?:error|critical warning):/i.test(line) && diagnostics.length < 20) diagnostics.push(line);
+      if (line.trim()) {
+        tail.push(line);
+        if (tail.length > 20) tail.shift();
+      }
+    };
+    const consume = (pending: string, chunk: Buffer): string => {
+      const lines = `${pending}${chunk.toString('utf8')}`.split(/\r?\n/);
+      const rest = lines.pop() ?? '';
+      for (const line of lines) recordLine(line);
+      return rest;
+    };
+    child.stdout.on('data', (chunk: Buffer) => { stdoutPending = consume(stdoutPending, chunk); });
+    child.stderr.on('data', (chunk: Buffer) => { stderrPending = consume(stderrPending, chunk); });
+
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGTERM');
+    }, timeoutMs);
+    child.on('error', (error: NodeJS.ErrnoException) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      reject(new Error(error.code === 'ENOENT'
+        ? 'qsys-script was not found. Set “Qsys View: Quartus Path” in VS Code settings.'
+        : `Unable to start qsys-script: ${error.message}`));
+    });
+    child.on('close', (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      if (stdoutPending) recordLine(stdoutPending);
+      if (stderrPending) recordLine(stderrPending);
+      if (code === 0) {
+        resolve(metadataLines.join('\n'));
         return;
       }
-      const cause = (error as NodeJS.ErrnoException).code === 'ENOENT'
-        ? 'qsys-script was not found. Set “Qsys View: Quartus Path” in VS Code settings.'
-        : `qsys-script failed: ${lastLines(output, 12) || error.message}`;
-      reject(new Error(cause));
+      const usefulOutput = diagnostics.length > 0 ? diagnostics : tail;
+      const cause = timedOut
+        ? `qsys-script timed out after ${timeoutMs / 60_000} minutes.`
+        : `qsys-script exited with code ${code ?? 'unknown'}.`;
+      reject(new Error(`${cause}${usefulOutput.length > 0 ? `\n${usefulOutput.join('\n')}` : ''}`));
     });
   });
-}
-
-function lastLines(value: string, count: number): string {
-  return value.trim().split(/\r?\n/).slice(-count).join('\n');
 }
 
 function randomNonce(): string {
@@ -497,6 +648,15 @@ function randomNonce(): string {
 
 function isQsysTcl(uri: vscode.Uri): boolean {
   return uri.path.toLowerCase().endsWith('.tcl');
+}
+
+function subsystemUri(resource: string): vscode.Uri {
+  const uri = vscode.Uri.parse(resource, true);
+  const extension = path.extname(uri.path).toLowerCase();
+  if (uri.scheme !== 'file' || (extension !== '.qsys' && extension !== '.tcl')) {
+    throw new Error('Subsystem must be a local .qsys or .tcl file.');
+  }
+  return uri;
 }
 
 function tclQuoted(value: string): string {

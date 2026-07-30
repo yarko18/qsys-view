@@ -44,6 +44,8 @@ export interface StableLayoutResult {
   cache: StableLayoutCache;
 }
 
+interface NodeOffset { x: number; y: number }
+
 export function pathMidpoint(paths: LayoutPoint[][]): LayoutPoint | undefined {
   const segments = paths.flatMap((points) => points.slice(1).map((end, index) => ({
     start: points[index]!,
@@ -64,6 +66,93 @@ export function pathMidpoint(paths: LayoutPoint[][]): LayoutPoint | undefined {
     remaining -= segment.length;
   }
   return segments.at(-1)?.end;
+}
+
+/**
+ * Keeps an expanded subsystem in the pipeline band chosen by ELK. If its
+ * visual container would cover unrelated modules, those overlapping modules
+ * are moved below the container instead of pushing the subsystem itself to a
+ * separate row.
+ */
+export function separateHierarchyGroups(
+  layout: LayoutResult,
+  expandedInstanceIds: readonly string[],
+): LayoutResult {
+  const roots = expandedInstanceIds.filter((instanceId) =>
+    !expandedInstanceIds.some((candidate) => candidate !== instanceId && instanceId.startsWith(`${candidate}/`)),
+  );
+  if (roots.length === 0) return layout;
+
+  let nodes = layout.nodes.map((node) => ({ ...node }));
+  const offsets = new Map(nodes.map((node) => [node.id, { x: 0, y: 0 } satisfies NodeOffset]));
+  for (const instanceId of roots) {
+    const descendants = nodes.filter((node) => node.id.startsWith(`${instanceId}/`));
+    if (descendants.length === 0) continue;
+    const descendantIds = new Set(descendants.map((node) => node.id));
+    const outsiders = nodes.filter((node) => !descendantIds.has(node.id));
+    const bounds = nodeBounds(descendants);
+    const frame = {
+      x: bounds.x - 18,
+      y: bounds.y - 42,
+      width: bounds.width + 36,
+      height: bounds.height + 60,
+    };
+    const overlappingIds = new Set(outsiders
+      .filter((node) => rectanglesOverlap(frame, node))
+      .map((node) => node.id));
+    if (overlappingIds.size === 0) continue;
+
+    // Another expanded root is one visual unit too; do not split it when one
+    // of its descendants happens to overlap this frame.
+    for (const root of roots) {
+      if (root === instanceId) continue;
+      if (nodes.some((node) => overlappingIds.has(node.id) && node.id.startsWith(`${root}/`))) {
+        for (const node of nodes) {
+          if (node.id.startsWith(`${root}/`)) overlappingIds.add(node.id);
+        }
+      }
+    }
+    const overlapping = nodes.filter((node) => overlappingIds.has(node.id));
+    const overlapBounds = nodeBounds(overlapping);
+    let dy = frame.y + frame.height + 60 - overlapBounds.y;
+    const stationary = nodes.filter((node) => !overlappingIds.has(node.id));
+    for (;;) {
+      const translated = overlapping.map((node) => ({ ...node, y: node.y + dy }));
+      const collisions = stationary.filter((node) => translated.some((candidate) => rectanglesOverlap(candidate, node)));
+      if (collisions.length === 0) break;
+      dy = Math.max(...collisions.map((node) => node.y + node.height)) + 60 - overlapBounds.y;
+    }
+    nodes = nodes.map((node) => {
+      if (!overlappingIds.has(node.id)) return node;
+      const current = offsets.get(node.id)!;
+      offsets.set(node.id, { x: current.x, y: current.y + dy });
+      return { ...node, y: node.y + dy };
+    });
+  }
+
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+  const parallelCounts = new Map<string, number>();
+  const edges = layout.edges.flatMap((edge) => {
+    const source = nodeMap.get(edge.source);
+    const target = nodeMap.get(edge.target);
+    if (!source || !target) return [];
+    const sourceOffset = offsets.get(edge.source) ?? { x: 0, y: 0 };
+    const targetOffset = offsets.get(edge.target) ?? { x: 0, y: 0 };
+    if (sourceOffset.x === targetOffset.x && sourceOffset.y === targetOffset.y) {
+      return [{
+        ...edge,
+        paths: edge.paths.map((path) => path.map((point) => ({
+          x: point.x + sourceOffset.x,
+          y: point.y + sourceOffset.y,
+        }))),
+      }];
+    }
+    const pair = `${edge.source}\u0000${edge.target}`;
+    const parallelIndex = parallelCounts.get(pair) ?? 0;
+    parallelCounts.set(pair, parallelIndex + 1);
+    return [{ ...edge, paths: [routeOverlayEdge(source, target, parallelIndex)] }];
+  });
+  return layoutBounds(nodes, edges);
 }
 
 export async function layoutGraph(
@@ -304,4 +393,34 @@ function routeOverlayEdge(source: LayoutNode, target: LayoutNode, parallelIndex:
   const end = { x: targetCenterX + offset, y: goesDown ? target.y : target.y + target.height };
   const middleY = (start.y + end.y) / 2 + offset;
   return [start, { x: start.x, y: middleY }, { x: end.x, y: middleY }, end];
+}
+
+function nodeBounds(nodes: readonly LayoutNode[]): { x: number; y: number; width: number; height: number } {
+  const x = Math.min(...nodes.map((node) => node.x));
+  const y = Math.min(...nodes.map((node) => node.y));
+  const right = Math.max(...nodes.map((node) => node.x + node.width));
+  const bottom = Math.max(...nodes.map((node) => node.y + node.height));
+  return { x, y, width: right - x, height: bottom - y };
+}
+
+function rectanglesOverlap(
+  left: { x: number; y: number; width: number; height: number },
+  right: { x: number; y: number; width: number; height: number },
+): boolean {
+  return left.x < right.x + right.width
+    && left.x + left.width > right.x
+    && left.y < right.y + right.height
+    && left.y + left.height > right.y;
+}
+
+function layoutBounds(nodes: LayoutNode[], edges: LayoutEdge[]): LayoutResult {
+  const maxNodeX = Math.max(0, ...nodes.map((node) => node.x + node.width));
+  const maxNodeY = Math.max(0, ...nodes.map((node) => node.y + node.height));
+  const points = edges.flatMap((edge) => edge.paths.flat());
+  return {
+    width: Math.max(1, maxNodeX, ...points.map((point) => point.x)) + 36,
+    height: Math.max(1, maxNodeY, ...points.map((point) => point.y)) + 36,
+    nodes,
+    edges,
+  };
 }
