@@ -5,6 +5,9 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 1.0.7
+- Update media and Readme
+
 ## 1.0.6
 
 - Discover sibling Platform Designer systems used as IP and mark them as expandable subsystems.
