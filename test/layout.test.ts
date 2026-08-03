@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, expect, it } from 'vitest';
-import { layoutAnchoredGraph, layoutStableGraph, pathMidpoint, projectVisibleLayout, separateHierarchyGroups } from '../layout/elk';
+import { layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, projectVisibleLayout, separateHierarchyGroups } from '../layout/elk';
 import type { ConnectionKind, QsysConnection, QsysModule } from '../parser/graph';
 
 function module(id: string): QsysModule {
@@ -82,7 +82,54 @@ describe('expanded hierarchy layout', () => {
     expect(separated.nodes.find((node) => node.id === 'nested/first')?.y).toBe(40);
     expect(separated.nodes.find((node) => node.id === 'nested/second')?.y)
       .toBe(separated.nodes.find((node) => node.id === 'nested/first')?.y);
-    expect(separated.edges[0]?.paths[0]?.at(-1)?.y).toBe(110);
+    const targetPoint = separated.edges[0]!.paths[0]!.at(-1)!;
+    expect(targetPoint.x).toBe(first.x);
+    expect(targetPoint.y).toBeGreaterThanOrEqual(first.y);
+    expect(targetPoint.y).toBeLessThanOrEqual(first.y + first.height);
+  });
+});
+
+describe('directed interface sides', () => {
+  it('keeps inputs west and outputs east when two IP form a feedback cycle', async () => {
+    const splitter = module('splitter');
+    const compute = module('plateau_he_compute');
+    const apply = module('plateau_he_apply');
+    const linearize = module('linearize');
+    const connections = [
+      connection('compute-in', splitter.id, compute.id, 'avalon_streaming'),
+      connection('video-data', compute.id, apply.id, 'avalon_streaming'),
+      connection('apply-out', apply.id, linearize.id, 'avalon_streaming'),
+      connection('histogram-feedback', apply.id, compute.id, 'avalon_memory_mapped'),
+    ];
+    const result = await layoutGraph([splitter, compute, apply, linearize], connections);
+    const nodes = new Map(result.nodes.map((node) => [node.id, node]));
+
+    for (const edge of result.edges) {
+      const source = nodes.get(edge.source)!;
+      const target = nodes.get(edge.target)!;
+      expect(edge.paths[0]?.[0]?.x).toBeCloseTo(source.x + source.width);
+      expect(edge.paths[0]?.at(-1)?.x).toBeCloseTo(target.x);
+    }
+  });
+
+  it('routes a newly added feedback edge around frozen nodes', async () => {
+    const left = module('left');
+    const right = module('right');
+    const initial = await layoutStableGraph(
+      [left, right],
+      [connection('forward', left.id, right.id, 'avalon_streaming')],
+      undefined,
+    );
+    const feedback = connection('feedback', right.id, left.id, 'avalon_memory_mapped');
+    const changed = await layoutStableGraph([left, right], [feedback], initial.cache);
+    const source = changed.layout.nodes.find((node) => node.id === right.id)!;
+    const target = changed.layout.nodes.find((node) => node.id === left.id)!;
+    const path = changed.layout.edges[0]!.paths[0]!;
+
+    expect(path[0]?.x).toBe(source.x + source.width);
+    expect(path.at(-1)?.x).toBe(target.x);
+    expect(Math.max(...path.map((point) => point.y)))
+      .toBeGreaterThan(Math.max(source.y + source.height, target.y + target.height));
   });
 });
 

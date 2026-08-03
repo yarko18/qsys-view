@@ -5,6 +5,10 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## Unreleased
+
+- Keep input interfaces on the left and output interfaces on the right, routing feedback connections around IP blocks instead of flipping their port sides.
+
 ## 1.0.11
 
 - Build sibling exported Tcl subsystems in dependency order before converting a top-level Tcl system for Platform Designer.

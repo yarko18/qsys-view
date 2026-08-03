@@ -159,6 +159,10 @@ export async function layoutGraph(
   modules: QsysModule[],
   connections: QsysConnection[],
 ): Promise<LayoutResult> {
+  const moduleIds = new Set(modules.map((module) => module.id));
+  const validConnections = connections.filter((connection) =>
+    moduleIds.has(connection.source) && moduleIds.has(connection.target),
+  );
   const graph: ElkNode = {
     id: 'root',
     layoutOptions: {
@@ -171,20 +175,45 @@ export async function layoutGraph(
       'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
       'elk.padding': '[top=36,left=36,bottom=36,right=36]',
     },
-    children: modules.map((module) => ({
-      id: module.id,
-      width: Math.max(150, Math.min(280, 70 + module.name.length * 7)),
-      height: 70,
-    })),
-    edges: connections.map((edge) => ({
+    children: modules.map((module) => {
+      const inputs = [...new Set(validConnections
+        .filter((connection) => connection.target === module.id)
+        .map((connection) => connection.targetPort))].sort();
+      const outputs = [...new Set(validConnections
+        .filter((connection) => connection.source === module.id)
+        .map((connection) => connection.sourcePort))].sort();
+      return {
+        id: module.id,
+        width: Math.max(150, Math.min(280, 70 + module.name.length * 7)),
+        height: 70,
+        layoutOptions: {
+          'elk.portConstraints': 'FIXED_SIDE',
+        },
+        ports: [
+          ...inputs.map((interfaceName) => ({
+            id: elkPortId(module.id, 'input', interfaceName),
+            width: 0,
+            height: 0,
+            layoutOptions: { 'elk.port.side': 'WEST' },
+          })),
+          ...outputs.map((interfaceName) => ({
+            id: elkPortId(module.id, 'output', interfaceName),
+            width: 0,
+            height: 0,
+            layoutOptions: { 'elk.port.side': 'EAST' },
+          })),
+        ],
+      };
+    }),
+    edges: validConnections.map((edge) => ({
       id: edge.id,
-      sources: [edge.source],
-      targets: [edge.target],
+      sources: [elkPortId(edge.source, 'output', edge.sourcePort)],
+      targets: [elkPortId(edge.target, 'input', edge.targetPort)],
     })),
   };
   const result = await elk.layout(graph);
   const moduleMap = new Map(modules.map((module) => [module.id, module]));
-  const connectionMap = new Map(connections.map((connection) => [connection.id, connection]));
+  const connectionMap = new Map(validConnections.map((connection) => [connection.id, connection]));
   const nodes = (result.children ?? []).flatMap((node) => {
     const module = moduleMap.get(node.id);
     if (!module) return [];
@@ -212,6 +241,10 @@ export async function layoutGraph(
     nodes,
     edges,
   };
+}
+
+function elkPortId(moduleId: string, direction: 'input' | 'output', interfaceName: string): string {
+  return `${moduleId}::${direction}::${interfaceName}`;
 }
 
 /**
@@ -375,24 +408,31 @@ function translateLayout(layout: LayoutResult, dx: number, dy: number): LayoutRe
 
 function routeOverlayEdge(source: LayoutNode, target: LayoutNode, parallelIndex: number): LayoutPoint[] {
   const offset = ((parallelIndex % 5) - 2) * 7;
-  const sourceCenterX = source.x + source.width / 2;
   const sourceCenterY = source.y + source.height / 2;
-  const targetCenterX = target.x + target.width / 2;
   const targetCenterY = target.y + target.height / 2;
+  const start = { x: source.x + source.width, y: sourceCenterY + offset };
+  const end = { x: target.x, y: targetCenterY + offset };
 
-  if (Math.abs(targetCenterX - sourceCenterX) >= Math.abs(targetCenterY - sourceCenterY)) {
-    const goesRight = targetCenterX >= sourceCenterX;
-    const start = { x: goesRight ? source.x + source.width : source.x, y: sourceCenterY + offset };
-    const end = { x: goesRight ? target.x : target.x + target.width, y: targetCenterY + offset };
+  if (start.x < end.x) {
     const middleX = (start.x + end.x) / 2 + offset;
     return [start, { x: middleX, y: start.y }, { x: middleX, y: end.y }, end];
   }
 
-  const goesDown = targetCenterY >= sourceCenterY;
-  const start = { x: sourceCenterX + offset, y: goesDown ? source.y + source.height : source.y };
-  const end = { x: targetCenterX + offset, y: goesDown ? target.y : target.y + target.height };
-  const middleY = (start.y + end.y) / 2 + offset;
-  return [start, { x: start.x, y: middleY }, { x: end.x, y: middleY }, end];
+  // A feedback edge must still leave the source on the right and enter the
+  // target on the left. Route it around both blocks instead of taking the
+  // geometrically shorter path through their opposite sides.
+  const spacing = 50 + parallelIndex * 14;
+  const right = Math.max(source.x + source.width, target.x + target.width) + spacing;
+  const left = Math.min(source.x, target.x) - spacing;
+  const bottom = Math.max(source.y + source.height, target.y + target.height) + spacing;
+  return [
+    start,
+    { x: right, y: start.y },
+    { x: right, y: bottom },
+    { x: left, y: bottom },
+    { x: left, y: end.y },
+    end,
+  ];
 }
 
 function nodeBounds(nodes: readonly LayoutNode[]): { x: number; y: number; width: number; height: number } {
