@@ -27,7 +27,8 @@ and much more!
 - Detects Avalon-ST adapters after Quartus analysis and marks them with a red dot.
 - Shows elaborated interface ports, parameters, and an illustrative Avalon-ST waveform.
 - Updates a Tcl graph without moving existing IP or rerouting unchanged connections.
-- Adds new IP below the frozen graph; **Refresh** rereads the source hierarchy and recalculates the layout.
+- Adds new IP below the frozen graph; **Relayout** recalculates positions without discarding Quartus analysis.
+- Reloads the source hierarchy and sourced configuration explicitly with **Reload source**.
 - Reports static Tcl parser problems and opens the source line from the problems list.
 - Opens Qsys directly in Platform Designer or converts Tcl in a disposable sibling folder first.
 
@@ -87,7 +88,8 @@ Choose **Enter subsystem** in the IP details to navigate within the current view
 - **+** expands a detected subsystem; **−** collapses its container; **↘** enters it; **← Back** returns to the parent.
 - **Read interfaces…** requests exact Quartus metadata.
 - **Open in Platform Designer** opens or converts the system.
-- **Refresh** rereads the active Qsys/Tcl hierarchy, including sourced configuration files, and recalculates the layout; **Fit** fits it to the viewport.
+- **Reload source** rereads the active Qsys/Tcl hierarchy, including sourced configuration files, and invalidates stale Quartus analysis.
+- **Relayout** recalculates the active layout while preserving analysis; **Fit** fits it to the viewport.
 - Drag to pan, use the wheel to zoom, and search by instance name or IP type.
 
 New viewers start in Classic mode. With **Remember Last View State** enabled, Qsys View reuses the last mode, interface filters, IP visibility options, and name-inference choice across editors.

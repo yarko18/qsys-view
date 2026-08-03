@@ -62,7 +62,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     }) => {
       if (message.type === 'ready') {
         await sendGraph(false, true);
-      } else if (message.type === 'refresh') {
+      } else if (message.type === 'reload') {
         const requestedResource = message.resource ? subsystemUri(message.resource) : document.uri;
         const requestedKey = requestedResource.toString();
         loadedResources.add(requestedKey);
@@ -76,7 +76,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
             await this.sendGraph(subsystemUri(resource), panel.webview);
           }
         } finally {
-          await panel.webview.postMessage({ type: 'refreshFinished' });
+          await panel.webview.postMessage({ type: 'reloadFinished' });
         }
       } else if (message.type === 'loadQuartusMetadata') {
         await this.confirmAndLoadQuartus(message.resource ? subsystemUri(message.resource) : document.uri, panel.webview);
