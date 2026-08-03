@@ -15,11 +15,14 @@ describe('parseQsysTcl', () => {
     expect(graph.modules).toHaveLength(26);
     expect(graph.connections).toHaveLength(95);
     expect(graph.modules.find((module) => module.id === 'sc_fifo_0')?.parameters.FIFO_DEPTH).toBe('16');
-    expect(graph.connections.every((connection) => connection.kind === 'other')).toBe(true);
     expect(graph.diagnostics).toEqual([]);
     expect(graph.connections.find((connection) =>
       connection.source === 'mm_bridge' && connection.target === 'clipper',
-    )?.parameters.baseAddress).toBe('0x00080400');
+    )).toMatchObject({
+      kind: 'avalon_memory_mapped',
+      rawKind: 'avalon_memory_mapped',
+      parameters: { baseAddress: '0x00080400' },
+    });
   });
 
   it('supports braced, quoted, nested and escaped words', () => {
@@ -39,6 +42,23 @@ describe('parseQsysTcl', () => {
       LABEL: 'hello world',
     });
     expect(graph.connections[0]?.parameters.baseAddress).toBe('0x20');
+    expect(graph.connections[0]?.kind).toBe('avalon_memory_mapped');
+  });
+
+  it('infers Avalon-MM only from characteristic connection parameters', () => {
+    const graph = parseQsysTcl(`
+      add_instance master bridge 1.0
+      add_instance addressed peripheral 1.0
+      add_instance plain unknown 1.0
+      add_connection master.m0 addressed.s0
+      set_connection_parameter_value master.m0/addressed.s0 arbitrationPriority 1
+      add_connection master.m1 plain.s0
+    `);
+
+    expect(graph.connections).toMatchObject([
+      { kind: 'avalon_memory_mapped', rawKind: 'avalon_memory_mapped' },
+      { kind: 'other', rawKind: 'unknown (static Tcl)' },
+    ]);
   });
 
   it('uses explicit connection kinds and exported interface declarations', () => {

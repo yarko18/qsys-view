@@ -5,6 +5,7 @@ import { connectionKinds, type ConnectionKind, type QsysAdaptation, type QsysCon
 import { streamParameters } from '../parser/streamMetadata';
 import { createInterfaceWaveform } from '../parser/waveform';
 import { groupParameters } from './parameterGroups';
+import { createAvalonMmBuses } from './avalonMmBus';
 import { layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, projectVisibleLayout, separateHierarchyGroups, type LayoutPoint, type LayoutResult, type StableLayoutCache } from '../layout/elk';
 import { composeHierarchy, hierarchyBounds, type HierarchyBounds } from './hierarchy';
 import { connectionAddress, createInterfaceHubs, type HubKind, type InterfaceHub } from './interfaceHubs';
@@ -417,13 +418,31 @@ function draw(result: LayoutResult): void {
     return bounds ? [{ instanceId, bounds }] : [];
   });
   for (const container of hierarchyContainers) drawHierarchyBackground(container.instanceId, container.bounds);
+  const avalonMmBuses = state.viewMode === 'complete' ? createAvalonMmBuses(result.edges) : [];
+  const busBranches = new Map(avalonMmBuses.flatMap((bus) =>
+    bus.branches.map((branch) => [branch.edgeId, branch.paths] as const)));
+  for (const bus of avalonMmBuses) {
+    const group = svg('g', { class: 'edge edge-avalon_memory_mapped avmm-bus' });
+    for (const points of [bus.sourcePath, bus.trunkPath]) {
+      group.append(svg('path', {
+        d: pathData(points),
+        class: 'edge-line avmm-bus-line',
+      }));
+    }
+    const title = svg('title');
+    title.textContent = `${bus.source}.${bus.sourcePort} · ${bus.branches.length} Avalon-MM slaves`;
+    group.append(title);
+    scene.append(group);
+  }
   for (const edge of result.edges) {
+    const displayedPaths = busBranches.get(edge.id) ?? edge.paths;
+    const isBusBranch = busBranches.has(edge.id);
     const group = svg('g', {
       class: `edge edge-${edge.kind}`,
       tabindex: '0',
       role: 'button',
     });
-    for (const points of edge.paths) {
+    for (const points of displayedPaths) {
       group.append(svg('path', {
         d: pathData(points),
         class: 'edge-hit',
@@ -434,12 +453,12 @@ function draw(result: LayoutResult): void {
         'marker-end': `url(#arrow-${edge.kind})`,
       }));
       if (points.length > 0) {
-        group.append(edgeLabel(edge.sourcePort, points[0]!, 'source-port'));
+        if (!isBusBranch) group.append(edgeLabel(edge.sourcePort, points[0]!, 'source-port'));
         group.append(edgeLabel(edge.targetPort, points.at(-1)!, 'target-port'));
       }
     }
     if (edge.adaptations && edge.adaptations.length > 0) {
-      const midpoint = pathMidpoint(edge.paths);
+      const midpoint = pathMidpoint(displayedPaths);
       if (midpoint) {
         group.append(svg('circle', {
           cx: midpoint.x,

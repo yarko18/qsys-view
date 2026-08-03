@@ -284,6 +284,8 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 }
 .edge-hit { fill: none; stroke: transparent; stroke-width: 12; }
 .edge:hover .edge-line, .edge:focus .edge-line { stroke-width: 3; }
+.avmm-bus { pointer-events: none; cursor: default; }
+.avmm-bus-line { stroke-width: 4; }
 .arrow path { fill: var(--edge-color); }
 .adapter-dot {
   fill: #e5484d;

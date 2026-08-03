@@ -10,6 +10,8 @@ SPDX-License-Identifier: MIT
 - Keep input interfaces on the left and output interfaces on the right, routing feedback connections around IP blocks instead of flipping their port sides.
 - Separate Reload source, which rereads the loaded Qsys/Tcl hierarchy and invalidates stale analysis, from Relayout, which changes only geometry and preserves Quartus metadata.
 - Read instance parameter groups from Quartus and display configured IP parameters in their Platform Designer sections after interface analysis.
+- Infer Avalon-MM connections from exported Tcl address and arbitration parameters before Quartus analysis.
+- Draw one shared Avalon-MM bus from a master to multiple slaves in Classic view while keeping every branch selectable.
 
 ## 1.0.11
 

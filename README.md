@@ -24,6 +24,7 @@ and much more!
 - Shows IP and connection parameters on click.
 - Groups configured IP parameters by their Platform Designer sections after Quartus interface analysis.
 - Highlights clock, reset, Avalon-MM, and interrupt domains without filling the graph with their edges.
+- Draws multi-slave Avalon-MM masters as shared buses in Classic view while keeping each branch inspectable.
 - Detects Avalon-ST adapters after Quartus analysis and marks them with a red dot.
 - Shows elaborated interface ports, parameters, and an illustrative Avalon-ST waveform.
 - Updates a Tcl graph without moving existing IP or rerouting unchanged connections.
@@ -40,7 +41,7 @@ Qsys View has two modes:
 | --- | --- | --- |
 | Avalon-ST | Directed edge and layout anchor | Directed edge |
 | Conduit | Directed edge | Directed edge |
-| Avalon-MM | Highlight hub | Directed edge |
+| Avalon-MM | Highlight hub | Shared bus or directed edge |
 | Interrupt | Highlight hub | Directed edge |
 | Clock | Highlight hub | Highlight hub |
 | Reset | Highlight hub | Highlight hub |
@@ -48,7 +49,7 @@ Qsys View has two modes:
 
 Only interface filters present in the current system are shown. Pipeline layout is anchored exclusively by Avalon-ST when streaming connections exist. For exported Tcl, Pipeline remains disabled until **Read interfaces…** resolves the real interface types for every visible hierarchy level.
 
-The Tcl reader accepts Platform Designer declarations for `avalon`, `axi`, `tristate_conduit`, `avalon_streaming`, `interrupt`, `conduit`, `clock`, `reset`, and `nios_custom_instruction`.
+The Tcl reader accepts Platform Designer declarations for `avalon`, `axi`, `tristate_conduit`, `avalon_streaming`, `interrupt`, `conduit`, `clock`, `reset`, and `nios_custom_instruction`. Before Quartus analysis, Avalon-MM is also recognized from exported connection properties such as `baseAddress` and `arbitrationPriority`; unrelated unknown connections remain grey.
 
 ## Tcl and Quartus analysis
 

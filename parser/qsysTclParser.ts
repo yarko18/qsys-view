@@ -88,6 +88,19 @@ function hasSubstitution(words: string[]): boolean {
   return words.some((word) => word.includes('$') || word.includes('['));
 }
 
+const avalonMmConnectionParameters = new Set([
+  'baseaddress',
+  'arbitrationpriority',
+  'defaultconnection',
+]);
+
+function inferredConnectionKind(connection: PendingConnection): string {
+  return Object.keys(connection.parameters).some((parameter) =>
+    avalonMmConnectionParameters.has(parameter.toLowerCase()))
+    ? 'avalon_memory_mapped'
+    : '';
+}
+
 function addPort(module: QsysModule, interfaceName: string): void {
   if (!interfaceName || module.ports.some((port) => port.interfaceName === interfaceName)) return;
   const port: QsysPort = { name: interfaceName, interfaceName };
@@ -263,6 +276,7 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
     const rawKind = connection.rawKind
       || exportedKinds.get(connection.sourceEndpoint)
       || exportedKinds.get(connection.targetEndpoint)
+      || inferredConnectionKind(connection)
       || '';
     connections.push(orientPlatformDesignerConnection({
       id: connectionId(connection, duplicateConnectionCounts),
