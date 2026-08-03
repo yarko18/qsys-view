@@ -5,9 +5,10 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
-## Unreleased
+## 1.0.12
 
 - Keep input interfaces on the left and output interfaces on the right, routing feedback connections around IP blocks instead of flipping their port sides.
+- Replace Relayout with Refresh, which rereads the loaded Qsys/Tcl hierarchy and sourced configuration before recalculating the graph layout.
 
 ## 1.0.11
 

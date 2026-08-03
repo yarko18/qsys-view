@@ -63,7 +63,21 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       if (message.type === 'ready') {
         await sendGraph(false, true);
       } else if (message.type === 'refresh') {
-        await sendGraph();
+        const requestedResource = message.resource ? subsystemUri(message.resource) : document.uri;
+        const requestedKey = requestedResource.toString();
+        loadedResources.add(requestedKey);
+        // Refresh every hierarchy level already opened by this viewer. Put the
+        // active resource last so the final message redraws the current canvas
+        // after inactive parent/child snapshots have also been updated.
+        const resources = [...loadedResources]
+          .sort((left, right) => Number(left === requestedKey) - Number(right === requestedKey));
+        try {
+          for (const resource of resources) {
+            await this.sendGraph(subsystemUri(resource), panel.webview);
+          }
+        } finally {
+          await panel.webview.postMessage({ type: 'refreshFinished' });
+        }
       } else if (message.type === 'loadQuartusMetadata') {
         await this.confirmAndLoadQuartus(message.resource ? subsystemUri(message.resource) : document.uri, panel.webview);
       } else if (message.type === 'openPlatformDesigner') {

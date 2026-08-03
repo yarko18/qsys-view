@@ -119,7 +119,7 @@ app.innerHTML = `
       <button id="diagnostics-toggle" class="diagnostics-toggle hidden" title="Show Tcl parse problems"></button>
       <button id="quartus-metadata" title="Read exact interface metadata with qsys-script">Read interfaces…</button>
       <button id="open-platform-designer" title="Open this design in Intel Platform Designer">Open in Platform Designer</button>
-      <button id="relayout" title="Recalculate the current layout">Relayout</button>
+      <button id="refresh" title="Reload Qsys/Tcl sources and recalculate the layout">Refresh</button>
       <button id="fit" title="Fit graph to view">Fit</button>
     </div>
   </header>
@@ -215,11 +215,16 @@ required<HTMLButtonElement>('fit').addEventListener('click', fitView);
 required<HTMLButtonElement>('subsystem-back').addEventListener('click', leaveSubsystem);
 diagnosticsToggle.addEventListener('click', () => diagnosticsPanel.classList.toggle('hidden'));
 required<HTMLButtonElement>('diagnostics-close').addEventListener('click', () => diagnosticsPanel.classList.add('hidden'));
-required<HTMLButtonElement>('relayout').addEventListener('click', () => {
-  delete stableLayoutCaches[state.viewMode];
+const refresh = required<HTMLButtonElement>('refresh');
+refresh.addEventListener('click', () => {
+  refresh.disabled = true;
+  refresh.textContent = 'Refreshing…';
+  delete stableLayoutCaches.pipeline;
+  delete stableLayoutCaches.complete;
   activeHubId = undefined;
   didInitialFit = false;
-  void render();
+  showStatus('Reloading Qsys and Tcl sources…');
+  vscode.postMessage({ type: 'refresh', resource: activeResource });
 });
 quartusMetadata.addEventListener('click', () => {
   quartusMetadata.disabled = true;
@@ -299,6 +304,9 @@ window.addEventListener('message', (event: MessageEvent) => {
   } else if (message.type === 'platformDesignerFinished') {
     openPlatformDesigner.disabled = false;
     openPlatformDesigner.textContent = 'Open in Platform Designer';
+  } else if (message.type === 'refreshFinished') {
+    refresh.disabled = false;
+    refresh.textContent = 'Refresh';
   }
 });
 
