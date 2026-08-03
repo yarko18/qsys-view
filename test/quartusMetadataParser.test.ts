@@ -6,12 +6,14 @@ import { parseQsys } from '../parser/qsysParser';
 import { parseQsysTcl } from '../parser/qsysTclParser';
 import { applyQuartusMetadata } from '../parser/quartusMetadataParser';
 
-const qsys = `<system><module name="source" kind="source_ip"/><module name="sink" kind="sink_ip"/><connection kind="avalon_streaming" start="source.out" end="sink.in"/></system>`;
+const qsys = `<system><module name="source" kind="source_ip"><parameter name="PIPELINE_MODE" value="manual"/><parameter name="DATA_WIDTH" value="16"/></module><module name="sink" kind="sink_ip"/><connection kind="avalon_streaming" start="source.out" end="sink.in"/></system>`;
 
 describe('applyQuartusMetadata', () => {
   it('parses exact interface parameters and elaborated ports', () => {
     const output = [
       'ordinary Quartus output',
+      'QSYS_VIEWER\tINSTANCE_PARAMETER\tsource\tDATA_WIDTH\t2\tData format',
+      'QSYS_VIEWER\tINSTANCE_PARAMETER\tsource\tPIPELINE_MODE\t5\tAdvanced',
       'QSYS_VIEWER\tINTERFACE\tsource\tout\tavalon_streaming_source',
       'QSYS_VIEWER\tPARAMETER\tsource\tout\tsymbolsPerBeat\t2',
       'QSYS_VIEWER\tPORT\tsource\tout\tdata\tdata\tOutput\t16',
@@ -28,6 +30,10 @@ describe('applyQuartusMetadata', () => {
     });
     expect(graph.interfaces['source.out']?.kind).toBe('avalon_streaming_source');
     expect(graph.connections[0]?.kind).toBe('avalon_streaming');
+    expect(graph.modules.find((module) => module.id === 'source')?.parameterMetadata).toEqual({
+      DATA_WIDTH: { group: 'Data format', order: 2 },
+      PIPELINE_MODE: { group: 'Advanced', order: 5 },
+    });
   });
 
   it('fails rather than inventing metadata when Quartus returns no records', () => {

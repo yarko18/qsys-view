@@ -1,7 +1,7 @@
 // Copyright 2026 Yaroslav Mariukha
 // SPDX-License-Identifier: MIT
 
-import type { QsysGraph, QsysInterface } from './graph';
+import type { QsysGraph, QsysInterface, QsysParameterMetadata } from './graph';
 import { classifyConnection, orientPlatformDesignerConnection } from './qsysParser';
 import { annotateStreamingAdapters } from './streamAdapters';
 
@@ -26,13 +26,28 @@ function interfaceKind(graph: QsysGraph, endpoint: string): string {
 
 export function applyQuartusMetadata(graph: QsysGraph, output: string, executable: string): QsysGraph {
   const interfaces: Record<string, QsysInterface> = {};
+  const parameterMetadata = new Map<string, Record<string, QsysParameterMetadata>>();
+  const moduleIds = new Set(graph.modules.map((module) => module.id));
   for (const line of output.split(/\r?\n/)) {
     if (!line.startsWith(prefix)) continue;
     const fields = line.split('\t').slice(1).map(unescapeField);
     const [record, moduleName, interfaceName, recordValue] = fields;
     if (!record || !moduleName || !interfaceName) continue;
+    if (record === 'INSTANCE_PARAMETER') {
+      if (!moduleIds.has(moduleName)) continue;
+      const [, , parameterName, orderText = '', group = ''] = fields;
+      const order = Number(orderText);
+      if (!parameterName || !Number.isFinite(order)) continue;
+      const moduleMetadata = parameterMetadata.get(moduleName) ?? {};
+      moduleMetadata[parameterName] = {
+        order,
+        ...(group.trim() ? { group: group.trim() } : {}),
+      };
+      parameterMetadata.set(moduleName, moduleMetadata);
+      continue;
+    }
     const endpoint = `${moduleName}.${interfaceName}`;
-    if (!graph.modules.some((module) => module.id === moduleName)) continue;
+    if (!moduleIds.has(moduleName)) continue;
     const iface = interfaces[endpoint] ?? {
       module: moduleName,
       name: interfaceName,
@@ -59,6 +74,15 @@ export function applyQuartusMetadata(graph: QsysGraph, output: string, executabl
   }
   const count = Object.keys(interfaces).length;
   if (count === 0) throw new Error('qsys-script returned no elaborated interfaces. Check the IP search paths.');
+  const modules = graph.modules.map((module) => {
+    const discovered = parameterMetadata.get(module.id);
+    if (!discovered) return module;
+    const configured = Object.fromEntries(Object.entries(discovered)
+      .filter(([parameter]) => Object.hasOwn(module.parameters, parameter)));
+    return Object.keys(configured).length > 0
+      ? { ...module, parameterMetadata: configured }
+      : module;
+  });
   const connections = graph.connections.map((connection) => {
     const sourceEndpoint = `${connection.source}.${connection.sourcePort}`;
     const targetEndpoint = `${connection.target}.${connection.targetPort}`;
@@ -81,6 +105,7 @@ export function applyQuartusMetadata(graph: QsysGraph, output: string, executabl
   });
   return annotateStreamingAdapters({
     ...graph,
+    modules,
     connections,
     interfaces,
     metadata: {

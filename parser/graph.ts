@@ -51,12 +51,18 @@ export interface QsysDiagnostic {
   command?: string;
 }
 
+export interface QsysParameterMetadata {
+  group?: string;
+  order: number;
+}
+
 export interface QsysModule {
   id: string;
   name: string;
   type: string;
   disabled: boolean;
   parameters: Record<string, string>;
+  parameterMetadata?: Record<string, QsysParameterMetadata>;
   ports: QsysPort[];
   subsystem?: QsysSubsystemReference;
   hierarchyPath?: string[];

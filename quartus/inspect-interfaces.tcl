@@ -14,6 +14,15 @@ foreach instance [get_instances] {
             continue
         }
     }
+    set parameter_index 0
+    if {![catch {get_instance_parameters $instance} instance_parameters]} {
+        foreach parameter $instance_parameters {
+            set group ""
+            catch {set group [get_instance_parameter_property $instance $parameter GROUP]}
+            puts "QSYS_VIEWER\tINSTANCE_PARAMETER\t[qv_clean $instance]\t[qv_clean $parameter]\t$parameter_index\t[qv_clean $group]"
+            incr parameter_index
+        }
+    }
     foreach interface [get_instance_interfaces $instance] {
         set class_name ""
         catch {set class_name [get_instance_interface_property $instance $interface CLASS_NAME]}

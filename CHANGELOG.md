@@ -9,6 +9,7 @@ SPDX-License-Identifier: MIT
 
 - Keep input interfaces on the left and output interfaces on the right, routing feedback connections around IP blocks instead of flipping their port sides.
 - Replace Relayout with Refresh, which rereads the loaded Qsys/Tcl hierarchy and sourced configuration before recalculating the graph layout.
+- Read instance parameter groups from Quartus and display configured IP parameters in their Platform Designer sections after interface analysis.
 
 ## 1.0.11
 

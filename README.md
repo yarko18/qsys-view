@@ -22,6 +22,7 @@ and much more!
 - Expands a selected subsystem in place, enters it in the same canvas, or opens it in a new editor without automatically expanding deeper levels.
 - Draws a left-to-right graph with orthogonal connections.
 - Shows IP and connection parameters on click.
+- Groups configured IP parameters by their Platform Designer sections after Quartus interface analysis.
 - Highlights clock, reset, Avalon-MM, and interrupt domains without filling the graph with their edges.
 - Detects Avalon-ST adapters after Quartus analysis and marks them with a red dot.
 - Shows elaborated interface ports, parameters, and an illustrative Avalon-ST waveform.

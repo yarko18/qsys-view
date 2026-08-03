@@ -4,6 +4,7 @@
 import { connectionKinds, type ConnectionKind, type QsysAdaptation, type QsysConnection, type QsysDiagnostic, type QsysGraph, type QsysInterface, type QsysModule } from '../parser/graph';
 import { streamParameters } from '../parser/streamMetadata';
 import { createInterfaceWaveform } from '../parser/waveform';
+import { groupParameters } from './parameterGroups';
 import { layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, projectVisibleLayout, separateHierarchyGroups, type LayoutPoint, type LayoutResult, type StableLayoutCache } from '../layout/elk';
 import { composeHierarchy, hierarchyBounds, type HierarchyBounds } from './hierarchy';
 import { connectionAddress, createInterfaceHubs, type HubKind, type InterfaceHub } from './interfaceHubs';
@@ -729,7 +730,7 @@ function showModuleDetails(module: QsysModule): void {
     actions.append(enter, expand, open);
     details.append(actions);
   }
-  details.append(parameterTable('Parameters', module.parameters));
+  details.append(parameterTable('Parameters', module.parameters, module.parameterMetadata));
   details.classList.remove('hidden');
 }
 
@@ -815,20 +816,34 @@ function detailsCloseButton(): HTMLButtonElement {
   return close;
 }
 
-function parameterTable(titleText: string, parameters: Record<string, string>): HTMLElement {
+function parameterTable(
+  titleText: string,
+  parameters: Record<string, string>,
+  metadata?: QsysModule['parameterMetadata'],
+): HTMLElement {
   const section = document.createElement('section');
   const title = document.createElement('h3');
   title.textContent = titleText;
-  const table = document.createElement('dl');
-  const entries = Object.entries(parameters);
-  for (const [name, value] of entries) appendDefinition(table, name, value);
-  if (entries.length === 0) {
+  section.append(title);
+  const groups = groupParameters(parameters, metadata);
+  for (const group of groups) {
+    if (group.name) {
+      const groupTitle = document.createElement('h4');
+      groupTitle.textContent = group.name;
+      section.append(groupTitle);
+    }
+    const table = document.createElement('dl');
+    for (const [name, value] of group.entries) appendDefinition(table, name, value);
+    section.append(table);
+  }
+  if (groups.length === 0) {
+    const table = document.createElement('dl');
     const empty = document.createElement('div');
     empty.className = 'empty-parameters';
     empty.textContent = 'Not serialized in this Qsys file.';
     table.append(empty);
+    section.append(table);
   }
-  section.append(title, table);
   return section;
 }
 
