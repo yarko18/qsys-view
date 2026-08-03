@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, expect, it } from 'vitest';
-import { platformDesignerArguments, platformDesignerTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclInspectionWrapper, qsysTclScriptArguments, siblingQsysSearchPattern } from '../src/qsysScript';
+import { platformDesignerArguments, platformDesignerTemporaryPrefix, qsysAnalysisTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclInspectionWrapper, qsysTclScriptArguments, siblingQsysSearchPattern } from '../src/qsysScript';
 
 describe('platformDesignerArguments', () => {
   it('keeps the original IP search path when opening a disposable Qsys file', () => {
@@ -35,6 +35,14 @@ describe('qsysTclScriptArguments', () => {
       '--search-path=ip-search-path',
       '--script=/tmp/qsys-view/inspect-tcl.tcl',
     ]);
+  });
+});
+
+describe('qsysAnalysisTemporaryPrefix', () => {
+  it('uses Quartus-safe working-directory names for Windows analysis', () => {
+    expect(qsysAnalysisTemporaryPrefix('/tmp', 'qsys')).toBe('/tmp/qsys_view_');
+    expect(qsysAnalysisTemporaryPrefix('/tmp', 'tcl')).toBe('/tmp/qsys_view_tcl_');
+    expect(qsysAnalysisTemporaryPrefix('/tmp', 'tcl')).not.toContain('-');
   });
 });
 
@@ -113,9 +121,12 @@ describe('qsysTclInspectionWrapper', () => {
 });
 
 describe('platformDesignerTemporaryPrefix', () => {
-  it('places the generated Platform Designer folder beside the source Tcl file', () => {
+  it('places a Quartus-safe generated folder beside the source Tcl file', () => {
     expect(platformDesignerTemporaryPrefix('/work/quartus/video.tcl')).toBe(
-      '/work/quartus/.qsys-view-video-',
+      '/work/quartus/qsys_view_video_',
+    );
+    expect(platformDesignerTemporaryPrefix('/work/quartus/video-system.tcl')).toBe(
+      '/work/quartus/qsys_view_video_system_',
     );
   });
 });

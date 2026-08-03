@@ -12,6 +12,7 @@ SPDX-License-Identifier: MIT
 - Read instance parameter groups from Quartus and display configured IP parameters in their Platform Designer sections after interface analysis.
 - Infer Avalon-MM connections from exported Tcl address and arbitration parameters before Quartus analysis.
 - Draw one shared Avalon-MM bus from a master to multiple slaves in Classic view while keeping every branch selectable.
+- Use Quartus-safe temporary project names during Windows interface analysis.
 
 ## 1.0.11
 

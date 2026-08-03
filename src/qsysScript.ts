@@ -37,6 +37,18 @@ export function qsysTclScriptArguments(searchPath: string, wrapperPath: string):
   ];
 }
 
+/**
+ * Quartus on Windows derives an internal project name from the qsys-script
+ * working directory. Keep that directory free of dashes and other characters
+ * which are valid in a filesystem path but invalid in a Quartus project name.
+ */
+export function qsysAnalysisTemporaryPrefix(
+  temporaryRoot: string,
+  format: 'qsys' | 'tcl',
+): string {
+  return path.join(temporaryRoot, format === 'tcl' ? 'qsys_view_tcl_' : 'qsys_view_');
+}
+
 export function qsysTclExportWrapper(
   sourcePath: string,
   generatedSystemPath: string,
@@ -67,8 +79,8 @@ export function qsysTclInspectionWrapper(
 
 export function platformDesignerTemporaryPrefix(sourcePath: string): string {
   const extension = path.extname(sourcePath);
-  const systemName = path.basename(sourcePath, extension);
-  return path.join(path.dirname(sourcePath), `.qsys-view-${systemName}-`);
+  const systemName = path.basename(sourcePath, extension).replaceAll(/[^A-Za-z0-9_]/g, '_');
+  return path.join(path.dirname(sourcePath), `qsys_view_${systemName}_`);
 }
 
 export function siblingQsysSearchPattern(projectDirectory: string): string {

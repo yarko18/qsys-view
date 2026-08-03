@@ -12,7 +12,7 @@ import { applyQuartusMetadata } from '../parser/quartusMetadataParser';
 import { parseQsys } from '../parser/qsysParser';
 import { parseEvaluatedQsysTcl } from '../parser/qsysTclEvaluation';
 import { parseQsysTcl } from '../parser/qsysTclParser';
-import { platformDesignerArguments, platformDesignerTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclInspectionWrapper, qsysTclScriptArguments, siblingQsysSearchPattern, type TclVariableValue } from './qsysScript';
+import { platformDesignerArguments, platformDesignerTemporaryPrefix, qsysAnalysisTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclInspectionWrapper, qsysTclScriptArguments, siblingQsysSearchPattern, type TclVariableValue } from './qsysScript';
 import { traceQsysTcl } from './staticTcl';
 import { subsystemCandidatePaths, tclSubsystemBuildOrder } from './subsystems';
 
@@ -325,7 +325,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     const executable = await this.findQsysScript(uri);
     const projectDirectory = path.dirname(uri.fsPath);
     const searchPath = this.ipSearchPath(uri, projectDirectory);
-    const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'qsys-view-'));
+    const temporaryDirectory = await fs.mkdtemp(qsysAnalysisTemporaryPrefix(os.tmpdir(), 'qsys'));
     const temporaryQsys = path.join(temporaryDirectory, `${systemName}.qsys`);
     const inspector = path.join(this.context.extensionUri.fsPath, 'quartus', 'inspect-interfaces.tcl');
     try {
@@ -349,8 +349,8 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     const executable = await this.findQsysScript(uri);
     const projectDirectory = path.dirname(uri.fsPath);
     const searchPath = this.ipSearchPath(uri, projectDirectory);
-    const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'qsys-view-tcl-'));
-    const wrapper = path.join(temporaryDirectory, 'inspect-exported-system.tcl');
+    const temporaryDirectory = await fs.mkdtemp(qsysAnalysisTemporaryPrefix(os.tmpdir(), 'tcl'));
+    const wrapper = path.join(temporaryDirectory, 'inspect_exported_system.tcl');
     const evaluatedSystem = path.join(temporaryDirectory, 'evaluated.qsys');
     const inspector = path.join(this.context.extensionUri.fsPath, 'quartus', 'inspect-interfaces.tcl');
     try {
@@ -404,7 +404,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       const dependencyUri = subsystemUri(resource);
       const systemName = path.basename(dependencyUri.fsPath, path.extname(dependencyUri.fsPath));
       const generatedSystemPath = path.join(temporaryDirectory, `${systemName}.qsys`);
-      const dependencyWrapper = path.join(temporaryDirectory, `build-subsystem-${index}.tcl`);
+      const dependencyWrapper = path.join(temporaryDirectory, `build_subsystem_${index}.tcl`);
       progress?.report({ message: `Preparing subsystem ${systemName}…` });
       // Source the original dependency so its [info script] keeps pointing at
       // the design directory and sibling config/source files remain visible.
@@ -545,7 +545,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
   ): Promise<{ filePath: string; searchPath: string; cleanup?: () => Promise<void> }> {
     const temporaryDirectory = await fs.mkdtemp(platformDesignerTemporaryPrefix(uri.fsPath));
     const temporaryQsys = path.join(temporaryDirectory, `${path.basename(uri.fsPath, path.extname(uri.fsPath))}.qsys`);
-    const wrapper = path.join(temporaryDirectory, 'export-system.tcl');
+    const wrapper = path.join(temporaryDirectory, 'export_system.tcl');
     try {
       const graph = (await this.readGraph(uri)).graph;
       const searchPath = await this.prepareTclSubsystems(
