@@ -27,6 +27,12 @@ export interface LayoutEdge extends QsysConnection {
   paths: LayoutPoint[][];
 }
 
+export interface LayoutExternalPort {
+  moduleId: string;
+  interfaceName: string;
+  direction: 'input' | 'output';
+}
+
 interface FrozenNodeGeometry {
   x: number;
   y: number;
@@ -77,6 +83,7 @@ export function pathMidpoint(paths: LayoutPoint[][]): LayoutPoint | undefined {
 export function separateHierarchyGroups(
   layout: LayoutResult,
   expandedInstanceIds: readonly string[],
+  externalPorts: readonly LayoutExternalPort[] = [],
 ): LayoutResult {
   const roots = expandedInstanceIds.filter((instanceId) =>
     !expandedInstanceIds.some((candidate) => candidate !== instanceId && instanceId.startsWith(`${candidate}/`)),
@@ -150,7 +157,16 @@ export function separateHierarchyGroups(
     const pair = `${edge.source}\u0000${edge.target}`;
     const parallelIndex = parallelCounts.get(pair) ?? 0;
     parallelCounts.set(pair, parallelIndex + 1);
-    return [{ ...edge, paths: [routeOverlayEdge(source, target, parallelIndex)] }];
+    return [{
+      ...edge,
+      paths: [routeOverlayEdge(
+        source,
+        target,
+        parallelIndex,
+        portAnchorY(source, 'output', edge.sourcePort, layout.edges, externalPorts),
+        portAnchorY(target, 'input', edge.targetPort, layout.edges, externalPorts),
+      )],
+    }];
   });
   return layoutBounds(nodes, edges);
 }
@@ -158,6 +174,7 @@ export function separateHierarchyGroups(
 export async function layoutGraph(
   modules: QsysModule[],
   connections: QsysConnection[],
+  externalPorts: readonly LayoutExternalPort[] = [],
 ): Promise<LayoutResult> {
   const moduleIds = new Set(modules.map((module) => module.id));
   const validConnections = connections.filter((connection) =>
@@ -172,35 +189,51 @@ export async function layoutGraph(
       'elk.spacing.nodeNode': '44',
       'elk.layered.spacing.nodeNodeBetweenLayers': '90',
       'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
-      'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
-      'elk.padding': '[top=36,left=36,bottom=36,right=36]',
+      'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
+      'elk.layered.nodePlacement.bk.edgeStraightening': 'IMPROVE_STRAIGHTNESS',
+      'elk.layered.nodePlacement.favorStraightEdges': 'true',
+      'elk.padding': '[top=36,left=90,bottom=36,right=90]',
     },
     children: modules.map((module) => {
       const inputs = [...new Set(validConnections
         .filter((connection) => connection.target === module.id)
-        .map((connection) => connection.targetPort))].sort();
+        .map((connection) => connection.targetPort)
+        .concat(externalPorts
+          .filter((port) => port.moduleId === module.id && port.direction === 'input')
+          .map((port) => port.interfaceName)))].sort(naturalInterfaceOrder);
       const outputs = [...new Set(validConnections
         .filter((connection) => connection.source === module.id)
-        .map((connection) => connection.sourcePort))].sort();
+        .map((connection) => connection.sourcePort)
+        .concat(externalPorts
+          .filter((port) => port.moduleId === module.id && port.direction === 'output')
+          .map((port) => port.interfaceName)))].sort(naturalInterfaceOrder);
       return {
         id: module.id,
         width: Math.max(150, Math.min(280, 70 + module.name.length * 7)),
         height: 70,
         layoutOptions: {
-          'elk.portConstraints': 'FIXED_SIDE',
+          'elk.portConstraints': 'FIXED_ORDER',
+          'elk.portAlignment.default': 'DISTRIBUTED',
         },
         ports: [
-          ...inputs.map((interfaceName) => ({
+          ...inputs.map((interfaceName, index) => ({
             id: elkPortId(module.id, 'input', interfaceName),
             width: 0,
             height: 0,
-            layoutOptions: { 'elk.port.side': 'WEST' },
+            // ELK numbers west-side ports clockwise, hence the reversed index.
+            layoutOptions: {
+              'elk.port.side': 'WEST',
+              'elk.port.index': String(inputs.length - index - 1),
+            },
           })),
-          ...outputs.map((interfaceName) => ({
+          ...outputs.map((interfaceName, index) => ({
             id: elkPortId(module.id, 'output', interfaceName),
             width: 0,
             height: 0,
-            layoutOptions: { 'elk.port.side': 'EAST' },
+            layoutOptions: {
+              'elk.port.side': 'EAST',
+              'elk.port.index': String(index),
+            },
           })),
         ],
       };
@@ -247,6 +280,10 @@ function elkPortId(moduleId: string, direction: 'input' | 'output', interfaceNam
   return `${moduleId}::${direction}::${interfaceName}`;
 }
 
+function naturalInterfaceOrder(left: string, right: string): number {
+  return left.localeCompare(right, 'en', { numeric: true, sensitivity: 'base' });
+}
+
 /**
  * Builds a stable master layout. When Avalon-ST exists, only its topology is
  * allowed to position the streaming pipeline. Modules outside that pipeline
@@ -256,25 +293,26 @@ function elkPortId(moduleId: string, direction: 'input' | 'output', interfaceNam
 export async function layoutAnchoredGraph(
   modules: QsysModule[],
   connections: QsysConnection[],
+  externalPorts: readonly LayoutExternalPort[] = [],
 ): Promise<LayoutResult> {
   const moduleIds = new Set(modules.map((module) => module.id));
   const validConnections = connections.filter((connection) =>
     moduleIds.has(connection.source) && moduleIds.has(connection.target),
   );
   const streamingConnections = validConnections.filter((connection) => connection.kind === 'avalon_streaming');
-  if (streamingConnections.length === 0) return layoutGraph(modules, validConnections);
+  if (streamingConnections.length === 0) return layoutGraph(modules, validConnections, externalPorts);
 
   const streamingIds = new Set(streamingConnections.flatMap((connection) => [connection.source, connection.target]));
   const streamingModules = modules.filter((module) => streamingIds.has(module.id));
   const otherModules = modules.filter((module) => !streamingIds.has(module.id));
-  const streamingLayout = await layoutGraph(streamingModules, streamingConnections);
+  const streamingLayout = await layoutGraph(streamingModules, streamingConnections, externalPorts);
   if (otherModules.length === 0) return streamingLayout;
 
   const otherIds = new Set(otherModules.map((module) => module.id));
   const otherConnections = validConnections.filter((connection) =>
     otherIds.has(connection.source) && otherIds.has(connection.target),
   );
-  const otherLayout = await layoutGraph(otherModules, otherConnections);
+  const otherLayout = await layoutGraph(otherModules, otherConnections, externalPorts);
   const gap = 80;
   const translatedOther = translateLayout(otherLayout, 0, streamingLayout.height + gap);
 
@@ -295,10 +333,15 @@ export async function layoutStableGraph(
   modules: QsysModule[],
   connections: QsysConnection[],
   previous: StableLayoutCache | undefined,
-  initialLayout: (modules: QsysModule[], connections: QsysConnection[]) => Promise<LayoutResult> = layoutGraph,
+  initialLayout: (
+    modules: QsysModule[],
+    connections: QsysConnection[],
+    externalPorts: readonly LayoutExternalPort[],
+  ) => Promise<LayoutResult> = layoutGraph,
+  externalPorts: readonly LayoutExternalPort[] = [],
 ): Promise<StableLayoutResult> {
   if (!previous) {
-    const layout = await initialLayout(modules, connections);
+    const layout = await initialLayout(modules, connections, externalPorts);
     return {
       layout,
       cache: {
@@ -316,7 +359,7 @@ export async function layoutStableGraph(
     const newConnections = connections.filter((connection) =>
       newIds.has(connection.source) && newIds.has(connection.target),
     );
-    const appended = await layoutGraph(newModules, newConnections);
+    const appended = await layoutGraph(newModules, newConnections, externalPorts);
     const bottom = Math.max(0, ...[...nodes.values()].map((node) => node.y + node.height));
     const offsetY = nodes.size > 0 ? bottom + 80 : 0;
     for (const node of appended.nodes) {
@@ -341,6 +384,7 @@ export async function layoutStableGraph(
     { width: 1, height: 1, nodes: frozenNodes, edges: reusableEdges },
     modules,
     connections,
+    externalPorts,
   );
   for (const edge of projected.edges) routes.set(routeKey(edge), edge.paths);
   return { layout: projected, cache: { nodes, routes } };
@@ -351,6 +395,7 @@ export function projectVisibleLayout(
   master: LayoutResult,
   modules: QsysModule[],
   connections: QsysConnection[],
+  externalPorts: readonly LayoutExternalPort[] = [],
 ): LayoutResult {
   const visibleIds = new Set(modules.map((module) => module.id));
   const nodes = master.nodes.filter((node) => visibleIds.has(node.id));
@@ -369,7 +414,16 @@ export function projectVisibleLayout(
     const pair = `${connection.source}\u0000${connection.target}`;
     const parallelIndex = parallelCounts.get(pair) ?? 0;
     parallelCounts.set(pair, parallelIndex + 1);
-    return [{ ...connection, paths: [routeOverlayEdge(source, target, parallelIndex)] }];
+    return [{
+      ...connection,
+      paths: [routeOverlayEdge(
+        source,
+        target,
+        parallelIndex,
+        portAnchorY(source, 'output', connection.sourcePort, connections, externalPorts),
+        portAnchorY(target, 'input', connection.targetPort, connections, externalPorts),
+      )],
+    }];
   });
 
   const maxNodeX = Math.max(0, ...nodes.map((node) => node.x + node.width));
@@ -377,10 +431,9 @@ export function projectVisibleLayout(
   const edgePoints = edges.flatMap((edge) => edge.paths.flat());
   const maxEdgeX = Math.max(0, ...edgePoints.map((point) => point.x));
   const maxEdgeY = Math.max(0, ...edgePoints.map((point) => point.y));
-  const padding = 36;
   return {
-    width: Math.max(1, maxNodeX, maxEdgeX) + padding,
-    height: Math.max(1, maxNodeY, maxEdgeY) + padding,
+    width: Math.max(1, maxNodeX, maxEdgeX) + 90,
+    height: Math.max(1, maxNodeY, maxEdgeY) + 36,
     nodes,
     edges,
   };
@@ -406,12 +459,16 @@ function translateLayout(layout: LayoutResult, dx: number, dy: number): LayoutRe
   };
 }
 
-function routeOverlayEdge(source: LayoutNode, target: LayoutNode, parallelIndex: number): LayoutPoint[] {
+function routeOverlayEdge(
+  source: LayoutNode,
+  target: LayoutNode,
+  parallelIndex: number,
+  sourceY = source.y + source.height / 2,
+  targetY = target.y + target.height / 2,
+): LayoutPoint[] {
   const offset = ((parallelIndex % 5) - 2) * 7;
-  const sourceCenterY = source.y + source.height / 2;
-  const targetCenterY = target.y + target.height / 2;
-  const start = { x: source.x + source.width, y: sourceCenterY + offset };
-  const end = { x: target.x, y: targetCenterY + offset };
+  const start = { x: source.x + source.width, y: sourceY };
+  const end = { x: target.x, y: targetY };
 
   if (start.x < end.x) {
     const middleX = (start.x + end.x) / 2 + offset;
@@ -433,6 +490,29 @@ function routeOverlayEdge(source: LayoutNode, target: LayoutNode, parallelIndex:
     { x: left, y: end.y },
     end,
   ];
+}
+
+/** Matches ELK's distributed fixed-order placement for a named interface. */
+export function portAnchorY(
+  node: LayoutNode,
+  direction: 'input' | 'output',
+  interfaceName: string,
+  connections: readonly QsysConnection[],
+  externalPorts: readonly LayoutExternalPort[] = [],
+): number {
+  const connected = connections.flatMap((connection) => {
+    if (direction === 'input' && connection.target === node.id) return [connection.targetPort];
+    if (direction === 'output' && connection.source === node.id) return [connection.sourcePort];
+    return [];
+  });
+  const external = externalPorts
+    .filter((port) => port.moduleId === node.id && port.direction === direction)
+    .map((port) => port.interfaceName);
+  const names = [...new Set([...connected, ...external])].sort(naturalInterfaceOrder);
+  const index = names.indexOf(interfaceName);
+  return index < 0
+    ? node.y + node.height / 2
+    : node.y + node.height * (index + 1) / (names.length + 1);
 }
 
 function nodeBounds(nodes: readonly LayoutNode[]): { x: number; y: number; width: number; height: number } {

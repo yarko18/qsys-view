@@ -79,6 +79,15 @@ describe('parseQsysTcl', () => {
       { id: 'status_link', kind: 'conduit', rawKind: 'conduit' },
     ]);
     expect(graph.exportedInterfaces).toEqual({ stream_out: 'source.out' });
+    expect(graph.exportedInterfaceMetadata).toEqual({
+      stream_out: {
+        kind: 'avalon_streaming',
+        rawKind: 'avalon_streaming',
+        direction: 'source',
+      },
+    });
+    expect(graph.modules.find((module) => module.id === 'source')?.ports)
+      .toContainEqual(expect.objectContaining({ interfaceName: 'out' }));
     expect(graph.warnings.join('\n')).not.toContain('add_interface');
   });
 

@@ -103,11 +103,19 @@ export function applyQuartusMetadata(graph: QsysGraph, output: string, executabl
       ? orientPlatformDesignerConnection(resolved)
       : resolved;
   });
+  const exportedInterfaceMetadata = Object.fromEntries(Object.entries(graph.exportedInterfaceMetadata ?? {})
+    .map(([name, metadata]) => {
+      const endpoint = graph.exportedInterfaces?.[name];
+      const exactKind = endpoint ? interfaces[endpoint]?.kind : undefined;
+      const rawKind = exactKind || metadata.rawKind;
+      return [name, { ...metadata, kind: classifyConnection(rawKind), rawKind }];
+    }));
   return annotateStreamingAdapters({
     ...graph,
     modules,
     connections,
     interfaces,
+    exportedInterfaceMetadata,
     metadata: {
       source: 'quartus',
       label: `Live Quartus metadata (${count} elaborated interfaces).`,

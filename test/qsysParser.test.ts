@@ -47,6 +47,13 @@ describe('parseQsys', () => {
     `);
 
     expect(graph.exportedInterfaces).toEqual({ din: 'fifo.in' });
+    expect(graph.exportedInterfaceMetadata).toEqual({
+      din: {
+        kind: 'avalon_streaming',
+        rawKind: 'avalon_streaming',
+        direction: 'end',
+      },
+    });
   });
 
   it('orients serialized interrupt connections from sender to receiver', () => {

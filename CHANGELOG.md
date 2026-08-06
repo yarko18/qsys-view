@@ -5,6 +5,12 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 1.0.13
+
+- Favor straight interface routes in Classic view and distribute fixed input/output ports evenly in natural numeric order.
+- Keep switch inputs on the left and outputs on the right, ordered from top to bottom.
+- Draw enabled top-level exported interfaces as labelled external connections before and after Quartus interface analysis.
+
 ## 1.0.12
 
 - Keep input interfaces on the left and output interfaces on the right, routing feedback connections around IP blocks instead of flipping their port sides.

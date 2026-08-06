@@ -295,6 +295,12 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
       report(`Parameters refer to missing instance ${instanceName}.`, pending.firstLine);
     }
   }
+  for (const declared of declaredInterfaces.values()) {
+    if (!declared.exportOf) continue;
+    const [moduleName, interfaceName] = splitEndpoint(declared.exportOf);
+    const module = moduleByName.get(moduleName);
+    if (module) addPort(module, interfaceName);
+  }
   if (unsupported.size > 0) {
     warnings.push(`Unsupported Tcl commands were ignored: ${[...unsupported].sort().join(', ')}.`);
   }
@@ -315,6 +321,15 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
       [...declaredInterfaces]
         .filter(([, declared]) => Boolean(declared.exportOf))
         .map(([name, declared]) => [name, declared.exportOf!]),
+    ),
+    exportedInterfaceMetadata: Object.fromEntries(
+      [...declaredInterfaces]
+        .filter(([, declared]) => Boolean(declared.exportOf))
+        .map(([name, declared]) => [name, {
+          kind: classifyConnection(declared.kind),
+          rawKind: declared.kind,
+          direction: declared.direction,
+        }]),
     ),
   };
 }
