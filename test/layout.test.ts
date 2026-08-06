@@ -131,6 +131,52 @@ describe('directed interface sides', () => {
     expect(Math.max(...path.map((point) => point.y)))
       .toBeGreaterThan(Math.max(source.y + source.height, target.y + target.height));
   });
+
+  it('orders numbered switch inputs and outputs from top to bottom with even spacing', async () => {
+    const source0 = module('source0');
+    const source1 = module('source1');
+    const switchIp = module('switch');
+    const sink0 = module('sink0');
+    const sink1 = module('sink1');
+    const links = [
+      { ...connection('in-1', source1.id, switchIp.id, 'avalon_streaming'), targetPort: 'din_1' },
+      { ...connection('out-1', switchIp.id, sink1.id, 'avalon_streaming'), sourcePort: 'dout_1' },
+      { ...connection('in-0', source0.id, switchIp.id, 'avalon_streaming'), targetPort: 'din_0' },
+      { ...connection('out-0', switchIp.id, sink0.id, 'avalon_streaming'), sourcePort: 'dout_0' },
+    ];
+    const result = await layoutGraph([source0, source1, switchIp, sink0, sink1], links);
+    const node = result.nodes.find((candidate) => candidate.id === switchIp.id)!;
+    const endpoints = new Map(result.edges.map((edge) => [edge.id, {
+      source: edge.paths[0]![0]!,
+      target: edge.paths[0]!.at(-1)!,
+    }]));
+
+    expect(endpoints.get('in-0')!.target.x).toBeCloseTo(node.x);
+    expect(endpoints.get('in-1')!.target.x).toBeCloseTo(node.x);
+    expect(endpoints.get('out-0')!.source.x).toBeCloseTo(node.x + node.width);
+    expect(endpoints.get('out-1')!.source.x).toBeCloseTo(node.x + node.width);
+    expect(endpoints.get('in-0')!.target.y).toBeCloseTo(node.y + node.height / 3);
+    expect(endpoints.get('in-1')!.target.y).toBeCloseTo(node.y + node.height * 2 / 3);
+    expect(endpoints.get('out-0')!.source.y).toBeCloseTo(node.y + node.height / 3);
+    expect(endpoints.get('out-1')!.source.y).toBeCloseTo(node.y + node.height * 2 / 3);
+  });
+
+  it('keeps proportional port anchors when links are added to a frozen layout', async () => {
+    const switchIp = module('switch');
+    const sink0 = module('sink0');
+    const sink1 = module('sink1');
+    const initial = await layoutStableGraph([switchIp, sink0, sink1], [], undefined);
+    const links = [
+      { ...connection('out-1', switchIp.id, sink1.id, 'avalon_streaming'), sourcePort: 'dout_1' },
+      { ...connection('out-0', switchIp.id, sink0.id, 'avalon_streaming'), sourcePort: 'dout_0' },
+    ];
+    const changed = await layoutStableGraph([switchIp, sink0, sink1], links, initial.cache);
+    const node = changed.layout.nodes.find((candidate) => candidate.id === switchIp.id)!;
+    const starts = new Map(changed.layout.edges.map((edge) => [edge.id, edge.paths[0]![0]!]));
+
+    expect(starts.get('out-0')!.y).toBeCloseTo(node.y + node.height / 3);
+    expect(starts.get('out-1')!.y).toBeCloseTo(node.y + node.height * 2 / 3);
+  });
 });
 
 describe('stable live layout', () => {

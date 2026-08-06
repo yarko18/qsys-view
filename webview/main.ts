@@ -6,10 +6,11 @@ import { streamParameters } from '../parser/streamMetadata';
 import { createInterfaceWaveform } from '../parser/waveform';
 import { groupParameters } from './parameterGroups';
 import { createAvalonMmBuses } from './avalonMmBus';
-import { layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, projectVisibleLayout, separateHierarchyGroups, type LayoutPoint, type LayoutResult, type StableLayoutCache } from '../layout/elk';
+import { layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, portAnchorY, projectVisibleLayout, separateHierarchyGroups, type LayoutExternalPort, type LayoutPoint, type LayoutResult, type StableLayoutCache } from '../layout/elk';
 import { composeHierarchy, hierarchyBounds, type HierarchyBounds } from './hierarchy';
 import { connectionAddress, createInterfaceHubs, type HubKind, type InterfaceHub } from './interfaceHubs';
 import { availableConnectionKinds, canUsePipelineView, connectedModuleIds, inferClockResetConnections, isDirectKind, isHubKind, type GraphViewMode } from './viewMode';
+import { collectExportedInterfaces, type ExportedInterface } from './exportedInterfaces';
 import './styles.css';
 
 const vscode = acquireVsCodeApi();
@@ -90,6 +91,9 @@ const pendingSubsystemActions = new Map<string, 'expand' | 'enter'>();
 const navigationStack: NavigationFrame[] = [];
 let activeHubId: string | undefined;
 let visibleHubs: InterfaceHub[] = [];
+let visibleSystemExports: ExportedInterface[] = [];
+let layoutExternalPorts: LayoutExternalPort[] = [];
+let layoutAnchorConnections: QsysConnection[] = [];
 let renderVersion = 0;
 let transform: CanvasTransform = { x: 20, y: 20, scale: 1 };
 let didInitialFit = false;
@@ -362,6 +366,16 @@ async function render(): Promise<void> {
   const enabledKinds = selectedKinds().filter((kind) => isDirectKind(kind, state.viewMode) || isHubKind(kind, state.viewMode));
   const selectedConnections = allowedConnections.filter((connection) => enabledKinds.includes(connection.kind));
   const connections = selectedConnections.filter((connection) => isDirectKind(connection.kind, state.viewMode));
+  const supportedExports = collectExportedInterfaces(renderedGraph).filter((item) =>
+    allowedIds.has(item.moduleId)
+    && (isDirectKind(item.kind, state.viewMode) || isHubKind(item.kind, state.viewMode)),
+  );
+  const selectedExports = supportedExports.filter((item) => enabledKinds.includes(item.kind));
+  const externalPorts = supportedExports.map((item) => ({
+    moduleId: item.moduleId,
+    interfaceName: item.port,
+    direction: item.side,
+  } satisfies LayoutExternalPort));
   const selectedHubKinds = enabledKinds.filter((kind) => isHubKind(kind, state.viewMode));
   const hubs = createInterfaceHubs(renderedGraph, selectedHubKinds, allowedIds);
   const connectedIds = connectedModuleIds(connections, hubs);
@@ -382,20 +396,28 @@ async function render(): Promise<void> {
       structuralConnections,
       stableLayoutCaches[mode],
       async (layoutModules, layoutConnections) => separateHierarchyGroups(
-        await baseLayout(layoutModules, layoutConnections),
+        await baseLayout(layoutModules, layoutConnections, externalPorts),
         [...expandedSubsystems.keys()],
+        externalPorts,
       ),
+      externalPorts,
     );
     if (version !== renderVersion) return;
     stableLayoutCaches[mode] = stable.cache;
-    const result = projectVisibleLayout(stable.layout, modules, connections);
+    const result = projectVisibleLayout(stable.layout, modules, connections, externalPorts);
     layout = result;
+    visibleSystemExports = selectedExports;
+    layoutExternalPorts = externalPorts;
+    layoutAnchorConnections = structuralConnections;
     draw(result);
     visibleHubs = hubs;
     if (activeHubId && !hubs.some((hub) => hub.id === activeHubId)) activeHubId = undefined;
     drawInterfaceHubs(hubs);
-    const visibleConnectionCount = selectedConnections.length;
-    required<HTMLElement>('summary').textContent = `${modules.length}/${graph.modules.length} IP · ${visibleConnectionCount}/${allowedConnections.length} interfaces`;
+    const visibleModuleIds = new Set(modules.map((module) => module.id));
+    const visibleConnectionCount = selectedConnections.length
+      + selectedExports.filter((item) => visibleModuleIds.has(item.moduleId)).length;
+    const availableInterfaceCount = allowedConnections.length + supportedExports.length;
+    required<HTMLElement>('summary').textContent = `${modules.length}/${graph.modules.length} IP · ${visibleConnectionCount}/${availableInterfaceCount} interfaces`;
     if (modules.length === 0) {
       showStatus('No graph elements match these filters. Enable another connection type or “All IP”.');
     } else {
@@ -486,6 +508,7 @@ function draw(result: LayoutResult): void {
     });
     scene.append(group);
   }
+  drawSystemExports(result);
   for (const node of result.nodes) {
     const group = svg('g', {
       class: `node${node.disabled ? ' disabled' : ''}${node.hierarchyPath ? ' nested' : ''}${node.subsystem ? ' subsystem' : ''}`,
@@ -529,6 +552,48 @@ function draw(result: LayoutResult): void {
   }
   createMarkers();
   applyTransform();
+}
+
+function drawSystemExports(result: LayoutResult): void {
+  const nodes = new Map(result.nodes.map((node) => [node.id, node]));
+  const stubLength = 54;
+  for (const item of visibleSystemExports) {
+    const node = nodes.get(item.moduleId);
+    if (!node) continue;
+    const anchorY = portAnchorY(
+      node,
+      item.side,
+      item.port,
+      layoutAnchorConnections,
+      layoutExternalPorts,
+    );
+    const input = item.side === 'input';
+    const internal = { x: input ? node.x : node.x + node.width, y: anchorY };
+    const external = { x: internal.x + (input ? -stubLength : stubLength), y: anchorY };
+    const points = input ? [external, internal] : [internal, external];
+    const group = svg('g', { class: `edge edge-${item.kind} exported-interface` });
+    group.append(svg('path', {
+      d: pathData(points),
+      class: 'edge-line exported-interface-line',
+      'marker-end': `url(#arrow-${item.kind})`,
+    }));
+    group.append(svg('circle', {
+      cx: external.x,
+      cy: external.y,
+      r: 3.5,
+      class: 'exported-interface-terminal',
+    }));
+    const label = svg('text', {
+      x: (internal.x + external.x) / 2,
+      y: anchorY - 7,
+      class: 'exported-interface-label',
+    });
+    label.textContent = item.name;
+    const title = svg('title');
+    title.textContent = `${item.name} ↔ ${item.endpoint}\n${labels[item.kind]} (${item.rawKind})`;
+    group.append(label, title);
+    scene.append(group);
+  }
 }
 
 function drawHierarchyBackground(instanceId: string, bounds: HierarchyBounds): void {
@@ -1347,7 +1412,11 @@ function selectedKinds(): ConnectionKind[] { return state.selectedKinds[state.vi
 
 function updateKindFilters(): void {
   const inferredConnections = inferClockResetConnections(graph?.connections ?? [], state.inferClockResetNames);
-  const available = new Set(availableConnectionKinds(inferredConnections.map((connection) => connection.kind), state.viewMode));
+  const exportKinds = graph ? collectExportedInterfaces(graph).map((item) => item.kind) : [];
+  const available = new Set(availableConnectionKinds([
+    ...inferredConnections.map((connection) => connection.kind),
+    ...exportKinds,
+  ], state.viewMode));
   for (const [kind, elements] of filterCheckboxes) {
     elements.checkbox.checked = selectedKinds().includes(kind);
     elements.label.classList.toggle('hidden', !available.has(kind));

@@ -305,6 +305,22 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 }
 .target-port { text-anchor: end; }
 .edge:hover .port-label { opacity: 1; }
+.exported-interface { cursor: default; }
+.exported-interface-line { stroke-dasharray: 5 3; }
+.exported-interface-terminal {
+  fill: var(--vscode-editor-background);
+  stroke: var(--edge-color);
+  stroke-width: 1.7;
+  vector-effect: non-scaling-stroke;
+}
+.exported-interface-label {
+  fill: var(--vscode-editor-foreground);
+  stroke: var(--vscode-editor-background);
+  stroke-width: 3px;
+  paint-order: stroke;
+  font-size: 9px;
+  text-anchor: middle;
+}
 .kind-avalon_streaming, .edge-avalon_streaming { --edge-color: var(--vscode-charts-blue, #4aa5f0); }
 .kind-avalon_memory_mapped, .edge-avalon_memory_mapped { --edge-color: var(--vscode-charts-orange, #d98b38); }
 .kind-clock, .edge-clock { --edge-color: var(--vscode-charts-green, #65b66e); }

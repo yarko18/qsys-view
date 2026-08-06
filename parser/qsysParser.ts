@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { XMLParser } from 'fast-xml-parser';
-import type { ConnectionKind, QsysConnection, QsysGraph, QsysModule, QsysPort } from './graph';
+import type { ConnectionKind, QsysConnection, QsysExportedInterfaceMetadata, QsysGraph, QsysModule, QsysPort } from './graph';
 
 type XmlNode = Record<string, unknown>;
 
@@ -77,8 +77,12 @@ function collectInterfaces(module: XmlNode): { ports: QsysPort[]; kinds: Map<str
   return { ports, kinds };
 }
 
-function collectExportedInterfaces(system: XmlNode): Record<string, string> {
+function collectExportedInterfaces(system: XmlNode): {
+  mappings: Record<string, string>;
+  metadata: Record<string, QsysExportedInterfaceMetadata>;
+} {
   const exportedInterfaces: Record<string, string> = {};
+  const metadata: Record<string, QsysExportedInterfaceMetadata> = {};
   const interfaces = [
     ...arrayOf(system.interface),
     ...arrayOf((system.interfaces as XmlNode | undefined)?.interface),
@@ -86,9 +90,16 @@ function collectExportedInterfaces(system: XmlNode): Record<string, string> {
   for (const iface of interfaces) {
     const name = text(iface.name);
     const internal = text(iface.internal);
-    if (name && internal) exportedInterfaces[name] = internal;
+    if (!name || !internal) continue;
+    const rawKind = text(iface.kind ?? iface.type);
+    exportedInterfaces[name] = internal;
+    metadata[name] = {
+      kind: classifyConnection(rawKind),
+      rawKind: rawKind || 'unknown',
+      direction: text(iface.direction ?? iface.dir),
+    };
   }
-  return exportedInterfaces;
+  return { mappings: exportedInterfaces, metadata };
 }
 
 function splitEndpoint(endpoint: string): [string, string] {
@@ -144,6 +155,7 @@ export function parseQsys(xml: string, fallbackName = 'Qsys system'): QsysGraph 
   }
 
   const system = findSystem(document);
+  const exported = collectExportedInterfaces(system);
   const rawModules = [
     ...arrayOf(system.module),
     ...arrayOf((system.modules as XmlNode | undefined)?.module),
@@ -222,6 +234,7 @@ export function parseQsys(xml: string, fallbackName = 'Qsys system'): QsysGraph 
       label: 'Exact interface metadata is not loaded. Run qsys-script from the viewer; values are never guessed.',
     },
     warnings,
-    exportedInterfaces: collectExportedInterfaces(system),
+    exportedInterfaces: exported.mappings,
+    exportedInterfaceMetadata: exported.metadata,
   };
 }

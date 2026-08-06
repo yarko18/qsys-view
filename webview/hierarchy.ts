@@ -120,11 +120,17 @@ export function composeHierarchy(
   expanded: ReadonlyMap<string, QsysGraph>,
 ): QsysGraph {
   const parts = composeParts(root, '', [], expanded);
+  const exportedInterfaces = Object.fromEntries(Object.entries(root.exportedInterfaces ?? {}).map(([name, address]) => {
+    const endpoint = splitEndpoint(address);
+    const resolved = resolveEndpoint(root, '', endpoint.module, endpoint.port, expanded);
+    return [name, `${resolved.module}.${resolved.port}`];
+  }));
   return {
     ...root,
     modules: parts.modules,
     connections: parts.connections,
     interfaces: parts.interfaces,
+    exportedInterfaces,
     domainAliases: parts.domainAliases,
   };
 }

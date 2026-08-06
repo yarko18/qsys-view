@@ -36,6 +36,12 @@ export interface QsysInterface {
   source: 'quartus';
 }
 
+export interface QsysExportedInterfaceMetadata {
+  kind: ConnectionKind;
+  rawKind: string;
+  direction: string;
+}
+
 export interface QsysMetadataStatus {
   source: 'quartus' | 'qsys-only';
   label: string;
@@ -107,6 +113,7 @@ export interface QsysGraph {
   warnings: string[];
   diagnostics?: QsysDiagnostic[];
   exportedInterfaces?: Record<string, string>;
+  exportedInterfaceMetadata?: Record<string, QsysExportedInterfaceMetadata>;
   /** Maps equivalent clock/reset source endpoints across expanded subsystem boundaries. */
   domainAliases?: Record<string, string>;
 }
