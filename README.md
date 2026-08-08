@@ -5,7 +5,7 @@ SPDX-License-Identifier: MIT
 
 # Qsys View
 
-Qsys View is a read-only Visual Studio Code viewer for Intel Platform Designer systems. It opens `.qsys` files and exported Platform Designer `.tcl` scripts as compact layered graphs.
+Qsys View is a read-only Visual Studio Code viewer for Intel Platform Designer systems and IP components. It opens `.qsys`, exported system `.tcl`, and component `*_hw.tcl` files as compact layered graphs.
 
 Open tcl with Qsys View:
 ![Open tcl with Qsys View](media/tcl_view.png)
@@ -17,7 +17,9 @@ and much more!
 
 ## What it does
 
-- Opens `.qsys` directly and `.tcl` through **Reopen Editor With… → Qsys TCL Graph**.
+- Opens `.qsys` directly, exported `.tcl` through **Reopen Editor With… → Qsys TCL Graph**, and `*_hw.tcl` through the default **Platform Designer IP** editor.
+- Shows component parameters and external interfaces, including elaborated physical port names and widths.
+- Runs validation, elaboration, and composition callbacks locally so parameter-dependent instances and connections update immediately.
 - Keeps hierarchical subsystems collapsed as single IP blocks.
 - Expands a selected subsystem in place, enters it in the same canvas, or opens it in a new editor without automatically expanding deeper levels.
 - Draws a left-to-right graph with orthogonal connections.
@@ -47,11 +49,19 @@ Qsys View has two modes:
 | Reset | Highlight hub | Highlight hub |
 | Other or unknown | Hidden | Grey directed edge |
 
-Only interface filters present in the current system are shown. Pipeline layout is anchored exclusively by Avalon-ST when streaming connections exist. For exported Tcl, Pipeline remains disabled until **Read interfaces…** resolves the real interface types for every visible hierarchy level.
+Only interface filters present in the current system are shown. Pipeline layout is anchored exclusively by Avalon-ST when streaming connections exist. For exported system Tcl, Pipeline remains disabled until **Read interfaces…** resolves the real interface types for every visible hierarchy level. Safely elaborated `*_hw.tcl` compositions already provide their declared connection types and can use Pipeline view without Quartus.
 
 The Tcl reader accepts Platform Designer declarations for `avalon`, `axi`, `tristate_conduit`, `avalon_streaming`, `interrupt`, `conduit`, `clock`, `reset`, and `nios_custom_instruction`. Before Quartus analysis, Avalon-MM is also recognized from exported connection properties such as `baseAddress` and `arbitrationPriority`; unrelated unknown connections remain grey.
 
-## Tcl and Quartus analysis
+## Hardware Tcl components without Quartus
+
+Opening a `*_hw.tcl` file evaluates it with a local restricted `tclsh` interpreter. Qsys View emulates the component API needed for parameters, module properties, interfaces, instances, and connections, then invokes `VALIDATION_CALLBACK` and either `COMPOSITION_CALLBACK` or `ELABORATION_CALLBACK`.
+
+Use **IP definition** to inspect external interfaces and edit enabled parameters. **Apply & re-elaborate** runs the callbacks again and redraws conditional instances, connections, interface properties, and port widths. This workflow does not require Quartus.
+
+The interpreter supports normal Tcl control flow, procedures, substitutions, and workspace-local `source` files. It blocks external commands and unsafe filesystem operations, limits output, and stops slow evaluation. If a component depends on a vendor command that cannot be safely emulated, Qsys View falls back to a static preview and reports the reason.
+
+## System Tcl and Quartus analysis
 
 In a trusted workspace, Qsys View automatically runs the system in a restricted safe `tclsh` interpreter. Platform Designer commands only record their resolved arguments, so `source`, namespaces, procedures, substitutions, `if`, `switch`, and loops appear immediately without starting Quartus. File access and external commands remain blocked; sourced Tcl is restricted to the current workspace and the resolver has a short timeout. If `tclsh` is unavailable or the script needs unsupported capabilities, Qsys View falls back to the lexical reader and reports a warning.
 
@@ -88,6 +98,7 @@ Choose **Enter subsystem** in the IP details to navigate within the current view
 - **Errors/Warnings** appears when the static Tcl reader finds a problem; click an item to open its source line.
 - **+** expands a detected subsystem; **−** collapses its container; **↘** enters it; **← Back** returns to the parent.
 - **Read interfaces…** requests exact Quartus metadata.
+- **IP definition** opens parameters and external interfaces for a `*_hw.tcl` component.
 - **Open in Platform Designer** opens or converts the system.
 - **Reload source** rereads the active Qsys/Tcl hierarchy, including sourced configuration files, and invalidates stale Quartus analysis.
 - **Relayout** recalculates the active layout while preserving analysis; **Fit** fits it to the viewport.
@@ -106,7 +117,7 @@ code --install-extension YaroslavMariukha.qsys-view
 A local package can be installed with:
 
 ```bash
-code --install-extension qsys-view-1.0.6.vsix --force
+code --install-extension qsys-view-1.1.0.vsix --force
 ```
 
 ## Settings
@@ -135,7 +146,7 @@ npm run package
 
 ## Scope
 
-Qsys View does not edit Qsys or Tcl sources and its static diagnostics do not replace Platform Designer validation. Unknown Tcl connections remain grey in Classic mode until their type is explicit, inferred, or resolved by Quartus. Waveforms are protocol illustrations, not simulation output.
+Qsys View does not edit Qsys or Tcl sources. Its safe component API covers common Platform Designer commands but does not replace vendor validation for unusual proprietary extensions. Unknown system Tcl connections remain grey in Classic mode until their type is explicit, inferred, or resolved by Quartus. Waveforms are protocol illustrations, not simulation output.
 
 ## License
 

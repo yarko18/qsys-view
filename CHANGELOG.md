@@ -5,6 +5,15 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 1.1.0
+
+- Open Platform Designer `*_hw.tcl` component definitions directly as IP graphs.
+- Evaluate component parameters, validation callbacks, elaboration callbacks, and composition callbacks in a restricted local `tclsh` interpreter without Quartus.
+- Show external interfaces with their directions, properties, physical ports, widths, and exported internal endpoints.
+- Show composed internal IP instances and connections, including conditional topology selected by the current parameter values.
+- Add an **IP definition** panel for editing enabled parameters and immediately re-elaborating the graph.
+- Preserve workspace-only `source` support while keeping process execution and unsafe filesystem operations blocked.
+
 ## 1.0.13
 
 - Favor straight interface routes in Classic view and distribute fixed input/output ports evenly in natural numeric order.
