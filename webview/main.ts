@@ -1,7 +1,7 @@
 // Copyright 2026 Yaroslav Mariukha
 // SPDX-License-Identifier: MIT
 
-import { connectionKinds, type ConnectionKind, type QsysAdaptation, type QsysConnection, type QsysDiagnostic, type QsysGraph, type QsysInterface, type QsysModule } from '../parser/graph';
+import { connectionKinds, type ConnectionKind, type QsysAdaptation, type QsysComponentInterface, type QsysComponentParameter, type QsysConnection, type QsysDiagnostic, type QsysGraph, type QsysInterface, type QsysModule } from '../parser/graph';
 import { streamParameters } from '../parser/streamMetadata';
 import { createInterfaceWaveform } from '../parser/waveform';
 import { groupParameters } from './parameterGroups';
@@ -97,6 +97,7 @@ let layoutAnchorConnections: QsysConnection[] = [];
 let renderVersion = 0;
 let transform: CanvasTransform = { x: 20, y: 20, scale: 1 };
 let didInitialFit = false;
+let componentPanelOpen = false;
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Qsys View root element is missing.');
@@ -122,6 +123,7 @@ app.innerHTML = `
       <label class="option"><input id="show-disabled" type="checkbox"> Disabled IP</label>
       <div id="expanded-subsystems" class="expanded-subsystems hidden"></div>
       <input id="search" class="search" type="search" placeholder="Find IP…" aria-label="Find IP">
+      <button id="component-toggle" class="hidden" title="Show component parameters and external interfaces">IP definition</button>
       <button id="diagnostics-toggle" class="diagnostics-toggle hidden" title="Show Tcl parse problems"></button>
       <button id="quartus-metadata" title="Read exact interface metadata with qsys-script">Read interfaces…</button>
       <button id="open-platform-designer" title="Open this design in Intel Platform Designer">Open in Platform Designer</button>
@@ -165,6 +167,7 @@ const subsystemPath = required<HTMLElement>('subsystem-path');
 const diagnosticsToggle = required<HTMLButtonElement>('diagnostics-toggle');
 const diagnosticsPanel = required<HTMLElement>('diagnostics');
 const diagnosticsList = required<HTMLElement>('diagnostics-list');
+const componentToggle = required<HTMLButtonElement>('component-toggle');
 
 const filterCheckboxes = new Map<ConnectionKind, { checkbox: HTMLInputElement; label: HTMLLabelElement }>();
 for (const kind of filterKinds) {
@@ -222,6 +225,10 @@ required<HTMLButtonElement>('fit').addEventListener('click', fitView);
 required<HTMLButtonElement>('subsystem-back').addEventListener('click', leaveSubsystem);
 diagnosticsToggle.addEventListener('click', () => diagnosticsPanel.classList.toggle('hidden'));
 required<HTMLButtonElement>('diagnostics-close').addEventListener('click', () => diagnosticsPanel.classList.add('hidden'));
+componentToggle.addEventListener('click', () => {
+  componentPanelOpen = true;
+  showComponentDetails();
+});
 const reloadSource = required<HTMLButtonElement>('reload-source');
 reloadSource.addEventListener('click', () => {
   reloadSource.disabled = true;
@@ -280,6 +287,7 @@ window.addEventListener('message', (event: MessageEvent) => {
     sourceGraph = message.graph;
     graph = composeHierarchy(sourceGraph, expandedSubsystems);
     if (firstGraph) didInitialFit = false;
+    if (firstGraph && sourceGraph.component) componentPanelOpen = true;
     required<HTMLElement>('system-name').textContent = sourceGraph.name;
     updateAnalysisControls();
     updateDiagnostics(graph.diagnostics ?? []);
@@ -379,6 +387,7 @@ async function render(): Promise<void> {
   const selectedHubKinds = enabledKinds.filter((kind) => isHubKind(kind, state.viewMode));
   const hubs = createInterfaceHubs(renderedGraph, selectedHubKinds, allowedIds);
   const connectedIds = connectedModuleIds(connections, hubs);
+  for (const item of supportedExports) connectedIds.add(item.moduleId);
   const modules = state.showDisconnected
     ? allowedModules
     : allowedModules.filter((module) => connectedIds.has(module.id));
@@ -428,6 +437,7 @@ async function render(): Promise<void> {
       }
     }
     updateSearch();
+    if (componentPanelOpen && sourceGraph?.component) showComponentDetails();
   } catch (error) {
     showStatus(`Layout failed: ${error instanceof Error ? error.message : String(error)}`, true);
   }
@@ -789,7 +799,208 @@ function createMarkers(): void {
   }
 }
 
+function showComponentDetails(): void {
+  const component = sourceGraph?.component;
+  if (!component) return;
+  details.replaceChildren();
+  const heading = document.createElement('h2');
+  heading.textContent = sourceGraph?.name ?? component.kind ?? 'IP definition';
+  const type = document.createElement('div');
+  type.className = 'details-type';
+  type.textContent = [component.kind, component.version ? `v${component.version}` : undefined]
+    .filter(Boolean).join(' · ');
+  const note = document.createElement('p');
+  note.className = 'details-note';
+  note.textContent = component.exact
+    ? 'Parameters and callbacks are evaluated locally with the safe Tcl interpreter; Quartus is not required.'
+    : 'Static preview only. Trust the workspace and configure tclsh to evaluate callbacks.';
+  details.append(detailsCloseButton(), heading, type, note);
+
+  const title = document.createElement('h3');
+  title.textContent = `Parameters (${component.parameters.length})`;
+  details.append(title);
+  const visibleParameters = component.parameters.filter((parameter) => parameter.visible);
+  const controls = new Map<string, HTMLInputElement | HTMLSelectElement>();
+  const groups = new Map<string, QsysComponentParameter[]>();
+  for (const parameter of visibleParameters) {
+    const group = parameter.group ?? '';
+    groups.set(group, [...(groups.get(group) ?? []), parameter]);
+  }
+  for (const [group, parameters] of groups) {
+    if (group) {
+      const groupTitle = document.createElement('h4');
+      groupTitle.textContent = group;
+      details.append(groupTitle);
+    }
+    for (const parameter of parameters) {
+      const field = componentParameterField(parameter);
+      controls.set(parameter.name, field.control);
+      details.append(field.element);
+    }
+  }
+  if (visibleParameters.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'details-note';
+    empty.textContent = 'This component does not expose visible parameters.';
+    details.append(empty);
+  }
+
+  const actions = document.createElement('div');
+  actions.className = 'details-actions component-actions';
+  const apply = document.createElement('button');
+  apply.textContent = 'Apply & re-elaborate';
+  apply.disabled = !component.exact;
+  apply.addEventListener('click', () => {
+    const invalid = [...controls.values()].find((control) => !control.checkValidity());
+    if (invalid) {
+      invalid.reportValidity();
+      return;
+    }
+    const values = Object.fromEntries(component.parameters.map((parameter) => [
+      parameter.name,
+      controls.get(parameter.name)?.value ?? parameter.value,
+    ]));
+    apply.disabled = true;
+    apply.textContent = 'Elaborating…';
+    delete stableLayoutCaches.pipeline;
+    delete stableLayoutCaches.complete;
+    didInitialFit = false;
+    showStatus('Evaluating component callbacks with the selected parameters…');
+    vscode.postMessage({
+      type: 'setComponentParameters',
+      resource: activeResource,
+      parameters: values,
+    });
+  });
+  const reset = document.createElement('button');
+  reset.textContent = 'Defaults';
+  reset.disabled = !component.exact;
+  reset.addEventListener('click', () => {
+    for (const parameter of component.parameters) {
+      const control = controls.get(parameter.name);
+      if (control) control.value = parameter.defaultValue;
+    }
+  });
+  actions.append(apply, reset);
+  details.append(actions);
+
+  const interfacesTitle = document.createElement('h3');
+  interfacesTitle.textContent = `External interfaces (${component.externalInterfaces.length})`;
+  details.append(interfacesTitle);
+  for (const iface of component.externalInterfaces) details.append(componentInterfaceDetails(iface));
+  if (component.externalInterfaces.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'details-note';
+    empty.textContent = 'No external interfaces were created for this parameter set.';
+    details.append(empty);
+  }
+  details.classList.remove('hidden');
+}
+
+function componentParameterField(parameter: QsysComponentParameter): {
+  element: HTMLElement;
+  control: HTMLInputElement | HTMLSelectElement;
+} {
+  const field = document.createElement('label');
+  field.className = `component-parameter${parameter.valid ? '' : ' invalid'}`;
+  const label = document.createElement('span');
+  label.className = 'component-parameter-label';
+  label.textContent = parameter.displayName ?? parameter.name;
+  const name = document.createElement('code');
+  name.textContent = parameter.name;
+
+  let control: HTMLInputElement | HTMLSelectElement;
+  if (parameter.allowedValues && parameter.allowedValues.length > 0) {
+    const select = document.createElement('select');
+    for (const value of parameter.allowedValues) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = value;
+      select.append(option);
+    }
+    if (!parameter.allowedValues.includes(parameter.value)) {
+      const option = document.createElement('option');
+      option.value = parameter.value;
+      option.textContent = parameter.value;
+      select.append(option);
+    }
+    select.value = parameter.value;
+    control = select;
+  } else if (parameter.displayHint?.toLowerCase() === 'boolean' || parameter.type.toLowerCase() === 'boolean') {
+    const select = document.createElement('select');
+    const numeric = ['0', '1'].includes(parameter.value) || ['0', '1'].includes(parameter.defaultValue);
+    const choices: Array<[string, string]> = numeric
+      ? [['0', 'False'], ['1', 'True']]
+      : [['false', 'False'], ['true', 'True']];
+    for (const [value, text] of choices) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = text;
+      select.append(option);
+    }
+    select.value = parameter.value;
+    control = select;
+  } else {
+    const input = document.createElement('input');
+    input.value = parameter.value;
+    if (/^(?:integer|int|long|double|float|number)$/i.test(parameter.type)) {
+      input.type = 'number';
+      input.step = /^(?:integer|int|long)$/i.test(parameter.type) ? '1' : 'any';
+      const range = parameter.range?.split(':');
+      if (range?.length === 2) {
+        input.min = range[0] ?? '';
+        input.max = range[1] ?? '';
+      }
+    } else {
+      input.type = 'text';
+    }
+    control = input;
+  }
+  control.disabled = !parameter.enabled || parameter.derived;
+  control.title = parameter.description ?? parameter.name;
+  field.append(label, name, control);
+  if (parameter.description) {
+    const description = document.createElement('small');
+    description.textContent = parameter.description;
+    field.append(description);
+  }
+  return { element: field, control };
+}
+
+function componentInterfaceDetails(iface: QsysComponentInterface): HTMLElement {
+  const section = document.createElement('section');
+  section.className = `component-interface kind-${iface.kind}`;
+  const heading = document.createElement('h4');
+  heading.textContent = iface.name;
+  const kind = document.createElement('div');
+  kind.className = 'interface-kind';
+  kind.textContent = `${iface.rawKind} · ${iface.direction || 'unspecified direction'}`;
+  section.append(heading, kind);
+  if (iface.exportOf) {
+    const exported = document.createElement('p');
+    exported.className = 'details-note';
+    exported.textContent = `Exports ${iface.exportOf}`;
+    section.append(exported);
+  }
+  if (Object.keys(iface.parameters).length > 0) {
+    const properties = document.createElement('dl');
+    for (const [name, value] of Object.entries(iface.parameters)) appendDefinition(properties, name, value);
+    section.append(properties);
+  }
+  if (iface.ports.length > 0) {
+    const portTitle = document.createElement('h4');
+    portTitle.textContent = 'Ports';
+    const ports = document.createElement('dl');
+    for (const port of iface.ports) {
+      appendDefinition(ports, port.role || port.name, `${port.width} bit · ${port.direction} · ${port.name}`);
+    }
+    section.append(portTitle, ports);
+  }
+  return section;
+}
+
 function showModuleDetails(module: QsysModule): void {
+  componentPanelOpen = false;
   details.replaceChildren();
   const close = detailsCloseButton();
   const heading = document.createElement('h2');
@@ -827,6 +1038,7 @@ function showModuleDetails(module: QsysModule): void {
 
 function showConnectionDetails(connection: QsysConnection): void {
   if (!graph) return;
+  componentPanelOpen = false;
   const source = graph.modules.find((module) => module.id === connection.source);
   const target = graph.modules.find((module) => module.id === connection.target);
   details.replaceChildren();
@@ -903,7 +1115,10 @@ function detailsCloseButton(): HTMLButtonElement {
   close.className = 'details-close';
   close.textContent = '×';
   close.title = 'Close';
-  close.addEventListener('click', () => details.classList.add('hidden'));
+  close.addEventListener('click', () => {
+    componentPanelOpen = false;
+    details.classList.add('hidden');
+  });
   return close;
 }
 
@@ -1270,9 +1485,12 @@ function updateSubsystemNavigation(): void {
 }
 
 function updateAnalysisControls(): void {
-  const exact = sourceGraph?.metadata.source === 'quartus'
-    && [...expandedSubsystems.values()].every((child) => child.metadata.source === 'quartus');
-  quartusMetadata.classList.toggle('hidden', Boolean(exact));
+  const exact = Boolean(sourceGraph) && sourceGraph!.metadata.source !== 'qsys-only'
+    && [...expandedSubsystems.values()].every((child) => child.metadata.source !== 'qsys-only');
+  const isComponent = Boolean(sourceGraph?.component);
+  componentToggle.classList.toggle('hidden', !sourceGraph?.component);
+  quartusMetadata.classList.toggle('hidden', Boolean(exact || isComponent));
+  openPlatformDesigner.classList.toggle('hidden', isComponent);
   inferClockResetOption.classList.toggle('hidden', Boolean(exact));
   quartusMetadata.disabled = false;
   quartusMetadata.textContent = 'Read interfaces…';
@@ -1282,10 +1500,11 @@ function updateAnalysisControls(): void {
 
 function updateViewAvailability(): void {
   const available = canUsePipelineView([
-    { resource: activeResource, exactMetadata: sourceGraph?.metadata.source === 'quartus' },
+    { resource: activeResource, exactMetadata: Boolean(sourceGraph) && sourceGraph!.metadata.source !== 'qsys-only' },
     ...[...expandedSubsystemResources].map(([instanceId, resource]) => ({
       resource,
-      exactMetadata: expandedSubsystems.get(instanceId)?.metadata.source === 'quartus',
+      exactMetadata: Boolean(expandedSubsystems.get(instanceId))
+        && expandedSubsystems.get(instanceId)!.metadata.source !== 'qsys-only',
     })),
   ]);
   const unavailable = !available;

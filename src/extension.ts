@@ -8,12 +8,13 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { QsysGraph } from '../parser/graph';
+import { parseEvaluatedHwTcl, parseHwTclStatic } from '../parser/hwTclParser';
 import { applyQuartusMetadata } from '../parser/quartusMetadataParser';
 import { parseQsys } from '../parser/qsysParser';
 import { parseEvaluatedQsysTcl } from '../parser/qsysTclEvaluation';
 import { parseQsysTcl } from '../parser/qsysTclParser';
 import { platformDesignerArguments, platformDesignerTemporaryPrefix, qsysAnalysisTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclInspectionWrapper, qsysTclScriptArguments, siblingQsysSearchPattern, type TclVariableValue } from './qsysScript';
-import { traceQsysTcl } from './staticTcl';
+import { traceHwTcl, traceQsysTcl } from './staticTcl';
 import { subsystemCandidatePaths, tclSubsystemBuildOrder } from './subsystems';
 
 const lastViewStateKey = 'qsysView.lastViewState';
@@ -42,6 +43,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
 
     const key = document.uri.toString();
     const loadedResources = new Set([key]);
+    const componentParameters = new Map<string, Record<string, TclVariableValue>>();
     const documentPanels = this.panels.get(key) ?? new Set<vscode.WebviewPanel>();
     documentPanels.add(panel);
     this.panels.set(key, documentPanels);
@@ -51,7 +53,13 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     });
 
     const sendGraph = (loadQuartus = false, includeViewState = false) =>
-      this.sendGraph(document.uri, panel.webview, loadQuartus, includeViewState);
+      this.sendGraph(
+        document.uri,
+        panel.webview,
+        loadQuartus,
+        includeViewState,
+        componentParameters.get(document.uri.toString()),
+      );
     panel.webview.onDidReceiveMessage(async (message: {
       type?: string;
       state?: unknown;
@@ -59,6 +67,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       resource?: string;
       instanceId?: string;
       analyze?: boolean;
+      parameters?: Record<string, unknown>;
     }) => {
       if (message.type === 'ready') {
         await sendGraph(false, true);
@@ -73,13 +82,25 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
           .sort((left, right) => Number(left === requestedKey) - Number(right === requestedKey));
         try {
           for (const resource of resources) {
-            await this.sendGraph(subsystemUri(resource), panel.webview);
+            const resourceUri = subsystemUri(resource);
+            await this.sendGraph(
+              resourceUri,
+              panel.webview,
+              false,
+              false,
+              componentParameters.get(resourceUri.toString()),
+            );
           }
         } finally {
           await panel.webview.postMessage({ type: 'reloadFinished' });
         }
       } else if (message.type === 'loadQuartusMetadata') {
         await this.confirmAndLoadQuartus(message.resource ? subsystemUri(message.resource) : document.uri, panel.webview);
+      } else if (message.type === 'setComponentParameters') {
+        const requestedResource = message.resource ? subsystemUri(message.resource) : document.uri;
+        const parameters = validatedTclValues(message.parameters ?? {}, 'component parameter');
+        componentParameters.set(requestedResource.toString(), parameters);
+        await this.sendGraph(requestedResource, panel.webview, false, false, parameters);
       } else if (message.type === 'openPlatformDesigner') {
         await this.openPlatformDesigner(message.resource ? subsystemUri(message.resource) : document.uri);
         await panel.webview.postMessage({ type: 'platformDesignerFinished' });
@@ -97,7 +118,13 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
 
     const watcher = vscode.workspace.onDidChangeTextDocument((event) => {
       if (loadedResources.has(event.document.uri.toString())) {
-        void this.sendGraph(event.document.uri, panel.webview);
+        void this.sendGraph(
+          event.document.uri,
+          panel.webview,
+          false,
+          false,
+          componentParameters.get(event.document.uri.toString()),
+        );
       }
     });
     panel.onDidDispose(() => watcher.dispose());
@@ -158,9 +185,10 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     webview: vscode.Webview,
     loadQuartus = false,
     includeViewState = false,
+    componentParameters: Record<string, TclVariableValue> = {},
   ): Promise<void> {
     try {
-      const source = await this.readGraph(uri);
+      const source = await this.readGraph(uri, componentParameters);
       const { bytes, fileName } = source;
       let { graph } = source;
       if (loadQuartus) {
@@ -195,7 +223,10 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     }
   }
 
-  private async readGraph(uri: vscode.Uri): Promise<{ bytes: Uint8Array; fileName: string; graph: QsysGraph }> {
+  private async readGraph(
+    uri: vscode.Uri,
+    componentParameters: Record<string, TclVariableValue> = {},
+  ): Promise<{ bytes: Uint8Array; fileName: string; graph: QsysGraph }> {
     const openDocument = vscode.workspace.textDocuments.find(
       (document) => document.uri.toString() === uri.toString(),
     );
@@ -204,14 +235,48 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       : await vscode.workspace.fs.readFile(uri);
     const fileName = uri.path.split('/').pop()?.replace(/\.(?:qsys|tcl)$/i, '') || 'Qsys system';
     const source = bytes.toString('utf8');
-    const parsed = isQsysTcl(uri)
-      ? await this.parseTclGraph(uri, source, fileName)
+    const parsed = isHwTcl(uri)
+      ? await this.parseHwTclGraph(uri, source, fileName, componentParameters)
+      : isQsysTcl(uri)
+        ? await this.parseTclGraph(uri, source, fileName)
       : parseQsys(source, fileName);
     const modules = await Promise.all(parsed.modules.map(async (module) => {
       const subsystem = await this.findSubsystem(uri, module.type);
       return subsystem ? { ...module, subsystem } : module;
     }));
     return { bytes, fileName, graph: { ...parsed, modules } };
+  }
+
+  private async parseHwTclGraph(
+    uri: vscode.Uri,
+    source: string,
+    fallbackName: string,
+    parameters: Record<string, TclVariableValue>,
+  ): Promise<QsysGraph> {
+    const lexical = parseHwTclStatic(source, fallbackName);
+    if (!vscode.workspace.isTrusted || uri.scheme !== 'file') return lexical;
+    const configuration = vscode.workspace.getConfiguration('qsysView', uri);
+    const executable = configuration.get<string>('tclshPath', '').trim()
+      || (process.platform === 'win32' ? 'tclsh.exe' : 'tclsh');
+    const workspaceRoot = vscode.workspace.getWorkspaceFolder(uri)?.uri.fsPath ?? path.dirname(uri.fsPath);
+    const controller = path.join(this.context.extensionUri.fsPath, 'quartus', 'trace-component.tcl');
+    try {
+      const trace = await traceHwTcl({
+        executable,
+        controllerPath: controller,
+        sourcePath: uri.fsPath,
+        allowedRoot: workspaceRoot,
+        source,
+        parameters,
+      });
+      return parseEvaluatedHwTcl(trace, fallbackName);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        ...lexical,
+        warnings: [...lexical.warnings, `Safe component elaboration unavailable: ${message}`],
+      };
+    }
   }
 
   private async parseTclGraph(uri: vscode.Uri, source: string, fallbackName: string): Promise<QsysGraph> {
@@ -305,7 +370,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     await vscode.commands.executeCommand(
       'vscode.openWith',
       uri,
-      isQsysTcl(uri) ? 'qsysView.tclGraph' : 'qsysView.graph',
+      graphViewType(uri),
     );
   }
 
@@ -771,8 +836,34 @@ function randomNonce(): string {
   return Array.from({ length: 32 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
 }
 
+function validatedTclValues(
+  values: Record<string, unknown>,
+  label: string,
+): Record<string, TclVariableValue> {
+  const result: Record<string, TclVariableValue> = {};
+  for (const [name, value] of Object.entries(values)) {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+      throw new Error(`Invalid ${label} name “${name}”.`);
+    }
+    if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+      throw new Error(`Qsys View ${label} “${name}” must be a string, number, or boolean.`);
+    }
+    result[name] = value;
+  }
+  return result;
+}
+
+function isHwTcl(uri: vscode.Uri): boolean {
+  return uri.path.toLowerCase().endsWith('_hw.tcl');
+}
+
 function isQsysTcl(uri: vscode.Uri): boolean {
   return uri.path.toLowerCase().endsWith('.tcl');
+}
+
+function graphViewType(uri: vscode.Uri): string {
+  if (isHwTcl(uri)) return 'qsysView.hwTclGraph';
+  return isQsysTcl(uri) ? 'qsysView.tclGraph' : 'qsysView.graph';
 }
 
 function subsystemUri(resource: string): vscode.Uri {
@@ -793,6 +884,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.registerCustomEditorProvider('qsysView.tclGraph', provider, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
+    vscode.window.registerCustomEditorProvider('qsysView.hwTclGraph', provider, {
+      webviewOptions: { retainContextWhenHidden: true },
+    }),
     vscode.commands.registerCommand('qsysView.openGraph', async (uri?: vscode.Uri) => {
       const target = uri ?? vscode.window.activeTextEditor?.document.uri;
       const extension = target?.path.toLowerCase();
@@ -803,7 +897,7 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.commands.executeCommand(
         'vscode.openWith',
         target,
-        extension.endsWith('.tcl') ? 'qsysView.tclGraph' : 'qsysView.graph',
+        graphViewType(target),
       );
     }),
   );

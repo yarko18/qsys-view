@@ -33,7 +33,16 @@ proc qv_source {slave allowed_root current requested} {
     if {![qv_is_within $resolved $allowed_root]} {
         error "source outside the workspace is not allowed: $resolved"
     }
-    return [interp invokehidden $slave source $resolved]
+    set channel [open $resolved r]
+    set script [read $channel]
+    close $channel
+    set previous [interp eval $slave {set ::qv_active_path}]
+    interp eval $slave [list set ::qv_active_path $resolved]
+    try {
+        return [interp eval $slave [list uplevel #0 $script]]
+    } finally {
+        interp eval $slave [list set ::qv_active_path $previous]
+    }
 }
 
 proc qv_package {subcommand args} {
@@ -52,14 +61,14 @@ interp eval $qv_slave {
     rename info qv_info_core
     proc info {subcommand args} {
         if {$subcommand eq "script" && [qv_info_core script] eq ""} {
-            return $::qv_entry_path
+            return $::qv_active_path
         }
         return [uplevel 1 [list qv_info_core $subcommand {*}$args]]
     }
     proc source {requested} {
         set current [qv_info_core script]
         if {$current eq ""} {
-            set current $::qv_entry_path
+            set current $::qv_active_path
         }
         return [qv_source $current $requested]
     }
@@ -71,6 +80,7 @@ interp eval $qv_slave {
     }
 }
 interp eval $qv_slave [list set ::qv_entry_path $qv_source_path]
+interp eval $qv_slave [list set ::qv_active_path $qv_source_path]
 foreach {name value} $qv_variable_args {
     interp eval $qv_slave [list set $name $value]
 }

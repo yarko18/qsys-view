@@ -363,6 +363,31 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .details-type { color: var(--vscode-descriptionForeground); }
 .details-actions { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0; }
 .details-note, .waveform-note { margin: 10px 0; color: var(--vscode-descriptionForeground); font-size: 11px; line-height: 1.45; }
+.component-parameter {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(120px, 1fr);
+  gap: 3px 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+.component-parameter.invalid { border-left: 3px solid var(--vscode-editorError-foreground); padding-left: 7px; }
+.component-parameter-label { align-self: center; font-size: 11px; font-weight: 600; }
+.component-parameter code { grid-column: 1; color: var(--vscode-descriptionForeground); font-size: 9px; overflow-wrap: anywhere; }
+.component-parameter input, .component-parameter select {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid var(--vscode-input-border, transparent);
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+}
+.component-parameter input:focus, .component-parameter select:focus { outline: 1px solid var(--vscode-focusBorder); }
+.component-parameter input:disabled, .component-parameter select:disabled { opacity: .65; }
+.component-parameter small { grid-column: 1 / -1; color: var(--vscode-descriptionForeground); font-size: 10px; line-height: 1.35; }
+.component-actions { position: sticky; bottom: -16px; z-index: 1; margin: 12px -16px 0; padding: 10px 16px; border-top: 1px solid var(--vscode-panel-border); background: var(--vscode-editorWidget-background); }
+.component-interface { --edge-color: var(--vscode-focusBorder); margin: 8px 0; padding: 1px 10px 10px; border-left: 4px solid var(--edge-color); background: color-mix(in srgb, var(--edge-color) 8%, transparent); }
+.component-interface h4:first-child { margin-top: 9px; color: var(--vscode-foreground); font-size: 12px; }
 .interface-kind { margin: -4px 0 7px; color: var(--vscode-descriptionForeground); font-size: 10px; }
 .metadata-unavailable { padding: 9px; border-left: 3px solid var(--vscode-charts-yellow); background: var(--vscode-textBlockQuote-background); color: var(--vscode-descriptionForeground); font-size: 11px; }
 .adaptation-details { border-left: 3px solid #e5484d; padding-left: 10px; }

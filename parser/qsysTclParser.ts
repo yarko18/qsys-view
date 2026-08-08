@@ -146,7 +146,9 @@ export function parseQsysTcl(script: string, fallbackName = 'Qsys system'): Qsys
     }
     if (command.name === 'add_instance') {
       const [name, type] = command.words;
-      if (!name || !type || hasSubstitution(command.words)) {
+      // A dynamic version (for example $wipVersion) does not prevent the
+      // static viewer from identifying the instance itself.
+      if (!name || !type || hasSubstitution([name, type])) {
         report(`Skipped dynamic or incomplete add_instance at line ${command.line}.`, command.line);
         continue;
       }
