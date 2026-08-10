@@ -147,6 +147,12 @@ describe('parseQsysTcl', () => {
     }));
   });
 
+  it('keeps an instance whose version is supplied through a Tcl variable', () => {
+    const graph = parseQsysTcl('add_instance core core_ip $componentVersion');
+
+    expect(graph.modules).toContainEqual(expect.objectContaining({ id: 'core', type: 'core_ip' }));
+  });
+
   it('reports misspelled Platform Designer commands as line diagnostics', () => {
     const graph = parseQsysTcl(`
       add_instance fir fir_type 1.0

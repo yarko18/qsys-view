@@ -16,6 +16,10 @@ interface StaticTclTraceOptions {
   timeoutMs?: number;
 }
 
+export interface HwTclTraceOptions extends Omit<StaticTclTraceOptions, 'variables'> {
+  parameters?: Record<string, TclVariableValue>;
+}
+
 export function extractStaticTclTrace(output: string): string {
   return output.split(/\r?\n/)
     .filter((line) => line.startsWith(tracePrefix))
@@ -86,5 +90,22 @@ export function traceQsysTcl({
       child.kill('SIGTERM');
     }, timeoutMs);
     child.stdin.end(source);
+  });
+}
+
+/**
+ * Evaluates a Platform Designer component in the restricted Tcl interpreter.
+ * The component controller treats argument pairs as parameter overrides and
+ * invokes validation plus composition/elaboration callbacks without Quartus.
+ */
+export function traceHwTcl({
+  parameters = {},
+  timeoutMs = 5_000,
+  ...options
+}: HwTclTraceOptions): Promise<string> {
+  return traceQsysTcl({
+    ...options,
+    variables: parameters,
+    timeoutMs,
   });
 }

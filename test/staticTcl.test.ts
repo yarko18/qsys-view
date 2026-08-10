@@ -4,8 +4,9 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { parseEvaluatedHwTcl } from '../parser/hwTclParser';
 import { parseQsysTcl } from '../parser/qsysTclParser';
-import { extractStaticTclTrace, traceQsysTcl } from '../src/staticTcl';
+import { extractStaticTclTrace, traceHwTcl, traceQsysTcl } from '../src/staticTcl';
 
 const tclsh = process.platform === 'win32' ? 'tclsh.exe' : 'tclsh';
 const tclshAvailable = !spawnSync(tclsh, [], { input: 'exit 0\n' }).error;
@@ -54,5 +55,50 @@ describe.skipIf(!tclshAvailable)('traceQsysTcl', () => {
     });
     expect(graph.connections).toHaveLength(1);
     expect(graph.connections[0]).toMatchObject({ source: 'cvi', target: 'wtc_sink' });
+  });
+
+  it('elaborates a hardware component again with parameter overrides', async () => {
+    const controllerPath = fileURLToPath(new URL('../quartus/trace-component.tcl', import.meta.url));
+    const sourcePath = fileURLToPath(new URL('./dynamic_component_hw.tcl', import.meta.url));
+    const options = {
+      executable: tclsh,
+      controllerPath,
+      sourcePath,
+      allowedRoot: fileURLToPath(new URL('..', import.meta.url)),
+      source: `
+        package require -exact qsys 16.1
+        set_module_property NAME dynamic_component
+        set_module_property DISPLAY_NAME "Dynamic component"
+        set_module_property COMPOSITION_CALLBACK compose
+        add_parameter MODE STRING DIRECT
+        set_parameter_property MODE ALLOWED_RANGES {DIRECT BYPASS}
+        proc compose {} {
+          set mode [get_parameter_value MODE]
+          add_instance source source_ip 1.0
+          add_instance sink sink_ip 1.0
+          if {$mode eq "BYPASS"} {
+            add_instance bypass bypass_ip 1.0
+            add_connection source.out bypass.in avalon_streaming
+            add_connection bypass.out sink.in avalon_streaming
+          } else {
+            add_connection source.out sink.in avalon_streaming
+          }
+          add_interface din avalon_streaming sink
+          set_interface_property din EXPORT_OF source.in
+        }
+      `,
+    };
+    const direct = parseEvaluatedHwTcl(await traceHwTcl(options), 'fallback');
+    const bypass = parseEvaluatedHwTcl(await traceHwTcl({ ...options, parameters: { MODE: 'BYPASS' } }), 'fallback');
+
+    expect(direct.modules.map((module) => module.id)).toEqual(['source', 'sink']);
+    expect(bypass.modules.map((module) => module.id)).toEqual(['source', 'sink', 'bypass']);
+    expect(bypass.connections).toHaveLength(2);
+    expect(bypass.component?.parameters[0]?.value).toBe('BYPASS');
+    expect(bypass.component?.externalInterfaces[0]).toMatchObject({
+      name: 'din',
+      exportOf: 'source.in',
+    });
+    expect(bypass.metadata.source).toBe('tcl');
   });
 });

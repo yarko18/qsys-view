@@ -33,7 +33,7 @@ export interface QsysInterface {
   kind: string;
   parameters: Record<string, string>;
   ports: QsysInterfacePort[];
-  source: 'quartus';
+  source: 'quartus' | 'tcl';
 }
 
 export interface QsysExportedInterfaceMetadata {
@@ -43,7 +43,7 @@ export interface QsysExportedInterfaceMetadata {
 }
 
 export interface QsysMetadataStatus {
-  source: 'quartus' | 'qsys-only';
+  source: 'quartus' | 'tcl' | 'qsys-only';
   label: string;
   path?: string;
 }
@@ -60,6 +60,42 @@ export interface QsysDiagnostic {
 export interface QsysParameterMetadata {
   group?: string;
   order: number;
+}
+
+export interface QsysComponentParameter {
+  name: string;
+  type: string;
+  value: string;
+  defaultValue: string;
+  enabled: boolean;
+  visible: boolean;
+  derived: boolean;
+  valid: boolean;
+  displayName?: string;
+  description?: string;
+  group?: string;
+  displayHint?: string;
+  allowedValues?: string[];
+  range?: string;
+}
+
+export interface QsysComponentInterface {
+  name: string;
+  kind: ConnectionKind;
+  rawKind: string;
+  direction: string;
+  parameters: Record<string, string>;
+  ports: QsysInterfacePort[];
+  exportOf?: string;
+}
+
+export interface QsysComponentMetadata {
+  source: 'hw-tcl';
+  exact: boolean;
+  kind?: string;
+  version?: string;
+  parameters: QsysComponentParameter[];
+  externalInterfaces: QsysComponentInterface[];
 }
 
 export interface QsysModule {
@@ -114,6 +150,8 @@ export interface QsysGraph {
   diagnostics?: QsysDiagnostic[];
   exportedInterfaces?: Record<string, string>;
   exportedInterfaceMetadata?: Record<string, QsysExportedInterfaceMetadata>;
+  /** Present when the graph was opened from a Platform Designer *_hw.tcl component. */
+  component?: QsysComponentMetadata;
   /** Maps equivalent clock/reset source endpoints across expanded subsystem boundaries. */
   domainAliases?: Record<string, string>;
 }
