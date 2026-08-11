@@ -180,6 +180,19 @@ describe('parseQsysTcl', () => {
     }));
   });
 
+  it('accepts address assignment and system validation commands', () => {
+    const graph = parseQsysTcl(`
+      create_system platform
+      add_instance source source_type 1.0
+      auto_assign_system_base_addresses
+      validate_system
+    `);
+
+    expect(graph.modules).toHaveLength(1);
+    expect(graph.diagnostics).toEqual([]);
+    expect(graph.warnings).toEqual([]);
+  });
+
   it('points missing-instance parameter warnings to the first parameter line', () => {
     const graph = parseQsysTcl([
       'add_instance clipper alt_vip_cl_clp 23.1',

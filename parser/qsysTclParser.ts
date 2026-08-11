@@ -27,10 +27,12 @@ interface PendingInstanceParameters {
 
 const ignoredCommands = new Set([
   'package',
+  'auto_assign_system_base_addresses',
   'set_project_property',
   'set_interconnect_requirement',
   'save_system',
   'sync_sysinfo_parameters',
+  'validate_system',
 ]);
 
 const platformDesignerCommand = /^(?:add|create|delete|disable|enable|get|load|remove|save|set|sync)_/;
