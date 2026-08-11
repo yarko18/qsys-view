@@ -20,7 +20,6 @@ export interface InputJunction {
   branches: InputJunctionBranch[];
 }
 
-const preferredTrunkLength = 36;
 const coordinateTolerance = 1;
 
 interface ResolvedEdge {
@@ -59,13 +58,11 @@ export function createInputJunctions(edges: readonly LayoutEdge[]): InputJunctio
       continue;
     }
 
-    // The junction must lie on every final horizontal segment so none of the
-    // safe ELK route before it has to be replaced.
-    const latestSegmentStart = Math.max(...members.map(({ previous }) => previous.x));
-    const point = {
-      x: Math.max(target.x - preferredTrunkLength, latestSegmentStart),
-      y: target.y,
-    };
+    // ELK often gives connections to the same port a shared suffix. Put the
+    // dot where that suffix actually begins; otherwise the lines appear to
+    // merge well before a decorative dot placed close to the target block.
+    const point = commonSuffixStart(members.map(({ path }) => path));
+    const trunkPath = suffixFromPoint(members[0]!.path, point);
     const first = group[0]!;
     junctions.push({
       key,
@@ -73,10 +70,10 @@ export function createInputJunctions(edges: readonly LayoutEdge[]): InputJunctio
       target: first.target,
       targetPort: first.targetPort,
       point,
-      trunkPath: [point, target],
+      trunkPath,
       branches: members.map(({ edge, path }) => ({
         edgeId: edge.id,
-        paths: [replaceTarget(path, point)],
+        paths: [prefixToPoint(path, point)],
         target,
       })),
     });
@@ -96,9 +93,87 @@ function resolveEdge(edge: LayoutEdge): ResolvedEdge | undefined {
   };
 }
 
-function replaceTarget(path: readonly LayoutPoint[], point: LayoutPoint): LayoutPoint[] {
-  const prefix = path.slice(0, -1);
-  const previous = prefix.at(-1);
-  if (previous && previous.x === point.x && previous.y === point.y) return prefix;
-  return [...prefix, point];
+function commonSuffixStart(paths: readonly LayoutPoint[][]): LayoutPoint {
+  const reversed = paths.map((path) => [...path].reverse());
+  const positions = reversed.map((path) => ({
+    path,
+    segment: 0,
+    point: { ...path[0]! },
+  }));
+  let common = { ...positions[0]!.point };
+
+  for (;;) {
+    const directions = positions.map((position) => nextDirection(position));
+    const direction = directions[0];
+    if (!direction || directions.some((candidate) =>
+      !candidate || candidate.x !== direction.x || candidate.y !== direction.y)) {
+      return common;
+    }
+    const distance = Math.min(...positions.map(distanceToNextPoint));
+    if (!Number.isFinite(distance) || distance <= coordinateTolerance) return common;
+    common = {
+      x: common.x + direction.x * distance,
+      y: common.y + direction.y * distance,
+    };
+    for (const position of positions) {
+      position.point = { ...common };
+      const next = position.path[position.segment + 1];
+      if (next && pointsEqual(position.point, next)) position.segment += 1;
+    }
+  }
+}
+
+function nextDirection(position: { path: LayoutPoint[]; segment: number; point: LayoutPoint }): LayoutPoint | undefined {
+  const next = position.path[position.segment + 1];
+  if (!next) return undefined;
+  return {
+    x: Math.sign(next.x - position.point.x),
+    y: Math.sign(next.y - position.point.y),
+  };
+}
+
+function distanceToNextPoint(position: { path: LayoutPoint[]; segment: number; point: LayoutPoint }): number {
+  const next = position.path[position.segment + 1];
+  return next ? Math.abs(next.x - position.point.x) + Math.abs(next.y - position.point.y) : Number.POSITIVE_INFINITY;
+}
+
+function prefixToPoint(path: readonly LayoutPoint[], point: LayoutPoint): LayoutPoint[] {
+  for (let index = path.length - 2; index >= 0; index -= 1) {
+    if (!pointOnSegment(point, path[index]!, path[index + 1]!)) continue;
+    return appendDistinct(path.slice(0, index + 1), point);
+  }
+  return [...path];
+}
+
+function suffixFromPoint(path: readonly LayoutPoint[], point: LayoutPoint): LayoutPoint[] {
+  for (let index = path.length - 2; index >= 0; index -= 1) {
+    if (!pointOnSegment(point, path[index]!, path[index + 1]!)) continue;
+    return appendDistinct([point], ...path.slice(index + 1));
+  }
+  return [point, path.at(-1)!];
+}
+
+function pointOnSegment(point: LayoutPoint, start: LayoutPoint, end: LayoutPoint): boolean {
+  const minX = Math.min(start.x, end.x) - coordinateTolerance;
+  const maxX = Math.max(start.x, end.x) + coordinateTolerance;
+  const minY = Math.min(start.y, end.y) - coordinateTolerance;
+  const maxY = Math.max(start.y, end.y) + coordinateTolerance;
+  const cross = (point.x - start.x) * (end.y - start.y) - (point.y - start.y) * (end.x - start.x);
+  return Math.abs(cross) <= coordinateTolerance
+    && point.x >= minX && point.x <= maxX
+    && point.y >= minY && point.y <= maxY;
+}
+
+function appendDistinct(first: LayoutPoint[], ...rest: LayoutPoint[]): LayoutPoint[] {
+  const result = [...first];
+  for (const point of rest) {
+    if (!pointsEqual(result.at(-1), point)) result.push(point);
+  }
+  return result;
+}
+
+function pointsEqual(left: LayoutPoint | undefined, right: LayoutPoint): boolean {
+  return Boolean(left
+    && Math.abs(left.x - right.x) <= coordinateTolerance
+    && Math.abs(left.y - right.y) <= coordinateTolerance);
 }

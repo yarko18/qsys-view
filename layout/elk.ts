@@ -221,7 +221,7 @@ export async function layoutGraph(
             id: elkPortId(module.id, 'input', interfaceName),
             width: 0,
             height: 0,
-            labels: externalPortLabel(module.id, 'input', interfaceName, externalPorts),
+            labels: layoutPortLabel(module.id, 'input', interfaceName, externalPorts),
             // ELK numbers west-side ports clockwise, hence the reversed index.
             layoutOptions: {
               'elk.port.side': 'WEST',
@@ -232,7 +232,7 @@ export async function layoutGraph(
             id: elkPortId(module.id, 'output', interfaceName),
             width: 0,
             height: 0,
-            labels: externalPortLabel(module.id, 'output', interfaceName, externalPorts),
+            labels: layoutPortLabel(module.id, 'output', interfaceName, externalPorts),
             layoutOptions: {
               'elk.port.side': 'EAST',
               'elk.port.index': String(index),
@@ -573,17 +573,17 @@ function interfaceNames(
   return [...new Set([...connected, ...external])].sort(naturalInterfaceOrder);
 }
 
-function externalPortLabel(
+function layoutPortLabel(
   moduleId: string,
   direction: 'input' | 'output',
   interfaceName: string,
   externalPorts: readonly LayoutExternalPort[],
 ): Array<{ id: string; text: string; width: number; height: number }> | undefined {
-  const labels = externalPorts
+  const labels = [interfaceName, ...externalPorts
     .filter((port) => port.moduleId === moduleId
       && port.direction === direction
       && port.interfaceName === interfaceName)
-    .map((port) => port.label ?? port.interfaceName)
+    .map((port) => port.label ?? port.interfaceName)]
     .sort((left, right) => exportedInterfaceLabelWidth(right) - exportedInterfaceLabelWidth(left));
   const label = labels[0];
   return label ? [{

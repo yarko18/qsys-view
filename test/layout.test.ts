@@ -134,6 +134,26 @@ describe('directed interface sides', () => {
     expect(exportedInterfaceStubLength(label)).toBeLessThan(gap);
   });
 
+  it('leaves a visible gap between long source and target labels', async () => {
+    const source = module('video');
+    const target = module('nios2');
+    const sourcePort = 'capture_mem_master_wr';
+    const targetPort = 'ram_port_3_wr';
+    const link = {
+      ...connection('write', source.id, target.id, 'avalon_memory_mapped'),
+      sourcePort,
+      targetPort,
+    };
+    const result = await layoutGraph([source, target], [link]);
+    const sourceNode = result.nodes.find((node) => node.id === source.id)!;
+    const targetNode = result.nodes.find((node) => node.id === target.id)!;
+    const gap = targetNode.x - sourceNode.x - sourceNode.width;
+
+    expect(gap).toBeGreaterThan(
+      exportedInterfaceLabelWidth(sourcePort) + exportedInterfaceLabelWidth(targetPort),
+    );
+  });
+
   it('keeps inputs west and outputs east when two IP form a feedback cycle', async () => {
     const splitter = module('splitter');
     const compute = module('plateau_he_compute');

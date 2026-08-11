@@ -10,6 +10,7 @@ SPDX-License-Identifier: MIT
 - Grow IP blocks vertically when they expose many interfaces, keeping exported port labels evenly spaced and readable.
 - Reserve horizontal layout space for long exported-interface names so labels no longer overlap neighbouring IP blocks.
 - Merge multiple outputs targeting the same input interface at a visible junction point with one shared input arrow.
+- Keep hover port labels separated and place each input junction dot at the real beginning of its shared route.
 
 ## 1.1.0
 
