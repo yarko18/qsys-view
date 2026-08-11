@@ -9,6 +9,7 @@ import { createAvalonMmBuses } from './avalonMmBus';
 import { exportedInterfaceStubLength, layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, portAnchorY, projectVisibleLayout, separateHierarchyGroups, type LayoutExternalPort, type LayoutPoint, type LayoutResult, type StableLayoutCache } from '../layout/elk';
 import { composeHierarchy, hierarchyBounds, type HierarchyBounds } from './hierarchy';
 import { connectionAddress, createInterfaceHubs, type HubKind, type InterfaceHub } from './interfaceHubs';
+import { createInputJunctions } from './inputJunctions';
 import { availableConnectionKinds, canUsePipelineView, connectedModuleIds, inferClockResetConnections, isDirectKind, isHubKind, type GraphViewMode } from './viewMode';
 import { collectExportedInterfaces, type ExportedInterface } from './exportedInterfaces';
 import './styles.css';
@@ -451,7 +452,12 @@ function draw(result: LayoutResult): void {
     return bounds ? [{ instanceId, bounds }] : [];
   });
   for (const container of hierarchyContainers) drawHierarchyBackground(container.instanceId, container.bounds);
-  const avalonMmBuses = state.viewMode === 'complete' ? createAvalonMmBuses(result.edges) : [];
+  const inputJunctions = createInputJunctions(result.edges);
+  const junctionBranches = new Map(inputJunctions.flatMap((junction) =>
+    junction.branches.map((branch) => [branch.edgeId, branch] as const)));
+  const avalonMmBuses = state.viewMode === 'complete'
+    ? createAvalonMmBuses(result.edges.filter((edge) => !junctionBranches.has(edge.id)))
+    : [];
   const busBranches = new Map(avalonMmBuses.flatMap((bus) =>
     bus.branches.map((branch) => [branch.edgeId, branch.paths] as const)));
   for (const bus of avalonMmBuses) {
@@ -467,9 +473,23 @@ function draw(result: LayoutResult): void {
     group.append(title);
     scene.append(group);
   }
+  for (const junction of inputJunctions) {
+    const group = svg('g', { class: `edge edge-${junction.kind} input-junction` });
+    group.append(svg('path', {
+      d: pathData(junction.trunkPath),
+      class: 'edge-line',
+      'marker-end': `url(#arrow-${junction.kind})`,
+    }));
+    const title = svg('title');
+    title.textContent = `${junction.branches.length} sources → ${junction.target}.${junction.targetPort}`;
+    group.append(title);
+    scene.append(group);
+  }
   for (const edge of result.edges) {
-    const displayedPaths = busBranches.get(edge.id) ?? edge.paths;
+    const junctionBranch = junctionBranches.get(edge.id);
+    const displayedPaths = junctionBranch?.paths ?? busBranches.get(edge.id) ?? edge.paths;
     const isBusBranch = busBranches.has(edge.id);
+    const isJunctionBranch = Boolean(junctionBranch);
     const group = svg('g', {
       class: `edge edge-${edge.kind}`,
       tabindex: '0',
@@ -480,14 +500,19 @@ function draw(result: LayoutResult): void {
         d: pathData(points),
         class: 'edge-hit',
       }));
-      group.append(svg('path', {
+      const lineAttributes: Record<string, string | number> = {
         d: pathData(points),
         class: 'edge-line',
-        'marker-end': `url(#arrow-${edge.kind})`,
-      }));
+      };
+      if (!isJunctionBranch) lineAttributes['marker-end'] = `url(#arrow-${edge.kind})`;
+      group.append(svg('path', lineAttributes));
       if (points.length > 0) {
         if (!isBusBranch) group.append(edgeLabel(edge.sourcePort, points[0]!, 'source-port'));
-        group.append(edgeLabel(edge.targetPort, points.at(-1)!, 'target-port'));
+        group.append(edgeLabel(
+          edge.targetPort,
+          junctionBranch?.target ?? points.at(-1)!,
+          'target-port',
+        ));
       }
     }
     if (edge.adaptations && edge.adaptations.length > 0) {
@@ -518,6 +543,14 @@ function draw(result: LayoutResult): void {
       if ((event as KeyboardEvent).key === 'Enter') openDetails(event);
     });
     scene.append(group);
+  }
+  for (const junction of inputJunctions) {
+    scene.append(svg('circle', {
+      cx: junction.point.x,
+      cy: junction.point.y,
+      r: 4.5,
+      class: `input-junction-dot edge-${junction.kind}`,
+    }));
   }
   drawSystemExports(result);
   for (const node of result.nodes) {
