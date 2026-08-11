@@ -26,7 +26,6 @@ interface ResolvedEdge {
   edge: LayoutEdge;
   path: LayoutPoint[];
   target: LayoutPoint;
-  previous: LayoutPoint;
 }
 
 /**
@@ -37,7 +36,10 @@ interface ResolvedEdge {
 export function createInputJunctions(edges: readonly LayoutEdge[]): InputJunction[] {
   const groups = new Map<string, LayoutEdge[]>();
   for (const edge of edges) {
-    const key = `${edge.kind}\0${edge.target}\0${edge.targetPort}`;
+    // The endpoint defines the electrical/logical input. Do not make
+    // junction detection depend on interface classification: before Quartus
+    // analysis the same connection may still be `other` (unknown).
+    const key = `${edge.target}\0${edge.targetPort}`;
     const group = groups.get(key) ?? [];
     group.push(edge);
     groups.set(key, group);
@@ -50,11 +52,9 @@ export function createInputJunctions(edges: readonly LayoutEdge[]): InputJunctio
     if (resolved.some((item) => !item)) continue;
     const members = resolved as ResolvedEdge[];
     const target = members[0]!.target;
-    if (members.some(({ target: candidate, previous }) =>
+    if (members.some(({ target: candidate }) =>
       Math.abs(candidate.x - target.x) > coordinateTolerance
-      || Math.abs(candidate.y - target.y) > coordinateTolerance
-      || Math.abs(previous.y - target.y) > coordinateTolerance
-      || previous.x >= target.x)) {
+      || Math.abs(candidate.y - target.y) > coordinateTolerance)) {
       continue;
     }
 
@@ -63,7 +63,7 @@ export function createInputJunctions(edges: readonly LayoutEdge[]): InputJunctio
     // merge well before a decorative dot placed close to the target block.
     const point = commonSuffixStart(members.map(({ path }) => path));
     const trunkPath = suffixFromPoint(members[0]!.path, point);
-    const first = group[0]!;
+    const first = group.find((edge) => edge.kind !== 'other') ?? group[0]!;
     junctions.push({
       key,
       kind: first.kind,
@@ -89,7 +89,6 @@ function resolveEdge(edge: LayoutEdge): ResolvedEdge | undefined {
     edge,
     path,
     target: path.at(-1)!,
-    previous: path.at(-2)!,
   };
 }
 

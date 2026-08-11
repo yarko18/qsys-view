@@ -5,6 +5,11 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 1.1.2
+
+- Create shared-input junctions for every directly rendered interface type, including unresolved static Tcl connections.
+- Detect junctions by their common input endpoint even when interface analysis changes a connection from unknown to a resolved type.
+
 ## 1.1.1
 
 - Grow IP blocks vertically when they expose many interfaces, keeping exported port labels evenly spaced and readable.
