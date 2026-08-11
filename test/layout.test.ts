@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, expect, it } from 'vitest';
-import { layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, projectVisibleLayout, separateHierarchyGroups } from '../layout/elk';
+import { exportedInterfaceLabelWidth, exportedInterfaceStubLength, layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, portAnchorY, projectVisibleLayout, separateHierarchyGroups, type LayoutExternalPort } from '../layout/elk';
 import type { ConnectionKind, QsysConnection, QsysModule } from '../parser/graph';
 
 function module(id: string): QsysModule {
@@ -90,6 +90,50 @@ describe('expanded hierarchy layout', () => {
 });
 
 describe('directed interface sides', () => {
+  it('grows an IP so exported interface labels keep a readable vertical distance', async () => {
+    const peripheral = module('peripherals');
+    const externalPorts: LayoutExternalPort[] = Array.from({ length: 9 }, (_, index) => ({
+      moduleId: peripheral.id,
+      interfaceName: `external_${index}`,
+      direction: 'input',
+      label: `peripherals_external_interface_${index}`,
+    }));
+    const result = await layoutGraph([peripheral], [], externalPorts);
+    const node = result.nodes[0]!;
+    const anchors = externalPorts.map((port) => portAnchorY(
+      node,
+      port.direction,
+      port.interfaceName,
+      [],
+      externalPorts,
+    ));
+
+    expect(node.height).toBeGreaterThan(70);
+    for (let index = 1; index < anchors.length; index += 1) {
+      expect(anchors[index]! - anchors[index - 1]!).toBeGreaterThanOrEqual(18);
+    }
+  });
+
+  it('reserves horizontal room for a long exported label between adjacent IP', async () => {
+    const source = module('nios2');
+    const peripheral = module('peripherals');
+    const link = connection('mm', source.id, peripheral.id, 'avalon_memory_mapped');
+    const label = 'peripherals_wip_nconfig_nconfig_enable';
+    const externalPorts: LayoutExternalPort[] = [{
+      moduleId: peripheral.id,
+      interfaceName: link.targetPort,
+      direction: 'input',
+      label,
+    }];
+    const result = await layoutGraph([source, peripheral], [link], externalPorts);
+    const sourceNode = result.nodes.find((node) => node.id === source.id)!;
+    const peripheralNode = result.nodes.find((node) => node.id === peripheral.id)!;
+    const gap = peripheralNode.x - sourceNode.x - sourceNode.width;
+
+    expect(gap).toBeGreaterThan(exportedInterfaceLabelWidth(label));
+    expect(exportedInterfaceStubLength(label)).toBeLessThan(gap);
+  });
+
   it('keeps inputs west and outputs east when two IP form a feedback cycle', async () => {
     const splitter = module('splitter');
     const compute = module('plateau_he_compute');

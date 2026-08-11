@@ -31,7 +31,16 @@ export interface LayoutExternalPort {
   moduleId: string;
   interfaceName: string;
   direction: 'input' | 'output';
+  label?: string;
 }
+
+const minimumNodeWidth = 150;
+const minimumNodeHeight = 70;
+const minimumInterfaceSpacing = 18;
+const minimumExportStubLength = 54;
+const exportLabelCharacterWidth = 5.8;
+const exportLabelPadding = 20;
+const exportLabelHeight = 12;
 
 interface FrozenNodeGeometry {
   x: number;
@@ -195,31 +204,24 @@ export async function layoutGraph(
       'elk.padding': '[top=36,left=90,bottom=36,right=90]',
     },
     children: modules.map((module) => {
-      const inputs = [...new Set(validConnections
-        .filter((connection) => connection.target === module.id)
-        .map((connection) => connection.targetPort)
-        .concat(externalPorts
-          .filter((port) => port.moduleId === module.id && port.direction === 'input')
-          .map((port) => port.interfaceName)))].sort(naturalInterfaceOrder);
-      const outputs = [...new Set(validConnections
-        .filter((connection) => connection.source === module.id)
-        .map((connection) => connection.sourcePort)
-        .concat(externalPorts
-          .filter((port) => port.moduleId === module.id && port.direction === 'output')
-          .map((port) => port.interfaceName)))].sort(naturalInterfaceOrder);
+      const inputs = interfaceNames(module.id, 'input', validConnections, externalPorts);
+      const outputs = interfaceNames(module.id, 'output', validConnections, externalPorts);
+      const dimensions = moduleDimensions(module, validConnections, externalPorts);
       return {
         id: module.id,
-        width: Math.max(150, Math.min(280, 70 + module.name.length * 7)),
-        height: 70,
+        width: dimensions.width,
+        height: dimensions.height,
         layoutOptions: {
           'elk.portConstraints': 'FIXED_ORDER',
           'elk.portAlignment.default': 'DISTRIBUTED',
+          'elk.portLabels.placement': 'OUTSIDE',
         },
         ports: [
           ...inputs.map((interfaceName, index) => ({
             id: elkPortId(module.id, 'input', interfaceName),
             width: 0,
             height: 0,
+            labels: externalPortLabel(module.id, 'input', interfaceName, externalPorts),
             // ELK numbers west-side ports clockwise, hence the reversed index.
             layoutOptions: {
               'elk.port.side': 'WEST',
@@ -230,6 +232,7 @@ export async function layoutGraph(
             id: elkPortId(module.id, 'output', interfaceName),
             width: 0,
             height: 0,
+            labels: externalPortLabel(module.id, 'output', interfaceName, externalPorts),
             layoutOptions: {
               'elk.port.side': 'EAST',
               'elk.port.index': String(index),
@@ -353,6 +356,17 @@ export async function layoutStableGraph(
 
   const nodes = new Map(previous.nodes);
   const routes = new Map(previous.routes);
+  const resizedNodeIds = new Set<string>();
+  for (const module of modules) {
+    const frozen = nodes.get(module.id);
+    if (!frozen) continue;
+    const dimensions = moduleDimensions(module, connections, externalPorts);
+    const width = Math.max(frozen.width, dimensions.width);
+    const height = Math.max(frozen.height, dimensions.height);
+    if (width === frozen.width && height === frozen.height) continue;
+    nodes.set(module.id, { ...frozen, width, height });
+    resizedNodeIds.add(module.id);
+  }
   const newModules = modules.filter((module) => !nodes.has(module.id));
   if (newModules.length > 0) {
     const newIds = new Set(newModules.map((module) => module.id));
@@ -377,6 +391,7 @@ export async function layoutStableGraph(
     return frozen ? [{ ...module, ...frozen }] : [];
   });
   const reusableEdges = connections.flatMap((connection) => {
+    if (resizedNodeIds.has(connection.source) || resizedNodeIds.has(connection.target)) return [];
     const paths = routes.get(routeKey(connection));
     return paths ? [{ ...connection, paths }] : [];
   });
@@ -431,8 +446,11 @@ export function projectVisibleLayout(
   const edgePoints = edges.flatMap((edge) => edge.paths.flat());
   const maxEdgeX = Math.max(0, ...edgePoints.map((point) => point.x));
   const maxEdgeY = Math.max(0, ...edgePoints.map((point) => point.y));
+  const rightExport = Math.max(0, ...externalPorts
+    .filter((port) => port.direction === 'output' && visibleIds.has(port.moduleId))
+    .map((port) => exportedInterfaceStubLength(port.label ?? port.interfaceName)));
   return {
-    width: Math.max(1, maxNodeX, maxEdgeX) + 90,
+    width: Math.max(1, maxNodeX, maxEdgeX) + Math.max(90, rightExport + 20),
     height: Math.max(1, maxNodeY, maxEdgeY) + 36,
     nodes,
     edges,
@@ -513,6 +531,67 @@ export function portAnchorY(
   return index < 0
     ? node.y + node.height / 2
     : node.y + node.height * (index + 1) / (names.length + 1);
+}
+
+/** Estimates the horizontal room needed by a rendered exported-interface label. */
+export function exportedInterfaceLabelWidth(label: string): number {
+  return Math.max(24, Math.ceil(label.length * exportLabelCharacterWidth));
+}
+
+/** Keeps an exported-interface label between its terminal and the IP border. */
+export function exportedInterfaceStubLength(label: string): number {
+  return Math.max(minimumExportStubLength, exportedInterfaceLabelWidth(label) + exportLabelPadding);
+}
+
+function moduleDimensions(
+  module: QsysModule,
+  connections: readonly QsysConnection[],
+  externalPorts: readonly LayoutExternalPort[],
+): { width: number; height: number } {
+  const inputs = interfaceNames(module.id, 'input', connections, externalPorts);
+  const outputs = interfaceNames(module.id, 'output', connections, externalPorts);
+  return {
+    width: Math.max(minimumNodeWidth, Math.min(280, 70 + module.name.length * 7)),
+    height: Math.max(minimumNodeHeight, (Math.max(inputs.length, outputs.length) + 1) * minimumInterfaceSpacing),
+  };
+}
+
+function interfaceNames(
+  moduleId: string,
+  direction: 'input' | 'output',
+  connections: readonly QsysConnection[],
+  externalPorts: readonly LayoutExternalPort[],
+): string[] {
+  const connected = connections.flatMap((connection) => {
+    if (direction === 'input' && connection.target === moduleId) return [connection.targetPort];
+    if (direction === 'output' && connection.source === moduleId) return [connection.sourcePort];
+    return [];
+  });
+  const external = externalPorts
+    .filter((port) => port.moduleId === moduleId && port.direction === direction)
+    .map((port) => port.interfaceName);
+  return [...new Set([...connected, ...external])].sort(naturalInterfaceOrder);
+}
+
+function externalPortLabel(
+  moduleId: string,
+  direction: 'input' | 'output',
+  interfaceName: string,
+  externalPorts: readonly LayoutExternalPort[],
+): Array<{ id: string; text: string; width: number; height: number }> | undefined {
+  const labels = externalPorts
+    .filter((port) => port.moduleId === moduleId
+      && port.direction === direction
+      && port.interfaceName === interfaceName)
+    .map((port) => port.label ?? port.interfaceName)
+    .sort((left, right) => exportedInterfaceLabelWidth(right) - exportedInterfaceLabelWidth(left));
+  const label = labels[0];
+  return label ? [{
+    id: `${elkPortId(moduleId, direction, interfaceName)}::external-label`,
+    text: label,
+    width: exportedInterfaceLabelWidth(label),
+    height: exportLabelHeight,
+  }] : undefined;
 }
 
 function nodeBounds(nodes: readonly LayoutNode[]): { x: number; y: number; width: number; height: number } {

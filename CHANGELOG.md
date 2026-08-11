@@ -5,6 +5,11 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 1.1.1
+
+- Grow IP blocks vertically when they expose many interfaces, keeping exported port labels evenly spaced and readable.
+- Reserve horizontal layout space for long exported-interface names so labels no longer overlap neighbouring IP blocks.
+
 ## 1.1.0
 
 - Open Platform Designer `*_hw.tcl` component definitions directly as IP graphs.

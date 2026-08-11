@@ -6,7 +6,7 @@ import { streamParameters } from '../parser/streamMetadata';
 import { createInterfaceWaveform } from '../parser/waveform';
 import { groupParameters } from './parameterGroups';
 import { createAvalonMmBuses } from './avalonMmBus';
-import { layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, portAnchorY, projectVisibleLayout, separateHierarchyGroups, type LayoutExternalPort, type LayoutPoint, type LayoutResult, type StableLayoutCache } from '../layout/elk';
+import { exportedInterfaceStubLength, layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, portAnchorY, projectVisibleLayout, separateHierarchyGroups, type LayoutExternalPort, type LayoutPoint, type LayoutResult, type StableLayoutCache } from '../layout/elk';
 import { composeHierarchy, hierarchyBounds, type HierarchyBounds } from './hierarchy';
 import { connectionAddress, createInterfaceHubs, type HubKind, type InterfaceHub } from './interfaceHubs';
 import { availableConnectionKinds, canUsePipelineView, connectedModuleIds, inferClockResetConnections, isDirectKind, isHubKind, type GraphViewMode } from './viewMode';
@@ -383,6 +383,7 @@ async function render(): Promise<void> {
     moduleId: item.moduleId,
     interfaceName: item.port,
     direction: item.side,
+    label: item.name,
   } satisfies LayoutExternalPort));
   const selectedHubKinds = enabledKinds.filter((kind) => isHubKind(kind, state.viewMode));
   const hubs = createInterfaceHubs(renderedGraph, selectedHubKinds, allowedIds);
@@ -566,7 +567,6 @@ function draw(result: LayoutResult): void {
 
 function drawSystemExports(result: LayoutResult): void {
   const nodes = new Map(result.nodes.map((node) => [node.id, node]));
-  const stubLength = 54;
   for (const item of visibleSystemExports) {
     const node = nodes.get(item.moduleId);
     if (!node) continue;
@@ -577,6 +577,7 @@ function drawSystemExports(result: LayoutResult): void {
       layoutAnchorConnections,
       layoutExternalPorts,
     );
+    const stubLength = exportedInterfaceStubLength(item.name);
     const input = item.side === 'input';
     const internal = { x: input ? node.x : node.x + node.width, y: anchorY };
     const external = { x: internal.x + (input ? -stubLength : stubLength), y: anchorY };
