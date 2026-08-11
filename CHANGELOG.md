@@ -11,6 +11,7 @@ SPDX-License-Identifier: MIT
 - Give every source domain one independent interconnect input and every target endpoint one output, preventing unrelated buses from overlapping while keeping all logical connections inspectable.
 - Keep local self-loops outside shared interconnects and retain stable synthetic nodes as Tcl branches are added or removed.
 - Keep all statically inferred branches of one source interface in the same domain; report Avalon-ST fan-in and fan-out as P2P errors instead of creating an interconnect.
+- Temporarily disable all connections of an IP or interconnect on the current canvas, restore them from the toolbar, and relayout only the remaining topology without changing Qsys or Tcl sources.
 
 ## 1.1.2
 

@@ -27,6 +27,7 @@ and much more!
 - Groups configured IP parameters by their Platform Designer sections after Quartus interface analysis.
 - Highlights clock, reset, Avalon-MM, and interrupt domains without filling the graph with their edges.
 - Draws explicit interconnect nodes for fan-out, fan-in, and many-to-many interfaces while keeping every logical connection inspectable.
+- Temporarily hides all connections of a selected IP or interconnect so **Relayout** can rebuild a simpler canvas without editing the source system.
 - Detects Avalon-ST adapters after Quartus analysis and marks them with a red dot.
 - Shows elaborated interface ports, parameters, and an illustrative Avalon-ST waveform.
 - Updates a Tcl graph without moving existing IP or rerouting unchanged connections.
@@ -101,7 +102,8 @@ Choose **Enter subsystem** in the IP details to navigate within the current view
 - **IP definition** opens parameters and external interfaces for a `*_hw.tcl` component.
 - **Open in Platform Designer** opens or converts the system.
 - **Reload source** rereads the active Qsys/Tcl hierarchy, including sourced configuration files, and invalidates stale Quartus analysis.
-- **Relayout** recalculates the active layout while preserving analysis; **Fit** fits it to the viewport.
+- **Disable connections** in IP or interconnect details hides those links only in the current viewer; **Restore connections** brings all hidden links back.
+- **Relayout** recalculates the active layout from currently visible connections while preserving analysis; **Fit** fits it to the viewport.
 - Drag to pan, use the wheel to zoom, and search by instance name or IP type.
 
 New viewers start in Classic mode. With **Remember Last View State** enabled, Qsys View reuses the last mode, interface filters, IP visibility options, and name-inference choice across editors.
