@@ -8,6 +8,8 @@ SPDX-License-Identifier: MIT
 ## 1.1.3
 
 - Draw a marked fan-out junction when IRQ, conduit, or unresolved connections share one source endpoint; report Avalon-ST fan-out as a P2P error.
+- Treat every source endpoint as an independent net tree: different masters no longer merge when they enter the same slave, and each domain receives its own input slot and route lane.
+- Keep all statically inferred branches of one source interface in the same domain and separate overlapping Avalon-MM master trunks.
 
 ## 1.1.2
 
