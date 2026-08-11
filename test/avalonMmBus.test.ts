@@ -47,4 +47,29 @@ describe('createAvalonMmBuses', () => {
       backward,
     ])).toEqual([]);
   });
+
+  it('assigns overlapping source domains to separate trunk lanes', () => {
+    const buses = createAvalonMmBuses([
+      edge('data-timer', 'data_master', 'timer', 100, 60),
+      edge('data-uart', 'data_master', 'uart', 100, 160),
+      edge('instruction-rom', 'instruction_master', 'rom', 120, 80),
+      edge('instruction-memory', 'instruction_master', 'memory', 120, 180),
+    ]);
+
+    expect(buses).toHaveLength(2);
+    expect(Math.abs(buses[0]!.trunkPath[0]!.x - buses[1]!.trunkPath[0]!.x)).toBeGreaterThanOrEqual(18);
+  });
+
+  it('keeps a forward bus when the same master also has a backward branch', () => {
+    const backward = edge('debug', 'data_master', 'cpu', 100, 100);
+    backward.paths = [[{ x: 100, y: 100 }, { x: 20, y: 100 }]];
+    const buses = createAvalonMmBuses([
+      backward,
+      edge('timer', 'data_master', 'timer', 100, 60),
+      edge('uart', 'data_master', 'uart', 100, 160),
+    ]);
+
+    expect(buses).toHaveLength(1);
+    expect(buses[0]!.branches.map(({ edgeId }) => edgeId)).toEqual(['timer', 'uart']);
+  });
 });

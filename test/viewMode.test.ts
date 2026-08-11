@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { ConnectionKind, QsysConnection } from '../parser/graph';
-import { availableConnectionKinds, canUsePipelineView, connectedModuleIds, inferClockResetConnections, isDirectKind, isHubKind } from '../webview/viewMode';
+import { availableConnectionKinds, canUsePipelineView, connectedModuleIds, inferClockResetConnections, inferSourceDomainConnectionKinds, isDirectKind, isHubKind } from '../webview/viewMode';
 
 const kinds: ConnectionKind[] = [
   'avalon_streaming',
@@ -112,5 +112,37 @@ describe('clock and reset name inference', () => {
     const explicit = { ...namedReset, kind: 'conduit' as const, rawKind: 'conduit' };
     expect(inferClockResetConnections([namedReset], false)[0]?.kind).toBe('other');
     expect(inferClockResetConnections([explicit], true)[0]?.kind).toBe('conduit');
+  });
+});
+
+describe('source-domain interface inference', () => {
+  function unresolved(sourcePort: string, targetPort: string): QsysConnection {
+    return {
+      id: `${sourcePort}-${targetPort}`,
+      source: 'source',
+      sourcePort,
+      target: 'target',
+      targetPort,
+      kind: 'other',
+      rawKind: 'unknown (static Tcl)',
+      parameters: {},
+    };
+  }
+
+  it('propagates one known kind to unresolved branches of the same source endpoint', () => {
+    const known = { ...unresolved('data_master', 'timer'), kind: 'avalon_memory_mapped' as const };
+    const sameDomain = unresolved('data_master', 'memory');
+    const otherDomain = unresolved('instruction_master', 'memory');
+
+    expect(inferSourceDomainConnectionKinds([known, sameDomain, otherDomain]).map(({ kind }) => kind))
+      .toEqual(['avalon_memory_mapped', 'avalon_memory_mapped', 'other']);
+  });
+
+  it('does not guess when one source endpoint has conflicting known kinds', () => {
+    const missing = unresolved('shared', 'target');
+    const memory = { ...unresolved('shared', 'memory'), kind: 'avalon_memory_mapped' as const };
+    const conduit = { ...unresolved('shared', 'pins'), kind: 'conduit' as const };
+
+    expect(inferSourceDomainConnectionKinds([memory, conduit, missing])[2]?.kind).toBe('other');
   });
 });

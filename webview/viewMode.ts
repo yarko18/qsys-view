@@ -73,3 +73,31 @@ export function inferClockResetConnections(
     return inferredKind ? { ...connection, kind: inferredKind } : connection;
   });
 }
+
+/**
+ * A source interface has one type across its whole domain. Static Tcl may
+ * reveal that type on only one connection (for example through a base-address
+ * parameter), so propagate it to unresolved branches from the same endpoint.
+ */
+export function inferSourceDomainConnectionKinds(
+  connections: readonly QsysConnection[],
+): QsysConnection[] {
+  const kinds = new Map<string, Set<ConnectionKind>>();
+  for (const connection of connections) {
+    if (connection.kind === 'other') continue;
+    const key = sourceDomainKey(connection);
+    const domainKinds = kinds.get(key) ?? new Set<ConnectionKind>();
+    domainKinds.add(connection.kind);
+    kinds.set(key, domainKinds);
+  }
+  return connections.map((connection) => {
+    if (connection.kind !== 'other') return connection;
+    const domainKinds = kinds.get(sourceDomainKey(connection));
+    if (domainKinds?.size !== 1) return connection;
+    return { ...connection, kind: [...domainKinds][0]! };
+  });
+}
+
+function sourceDomainKey(connection: QsysConnection): string {
+  return `${connection.source}\0${connection.sourcePort}`;
+}

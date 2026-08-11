@@ -61,6 +61,12 @@ export interface StableLayoutResult {
 
 interface NodeOffset { x: number; y: number }
 
+interface LayoutPortSlot {
+  key: string;
+  interfaceName: string;
+  external: boolean;
+}
+
 export function pathMidpoint(paths: LayoutPoint[][]): LayoutPoint | undefined {
   const segments = paths.flatMap((points) => points.slice(1).map((end, index) => ({
     start: points[index]!,
@@ -172,8 +178,8 @@ export function separateHierarchyGroups(
         source,
         target,
         parallelIndex,
-        portAnchorY(source, 'output', edge.sourcePort, layout.edges, externalPorts),
-        portAnchorY(target, 'input', edge.targetPort, layout.edges, externalPorts),
+        connectionPortAnchorY(source, 'output', edge, layout.edges, externalPorts),
+        connectionPortAnchorY(target, 'input', edge, layout.edges, externalPorts),
       )],
     }];
   });
@@ -201,10 +207,12 @@ export async function layoutGraph(
       'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
       'elk.layered.nodePlacement.bk.edgeStraightening': 'IMPROVE_STRAIGHTNESS',
       'elk.layered.nodePlacement.favorStraightEdges': 'true',
+      'elk.layered.mergeEdges': 'false',
+      'elk.layered.spacing.edgeEdgeBetweenLayers': '16',
       'elk.padding': '[top=36,left=90,bottom=36,right=90]',
     },
     children: modules.map((module) => {
-      const inputs = interfaceNames(module.id, 'input', validConnections, externalPorts);
+      const inputs = inputPortSlots(module.id, validConnections, externalPorts);
       const outputs = interfaceNames(module.id, 'output', validConnections, externalPorts);
       const dimensions = moduleDimensions(module, validConnections, externalPorts);
       return {
@@ -217,11 +225,11 @@ export async function layoutGraph(
           'elk.portLabels.placement': 'OUTSIDE',
         },
         ports: [
-          ...inputs.map((interfaceName, index) => ({
-            id: elkPortId(module.id, 'input', interfaceName),
+          ...inputs.map((slot, index) => ({
+            id: elkPortId(module.id, 'input', slot.key),
             width: 0,
             height: 0,
-            labels: layoutPortLabel(module.id, 'input', interfaceName, externalPorts),
+            labels: layoutPortLabel(module.id, 'input', slot.interfaceName, externalPorts, slot.key),
             // ELK numbers west-side ports clockwise, hence the reversed index.
             layoutOptions: {
               'elk.port.side': 'WEST',
@@ -244,7 +252,7 @@ export async function layoutGraph(
     edges: validConnections.map((edge) => ({
       id: edge.id,
       sources: [elkPortId(edge.source, 'output', edge.sourcePort)],
-      targets: [elkPortId(edge.target, 'input', edge.targetPort)],
+      targets: [elkPortId(edge.target, 'input', inputPortSlotKey(edge))],
     })),
   };
   const result = await elk.layout(graph);
@@ -435,8 +443,8 @@ export function projectVisibleLayout(
         source,
         target,
         parallelIndex,
-        portAnchorY(source, 'output', connection.sourcePort, connections, externalPorts),
-        portAnchorY(target, 'input', connection.targetPort, connections, externalPorts),
+        connectionPortAnchorY(source, 'output', connection, connections, externalPorts),
+        connectionPortAnchorY(target, 'input', connection, connections, externalPorts),
       )],
     }];
   });
@@ -518,8 +526,13 @@ export function portAnchorY(
   connections: readonly QsysConnection[],
   externalPorts: readonly LayoutExternalPort[] = [],
 ): number {
+  if (direction === 'input') {
+    const slots = inputPortSlots(node.id, connections, externalPorts);
+    const externalSlot = slots.find((slot) => slot.external && slot.interfaceName === interfaceName);
+    const slot = externalSlot ?? slots.find((candidate) => candidate.interfaceName === interfaceName);
+    return distributedPortY(node, slots, slot?.key);
+  }
   const connected = connections.flatMap((connection) => {
-    if (direction === 'input' && connection.target === node.id) return [connection.targetPort];
     if (direction === 'output' && connection.source === node.id) return [connection.sourcePort];
     return [];
   });
@@ -527,10 +540,26 @@ export function portAnchorY(
     .filter((port) => port.moduleId === node.id && port.direction === direction)
     .map((port) => port.interfaceName);
   const names = [...new Set([...connected, ...external])].sort(naturalInterfaceOrder);
-  const index = names.indexOf(interfaceName);
-  return index < 0
-    ? node.y + node.height / 2
-    : node.y + node.height * (index + 1) / (names.length + 1);
+  return distributedPortY(
+    node,
+    names.map((name) => ({ key: name })),
+    interfaceName,
+  );
+}
+
+/** Uses one target-side slot per source domain, even when domains share a slave. */
+export function connectionPortAnchorY(
+  node: LayoutNode,
+  direction: 'input' | 'output',
+  connection: QsysConnection,
+  connections: readonly QsysConnection[],
+  externalPorts: readonly LayoutExternalPort[] = [],
+): number {
+  if (direction === 'output') {
+    return portAnchorY(node, direction, connection.sourcePort, connections, externalPorts);
+  }
+  const slots = inputPortSlots(node.id, connections, externalPorts);
+  return distributedPortY(node, slots, inputPortSlotKey(connection));
 }
 
 /** Estimates the horizontal room needed by a rendered exported-interface label. */
@@ -548,12 +577,48 @@ function moduleDimensions(
   connections: readonly QsysConnection[],
   externalPorts: readonly LayoutExternalPort[],
 ): { width: number; height: number } {
-  const inputs = interfaceNames(module.id, 'input', connections, externalPorts);
+  const inputs = inputPortSlots(module.id, connections, externalPorts);
   const outputs = interfaceNames(module.id, 'output', connections, externalPorts);
   return {
     width: Math.max(minimumNodeWidth, Math.min(280, 70 + module.name.length * 7)),
     height: Math.max(minimumNodeHeight, (Math.max(inputs.length, outputs.length) + 1) * minimumInterfaceSpacing),
   };
+}
+
+function inputPortSlotKey(connection: QsysConnection): string {
+  return `${connection.targetPort}::source::${connection.source}::${connection.sourcePort}`;
+}
+
+function inputPortSlots(
+  moduleId: string,
+  connections: readonly QsysConnection[],
+  externalPorts: readonly LayoutExternalPort[],
+): LayoutPortSlot[] {
+  const slots = new Map<string, LayoutPortSlot>();
+  for (const connection of connections) {
+    if (connection.target !== moduleId) continue;
+    const key = inputPortSlotKey(connection);
+    slots.set(key, { key, interfaceName: connection.targetPort, external: false });
+  }
+  for (const port of externalPorts) {
+    if (port.moduleId !== moduleId || port.direction !== 'input') continue;
+    const key = `${port.interfaceName}::external`;
+    slots.set(key, { key, interfaceName: port.interfaceName, external: true });
+  }
+  return [...slots.values()].sort((left, right) =>
+    naturalInterfaceOrder(left.interfaceName, right.interfaceName)
+      || naturalInterfaceOrder(left.key, right.key));
+}
+
+function distributedPortY<T extends { key: string }>(
+  node: LayoutNode,
+  slots: readonly T[],
+  key: string | undefined,
+): number {
+  const index = key === undefined ? -1 : slots.findIndex((slot) => slot.key === key);
+  return index < 0
+    ? node.y + node.height / 2
+    : node.y + node.height * (index + 1) / (slots.length + 1);
 }
 
 function interfaceNames(
@@ -578,6 +643,7 @@ function layoutPortLabel(
   direction: 'input' | 'output',
   interfaceName: string,
   externalPorts: readonly LayoutExternalPort[],
+  portKey = interfaceName,
 ): Array<{ id: string; text: string; width: number; height: number }> | undefined {
   const labels = [interfaceName, ...externalPorts
     .filter((port) => port.moduleId === moduleId
@@ -587,7 +653,7 @@ function layoutPortLabel(
     .sort((left, right) => exportedInterfaceLabelWidth(right) - exportedInterfaceLabelWidth(left));
   const label = labels[0];
   return label ? [{
-    id: `${elkPortId(moduleId, direction, interfaceName)}::external-label`,
+    id: `${elkPortId(moduleId, direction, portKey)}::external-label`,
     text: label,
     width: exportedInterfaceLabelWidth(label),
     height: exportLabelHeight,

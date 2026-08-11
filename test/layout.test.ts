@@ -225,6 +225,26 @@ describe('directed interface sides', () => {
     expect(endpoints.get('out-1')!.source.y).toBeCloseTo(node.y + node.height * 2 / 3);
   });
 
+  it('gives independent source domains separate slots on one shared slave interface', async () => {
+    const cpu = module('cpu');
+    const memory = module('memory');
+    const data = {
+      ...connection('data', cpu.id, memory.id, 'avalon_memory_mapped'),
+      sourcePort: 'data_master',
+      targetPort: 'avl_0',
+    };
+    const instruction = {
+      ...connection('instruction', cpu.id, memory.id, 'avalon_memory_mapped'),
+      sourcePort: 'instruction_master',
+      targetPort: 'avl_0',
+    };
+    const result = await layoutGraph([cpu, memory], [data, instruction]);
+    const endpoints = result.edges.map((edge) => edge.paths[0]!.at(-1)!);
+
+    expect(endpoints[0]!.x).toBeCloseTo(endpoints[1]!.x);
+    expect(Math.abs(endpoints[0]!.y - endpoints[1]!.y)).toBeGreaterThanOrEqual(18);
+  });
+
   it('keeps proportional port anchors when links are added to a frozen layout', async () => {
     const switchIp = module('switch');
     const sink0 = module('sink0');

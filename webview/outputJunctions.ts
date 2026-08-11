@@ -4,22 +4,6 @@
 import type { ConnectionKind } from '../parser/graph';
 import type { LayoutEdge, LayoutPoint } from '../layout/elk';
 
-export interface InputJunctionBranch {
-  edgeId: string;
-  paths: LayoutPoint[][];
-  target: LayoutPoint;
-}
-
-export interface InputJunction {
-  key: string;
-  kind: ConnectionKind;
-  target: string;
-  targetPort: string;
-  point: LayoutPoint;
-  trunkPath: LayoutPoint[];
-  branches: InputJunctionBranch[];
-}
-
 export interface OutputJunctionBranch {
   edgeId: string;
   paths: LayoutPoint[][];
@@ -42,69 +26,12 @@ interface ResolvedEdge {
   edge: LayoutEdge;
   path: LayoutPoint[];
   source: LayoutPoint;
-  target: LayoutPoint;
 }
 
 /**
- * Merges two or more connections entering the same interface into a visible
- * junction. Every source keeps an individually selectable branch, followed by
- * one shared, arrowed segment into the input.
- */
-export function createInputJunctions(edges: readonly LayoutEdge[]): InputJunction[] {
-  const groups = new Map<string, LayoutEdge[]>();
-  for (const edge of edges) {
-    // Avalon-ST is P2P. Invalid fan-in is reported as an error instead of
-    // being made to look like a valid interconnect.
-    if (edge.kind === 'avalon_streaming') continue;
-    // The endpoint defines the electrical/logical input. Do not make
-    // junction detection depend on interface classification: before Quartus
-    // analysis the same connection may still be `other` (unknown).
-    const key = `${edge.target}\0${edge.targetPort}`;
-    const group = groups.get(key) ?? [];
-    group.push(edge);
-    groups.set(key, group);
-  }
-
-  const junctions: InputJunction[] = [];
-  for (const [key, group] of groups) {
-    if (group.length < 2) continue;
-    const resolved = group.map(resolveEdge);
-    if (resolved.some((item) => !item)) continue;
-    const members = resolved as ResolvedEdge[];
-    const target = members[0]!.target;
-    if (members.some(({ target: candidate }) =>
-      Math.abs(candidate.x - target.x) > coordinateTolerance
-      || Math.abs(candidate.y - target.y) > coordinateTolerance)) {
-      continue;
-    }
-
-    // ELK often gives connections to the same port a shared suffix. Put the
-    // dot where that suffix actually begins; otherwise the lines appear to
-    // merge well before a decorative dot placed close to the target block.
-    const point = commonSuffixStart(members.map(({ path }) => path));
-    const trunkPath = suffixFromPoint(members[0]!.path, point);
-    const first = group.find((edge) => edge.kind !== 'other') ?? group[0]!;
-    junctions.push({
-      key,
-      kind: first.kind,
-      target: first.target,
-      targetPort: first.targetPort,
-      point,
-      trunkPath,
-      branches: members.map(({ edge, path }) => ({
-        edgeId: edge.id,
-        paths: [prefixToPoint(path, point)],
-        target,
-      })),
-    });
-  }
-  return junctions;
-}
-
-/**
- * Splits a shared output route at one visible junction. Avalon-MM fan-out is
- * already represented by its dedicated bus, while Avalon-ST fan-out is an
- * invalid P2P topology reported by connection diagnostics.
+ * Draws one visible tree for every source endpoint. Avalon-MM fan-out is
+ * represented by its dedicated bus, while Avalon-ST fan-out is invalid P2P
+ * topology and is reported by connection diagnostics.
  */
 export function createOutputJunctions(edges: readonly LayoutEdge[]): OutputJunction[] {
   const groups = new Map<string, LayoutEdge[]>();
@@ -150,16 +77,7 @@ function resolveEdge(edge: LayoutEdge): ResolvedEdge | undefined {
   const nonempty = edge.paths.filter((path) => path.length >= 2);
   if (nonempty.length !== 1) return undefined;
   const path = nonempty[0]!;
-  return {
-    edge,
-    path,
-    source: path[0]!,
-    target: path.at(-1)!,
-  };
-}
-
-function commonSuffixStart(paths: readonly LayoutPoint[][]): LayoutPoint {
-  return commonPrefixEnd(paths.map((path) => [...path].reverse()));
+  return { edge, path, source: path[0]! };
 }
 
 function commonPrefixEnd(paths: readonly LayoutPoint[][]): LayoutPoint {
