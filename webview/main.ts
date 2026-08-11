@@ -5,12 +5,11 @@ import { connectionKinds, type ConnectionKind, type QsysAdaptation, type QsysCom
 import { streamParameters } from '../parser/streamMetadata';
 import { createInterfaceWaveform } from '../parser/waveform';
 import { groupParameters } from './parameterGroups';
-import { createAvalonMmBuses } from './avalonMmBus';
 import { connectionDiagnostics } from './connectionDiagnostics';
-import { exportedInterfaceStubLength, layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, portAnchorY, projectVisibleLayout, separateHierarchyGroups, type LayoutExternalPort, type LayoutPoint, type LayoutResult, type StableLayoutCache } from '../layout/elk';
+import { createConnectionFabricGraph, isConnectionFabricModule, type ConnectionFabric, type ConnectionFabricEndpoint } from './connectionFabrics';
+import { exportedInterfaceStubLength, layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, portAnchorY, projectVisibleLayout, separateHierarchyGroups, type LayoutExternalPort, type LayoutNode, type LayoutPoint, type LayoutResult, type StableLayoutCache } from '../layout/elk';
 import { composeHierarchy, hierarchyBounds, type HierarchyBounds } from './hierarchy';
 import { connectionAddress, createInterfaceHubs, type HubKind, type InterfaceHub } from './interfaceHubs';
-import { createOutputJunctions } from './outputJunctions';
 import { availableConnectionKinds, canUsePipelineView, connectedModuleIds, inferClockResetConnections, inferSourceDomainConnectionKinds, isDirectKind, isHubKind, type GraphViewMode } from './viewMode';
 import { collectExportedInterfaces, type ExportedInterface } from './exportedInterfaces';
 import './styles.css';
@@ -96,6 +95,14 @@ let visibleHubs: InterfaceHub[] = [];
 let visibleSystemExports: ExportedInterface[] = [];
 let layoutExternalPorts: LayoutExternalPort[] = [];
 let layoutAnchorConnections: QsysConnection[] = [];
+let visibleConnectionFabrics = new Map<string, ConnectionFabric>();
+interface VisibleFabricSegment {
+  fabric: ConnectionFabric;
+  endpoint: ConnectionFabricEndpoint;
+  side: 'input' | 'output';
+}
+
+let visibleFabricSegments = new Map<string, VisibleFabricSegment>();
 let renderVersion = 0;
 let transform: CanvasTransform = { x: 20, y: 20, scale: 1 };
 let didInitialFit = false;
@@ -398,6 +405,8 @@ async function render(): Promise<void> {
     : allowedModules.filter((module) => connectedIds.has(module.id));
   try {
     const structuralConnections = allowedConnections.filter((connection) => isDirectKind(connection.kind, state.viewMode));
+    const structuralFabricGraph = createConnectionFabricGraph(allowedModules, structuralConnections);
+    const visibleFabricGraph = createConnectionFabricGraph(modules, connections);
     const mode = state.viewMode;
     if (!stableLayoutCaches[mode]) {
       showStatus(state.viewMode === 'pipeline' && structuralConnections.some((connection) => connection.kind === 'avalon_streaming')
@@ -406,8 +415,8 @@ async function render(): Promise<void> {
     }
     const baseLayout = mode === 'pipeline' ? layoutAnchoredGraph : layoutGraph;
     const stable = await layoutStableGraph(
-      allowedModules,
-      structuralConnections,
+      structuralFabricGraph.modules,
+      structuralFabricGraph.connections,
       stableLayoutCaches[mode],
       async (layoutModules, layoutConnections) => separateHierarchyGroups(
         await baseLayout(layoutModules, layoutConnections, externalPorts),
@@ -418,11 +427,17 @@ async function render(): Promise<void> {
     );
     if (version !== renderVersion) return;
     stableLayoutCaches[mode] = stable.cache;
-    const result = projectVisibleLayout(stable.layout, modules, connections, externalPorts);
+    const result = projectVisibleLayout(
+      stable.layout,
+      visibleFabricGraph.modules,
+      visibleFabricGraph.connections,
+      externalPorts,
+    );
     layout = result;
     visibleSystemExports = selectedExports;
     layoutExternalPorts = externalPorts;
-    layoutAnchorConnections = structuralConnections;
+    layoutAnchorConnections = structuralFabricGraph.connections;
+    setVisibleConnectionFabrics(visibleFabricGraph.fabrics);
     draw(result);
     visibleHubs = hubs;
     if (activeHubId && !hubs.some((hub) => hub.id === activeHubId)) activeHubId = undefined;
@@ -455,46 +470,11 @@ function draw(result: LayoutResult): void {
     return bounds ? [{ instanceId, bounds }] : [];
   });
   for (const container of hierarchyContainers) drawHierarchyBackground(container.instanceId, container.bounds);
-  const outputJunctions = createOutputJunctions(result.edges);
-  const outputJunctionBranches = new Map(outputJunctions.flatMap((junction) =>
-    junction.branches.map((branch) => [branch.edgeId, branch] as const)));
-  const avalonMmBuses = state.viewMode === 'complete'
-    ? createAvalonMmBuses(result.edges)
-    : [];
-  const busBranches = new Map(avalonMmBuses.flatMap((bus) =>
-    bus.branches.map((branch) => [branch.edgeId, branch.paths] as const)));
-  for (const bus of avalonMmBuses) {
-    const group = svg('g', { class: 'edge edge-avalon_memory_mapped avmm-bus' });
-    for (const points of [bus.sourcePath, bus.trunkPath]) {
-      group.append(svg('path', {
-        d: pathData(points),
-        class: 'edge-line avmm-bus-line',
-      }));
-    }
-    const title = svg('title');
-    title.textContent = `${bus.source}.${bus.sourcePort} · ${bus.branches.length} Avalon-MM slaves`;
-    group.append(title);
-    scene.append(group);
-  }
-  for (const junction of outputJunctions) {
-    const group = svg('g', { class: `edge edge-${junction.kind} endpoint-junction` });
-    group.append(svg('path', {
-      d: pathData(junction.trunkPath),
-      class: 'edge-line',
-    }));
-    const title = svg('title');
-    title.textContent = `${junction.source}.${junction.sourcePort} → ${junction.branches.length} targets`;
-    group.append(title);
-    scene.append(group);
-  }
   for (const edge of result.edges) {
-    const outputJunctionBranch = outputJunctionBranches.get(edge.id);
-    const displayedPaths = outputJunctionBranch?.paths
-      ?? busBranches.get(edge.id)
-      ?? edge.paths;
-    const isBusBranch = busBranches.has(edge.id);
+    const fabricSegment = visibleFabricSegments.get(edge.id);
+    const displayedPaths = edge.paths;
     const group = svg('g', {
-      class: `edge edge-${edge.kind}`,
+      class: `edge edge-${edge.kind}${fabricSegment ? ' fabric-segment' : ''}`,
       tabindex: '0',
       role: 'button',
     });
@@ -510,12 +490,12 @@ function draw(result: LayoutResult): void {
       lineAttributes['marker-end'] = `url(#arrow-${edge.kind})`;
       group.append(svg('path', lineAttributes));
       if (points.length > 0) {
-        if (!isBusBranch) group.append(edgeLabel(
+        if (fabricSegment?.side !== 'output') group.append(edgeLabel(
           edge.sourcePort,
-          outputJunctionBranch?.source ?? points[0]!,
+          points[0]!,
           'source-port',
         ));
-        group.append(edgeLabel(
+        if (fabricSegment?.side !== 'input') group.append(edgeLabel(
           edge.targetPort,
           points.at(-1)!,
           'target-port',
@@ -535,41 +515,41 @@ function draw(result: LayoutResult): void {
     }
     const title = svg('title');
     const adapterSummary = edge.adaptations?.map(formatAdaptation).join('\n');
-    title.textContent = [
-      `${edge.source}.${edge.sourcePort} → ${edge.target}.${edge.targetPort}`,
-      `${labels[edge.kind]} (${edge.rawKind})`,
-      adapterSummary,
-    ].filter(Boolean).join('\n');
+    title.textContent = fabricSegment
+      ? fabricSegmentTitle(fabricSegment.side, fabricSegment.endpoint, fabricSegment.fabric)
+      : [
+        `${edge.source}.${edge.sourcePort} → ${edge.target}.${edge.targetPort}`,
+        `${labels[edge.kind]} (${edge.rawKind})`,
+        adapterSummary,
+      ].filter(Boolean).join('\n');
     group.append(title);
     const openDetails = (event: Event) => {
       event.stopPropagation();
-      showConnectionDetails(edge);
+      if (fabricSegment) showFabricEndpointDetails(fabricSegment.side, fabricSegment.endpoint, fabricSegment.fabric);
+      else showConnectionDetails(edge);
     };
     group.addEventListener('click', openDetails);
     group.addEventListener('keydown', (event) => {
       if ((event as KeyboardEvent).key === 'Enter') openDetails(event);
     });
     scene.append(group);
-  }
-  for (const junction of outputJunctions) {
-    scene.append(svg('circle', {
-      cx: junction.point.x,
-      cy: junction.point.y,
+    const terminal = fabricSegment && (fabricSegment.side === 'input'
+      ? displayedPaths.at(-1)?.at(-1)
+      : displayedPaths[0]?.[0]);
+    if (terminal) scene.append(svg('circle', {
+      cx: terminal.x,
+      cy: terminal.y,
       r: 4.5,
-      class: `endpoint-junction-dot edge-${junction.kind}`,
-    }));
-  }
-  for (const bus of avalonMmBuses) {
-    const point = bus.sourcePath.at(-1);
-    if (point) scene.append(svg('circle', {
-      cx: point.x,
-      cy: point.y,
-      r: 4.5,
-      class: 'endpoint-junction-dot edge-avalon_memory_mapped',
+      class: `endpoint-junction-dot edge-${edge.kind}`,
     }));
   }
   drawSystemExports(result);
   for (const node of result.nodes) {
+    const fabric = visibleConnectionFabrics.get(node.id);
+    if (fabric && isConnectionFabricModule(node)) {
+      drawConnectionFabricNode(node, fabric);
+      continue;
+    }
     const group = svg('g', {
       class: `node${node.disabled ? ' disabled' : ''}${node.hierarchyPath ? ' nested' : ''}${node.subsystem ? ' subsystem' : ''}`,
       transform: `translate(${node.x} ${node.y})`,
@@ -612,6 +592,119 @@ function draw(result: LayoutResult): void {
   }
   createMarkers();
   applyTransform();
+}
+
+function setVisibleConnectionFabrics(fabrics: readonly ConnectionFabric[]): void {
+  visibleConnectionFabrics = new Map(fabrics.map((fabric) => [fabric.id, fabric]));
+  visibleFabricSegments = new Map<string, VisibleFabricSegment>();
+  for (const fabric of fabrics) {
+    for (const endpoint of fabric.inputs) {
+      visibleFabricSegments.set(endpoint.edgeId, { fabric, endpoint, side: 'input' });
+    }
+    for (const endpoint of fabric.outputs) {
+      visibleFabricSegments.set(endpoint.edgeId, { fabric, endpoint, side: 'output' });
+    }
+  }
+}
+
+function drawConnectionFabricNode(node: LayoutNode, fabric: ConnectionFabric): void {
+  const group = svg('g', {
+    class: `node connection-fabric kind-${fabric.kind}`,
+    transform: `translate(${node.x} ${node.y})`,
+    'data-module-id': node.id,
+    'data-search': `${labels[fabric.kind]} interconnect`.toLowerCase(),
+    tabindex: '0',
+    role: 'button',
+  });
+  group.append(svg('rect', { width: node.width, height: node.height, rx: 12 }));
+  const name = svg('text', { x: node.width / 2, y: node.height / 2 - 5, class: 'fabric-name' });
+  name.textContent = `${labels[fabric.kind]} interconnect`;
+  const summary = svg('text', { x: node.width / 2, y: node.height / 2 + 13, class: 'fabric-summary' });
+  summary.textContent = `${fabric.inputs.length} in · ${fabric.outputs.length} out`;
+  const title = svg('title');
+  title.textContent = `${labels[fabric.kind]} interconnect\n${fabric.inputs.length} sources · ${fabric.outputs.length} targets · ${fabric.connections.length} connections`;
+  group.append(name, summary, title);
+  const openDetails = (event: Event) => {
+    event.stopPropagation();
+    showConnectionGroupDetails(
+      `${labels[fabric.kind]} interconnect`,
+      fabric,
+      fabric.connections,
+    );
+  };
+  group.addEventListener('click', openDetails);
+  group.addEventListener('keydown', (event) => {
+    const key = (event as KeyboardEvent).key;
+    if (key === 'Enter' || key === ' ') openDetails(event);
+  });
+  scene.append(group);
+}
+
+function fabricSegmentTitle(
+  side: 'input' | 'output',
+  endpoint: ConnectionFabricEndpoint,
+  fabric: ConnectionFabric,
+): string {
+  const endpointName = `${endpoint.moduleId}.${endpoint.interfaceName}`;
+  const related = side === 'input'
+    ? endpoint.connections.map(({ target, targetPort }) => `${target}.${targetPort}`)
+    : endpoint.connections.map(({ source, sourcePort }) => `${source}.${sourcePort}`);
+  return [
+    side === 'input'
+      ? `${endpointName} → ${labels[fabric.kind]} interconnect`
+      : `${labels[fabric.kind]} interconnect → ${endpointName}`,
+    `${related.length} ${side === 'input' ? 'target' : 'source'}${related.length === 1 ? '' : 's'}: ${related.join(', ')}`,
+  ].join('\n');
+}
+
+function showFabricEndpointDetails(
+  side: 'input' | 'output',
+  endpoint: ConnectionFabricEndpoint,
+  fabric: ConnectionFabric,
+): void {
+  if (endpoint.connections.length === 1) {
+    showConnectionDetails(endpoint.connections[0]!);
+    return;
+  }
+  const endpointName = `${endpoint.moduleId}.${endpoint.interfaceName}`;
+  showConnectionGroupDetails(
+    side === 'input'
+      ? `${endpointName} → interconnect`
+      : `Interconnect → ${endpointName}`,
+    fabric,
+    endpoint.connections,
+  );
+}
+
+function showConnectionGroupDetails(
+  headingText: string,
+  fabric: ConnectionFabric,
+  connections: readonly QsysConnection[],
+): void {
+  componentPanelOpen = false;
+  details.replaceChildren();
+  const heading = document.createElement('h2');
+  heading.textContent = headingText;
+  const type = document.createElement('div');
+  type.className = 'details-type';
+  type.textContent = `${labels[fabric.kind]} · ${connections.length} connection${connections.length === 1 ? '' : 's'}`;
+  const note = document.createElement('p');
+  note.className = 'details-note';
+  note.textContent = 'Each source enters the interconnect independently. Select a logical connection to inspect its parameters.';
+  const title = document.createElement('h3');
+  title.textContent = 'Logical connections';
+  const list = document.createElement('div');
+  list.className = 'fabric-connection-list';
+  for (const connection of connections) {
+    const button = document.createElement('button');
+    button.className = 'fabric-connection';
+    const address = connectionAddress(connection);
+    button.textContent = `${connection.source}.${connection.sourcePort} → ${connection.target}.${connection.targetPort}${address ? ` · ${address}` : ''}`;
+    button.addEventListener('click', () => showConnectionDetails(connection));
+    list.append(button);
+  }
+  details.append(detailsCloseButton(), heading, type, note, title, list);
+  details.classList.remove('hidden');
 }
 
 function drawSystemExports(result: LayoutResult): void {

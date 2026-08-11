@@ -232,6 +232,23 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .node-name { fill: var(--vscode-editor-foreground); font-size: 15px; font-weight: 600; }
 .node-kind { fill: var(--vscode-descriptionForeground); font-size: 10px; }
 .node-hierarchy { fill: var(--vscode-descriptionForeground); font-size: 8px; text-transform: uppercase; }
+.connection-fabric rect {
+  fill: color-mix(in srgb, var(--edge-color) 12%, var(--vscode-editorWidget-background));
+  stroke: var(--edge-color);
+  stroke-width: 2;
+  stroke-dasharray: 6 3;
+}
+.fabric-name {
+  fill: var(--vscode-editor-foreground);
+  font-size: 12px;
+  font-weight: 650;
+  text-anchor: middle;
+}
+.fabric-summary {
+  fill: var(--vscode-descriptionForeground);
+  font-size: 9px;
+  text-anchor: middle;
+}
 .hierarchy-container rect {
   fill: color-mix(in srgb, var(--vscode-focusBorder) 4%, transparent);
   stroke: var(--vscode-descriptionForeground);
@@ -284,9 +301,6 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 }
 .edge-hit { fill: none; stroke: transparent; stroke-width: 12; }
 .edge:hover .edge-line, .edge:focus .edge-line { stroke-width: 3; }
-.avmm-bus { pointer-events: none; cursor: default; }
-.avmm-bus-line { stroke-width: 4; }
-.endpoint-junction { pointer-events: none; cursor: default; }
 .endpoint-junction-dot {
   fill: var(--edge-color);
   stroke: var(--vscode-editor-background);
@@ -371,6 +385,13 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .details-type { color: var(--vscode-descriptionForeground); }
 .details-actions { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0; }
 .details-note, .waveform-note { margin: 10px 0; color: var(--vscode-descriptionForeground); font-size: 11px; line-height: 1.45; }
+.fabric-connection-list { display: flex; flex-direction: column; gap: 6px; }
+.fabric-connection {
+  width: 100%;
+  padding: 7px 9px;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
 .component-parameter {
   display: grid;
   grid-template-columns: minmax(110px, 1fr) minmax(120px, 1fr);

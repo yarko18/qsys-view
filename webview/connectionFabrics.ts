@@ -60,8 +60,11 @@ export function isConnectionFabricModule(module: QsysModule): boolean {
 }
 
 function fabricComponents(connections: readonly QsysConnection[]): QsysConnection[][] {
-  const candidates = connections.filter(({ kind }) =>
-    kind !== 'avalon_streaming' && kind !== 'clock' && kind !== 'reset');
+  const candidates = connections.filter(({ kind, source, target }) =>
+    source !== target
+      && kind !== 'avalon_streaming'
+      && kind !== 'clock'
+      && kind !== 'reset');
   const byKind = new Map<ConnectionKind, QsysConnection[]>();
   for (const connection of candidates) {
     byKind.set(connection.kind, [...(byKind.get(connection.kind) ?? []), connection]);
@@ -98,12 +101,15 @@ function fabricComponents(connections: readonly QsysConnection[]): QsysConnectio
 }
 
 function createFabric(component: QsysConnection[], usedModuleIds: Set<string>): ConnectionFabric {
+  const anchor = component[0]!;
   const sorted = [...component].sort(compareConnections);
   const kind = sorted[0]!.kind;
   const rawKind = sorted.find(({ rawKind: value }) => value && !value.startsWith('unknown'))?.rawKind
     ?? sorted[0]!.rawKind;
-  const signature = [kind, ...sorted.map(({ source, sourcePort, target, targetPort }) =>
-    `${source}.${sourcePort}>${target}.${targetPort}`)].join('|');
+  // Keep the synthetic node stable while branches are added or removed. Tcl
+  // normally appends new connections, so the first existing relationship is
+  // a much better identity anchor than the full, changing component contents.
+  const signature = `${kind}|${sourceEndpointKey(anchor)}>${targetEndpointKey(anchor)}`;
   const hierarchy = commonHierarchyParent(sorted.flatMap(({ source, target }) => [source, target]));
   const baseId = `${hierarchy ? `${hierarchy}/` : ''}__qsys_view_fabric_${kind}_${stableHash(signature)}`;
   let id = baseId;
@@ -118,18 +124,18 @@ function createFabric(component: QsysConnection[], usedModuleIds: Set<string>): 
   const targetGroups = groupBy(sorted, targetEndpointKey);
   const inputs = [...sourceGroups.values()]
     .sort((left, right) => naturalEndpointOrder(sourceEndpointKey(left[0]!), sourceEndpointKey(right[0]!)))
-    .map((connections, index) => ({
+    .map((connections) => ({
       moduleId: connections[0]!.source,
       interfaceName: connections[0]!.sourcePort,
-      edgeId: `${id}::input::${String(index).padStart(3, '0')}`,
+      edgeId: `${id}::input::${stableHash(sourceEndpointKey(connections[0]!))}`,
       connections,
     }));
   const outputs = [...targetGroups.values()]
     .sort((left, right) => naturalEndpointOrder(targetEndpointKey(left[0]!), targetEndpointKey(right[0]!)))
-    .map((connections, index) => ({
+    .map((connections) => ({
       moduleId: connections[0]!.target,
       interfaceName: connections[0]!.targetPort,
-      edgeId: `${id}::output::${String(index).padStart(3, '0')}`,
+      edgeId: `${id}::output::${stableHash(targetEndpointKey(connections[0]!))}`,
       connections,
     }));
   return { id, kind, rawKind, connections: sorted, inputs, outputs };
@@ -152,7 +158,7 @@ function fabricInputConnection(fabric: ConnectionFabric, endpoint: ConnectionFab
     source: endpoint.moduleId,
     sourcePort: endpoint.interfaceName,
     target: fabric.id,
-    targetPort: `input_${String(fabric.inputs.indexOf(endpoint)).padStart(3, '0')}`,
+    targetPort: fabricPortName('input', endpoint),
     kind: fabric.kind,
     rawKind: fabric.rawKind,
     parameters: {},
@@ -163,13 +169,17 @@ function fabricOutputConnection(fabric: ConnectionFabric, endpoint: ConnectionFa
   return {
     id: endpoint.edgeId,
     source: fabric.id,
-    sourcePort: `output_${String(fabric.outputs.indexOf(endpoint)).padStart(3, '0')}`,
+    sourcePort: fabricPortName('output', endpoint),
     target: endpoint.moduleId,
     targetPort: endpoint.interfaceName,
     kind: fabric.kind,
     rawKind: fabric.rawKind,
     parameters: {},
   };
+}
+
+function fabricPortName(side: 'input' | 'output', endpoint: ConnectionFabricEndpoint): string {
+  return `${side}_${endpoint.moduleId}.${endpoint.interfaceName}`;
 }
 
 function groupBy(
