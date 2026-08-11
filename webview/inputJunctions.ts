@@ -20,11 +20,28 @@ export interface InputJunction {
   branches: InputJunctionBranch[];
 }
 
+export interface OutputJunctionBranch {
+  edgeId: string;
+  paths: LayoutPoint[][];
+  source: LayoutPoint;
+}
+
+export interface OutputJunction {
+  key: string;
+  kind: ConnectionKind;
+  source: string;
+  sourcePort: string;
+  point: LayoutPoint;
+  trunkPath: LayoutPoint[];
+  branches: OutputJunctionBranch[];
+}
+
 const coordinateTolerance = 1;
 
 interface ResolvedEdge {
   edge: LayoutEdge;
   path: LayoutPoint[];
+  source: LayoutPoint;
   target: LayoutPoint;
 }
 
@@ -84,6 +101,51 @@ export function createInputJunctions(edges: readonly LayoutEdge[]): InputJunctio
   return junctions;
 }
 
+/**
+ * Splits a shared output route at one visible junction. Avalon-MM fan-out is
+ * already represented by its dedicated bus, while Avalon-ST fan-out is an
+ * invalid P2P topology reported by connection diagnostics.
+ */
+export function createOutputJunctions(edges: readonly LayoutEdge[]): OutputJunction[] {
+  const groups = new Map<string, LayoutEdge[]>();
+  for (const edge of edges) {
+    if (edge.kind === 'avalon_streaming' || edge.kind === 'avalon_memory_mapped') continue;
+    const key = `${edge.source}\0${edge.sourcePort}`;
+    groups.set(key, [...(groups.get(key) ?? []), edge]);
+  }
+
+  const junctions: OutputJunction[] = [];
+  for (const [key, group] of groups) {
+    if (group.length < 2) continue;
+    const resolved = group.map(resolveEdge);
+    if (resolved.some((item) => !item)) continue;
+    const members = resolved as ResolvedEdge[];
+    const source = members[0]!.source;
+    if (members.some(({ source: candidate }) =>
+      Math.abs(candidate.x - source.x) > coordinateTolerance
+      || Math.abs(candidate.y - source.y) > coordinateTolerance)) {
+      continue;
+    }
+
+    const point = commonPrefixEnd(members.map(({ path }) => path));
+    const first = group.find((edge) => edge.kind !== 'other') ?? group[0]!;
+    junctions.push({
+      key,
+      kind: first.kind,
+      source: first.source,
+      sourcePort: first.sourcePort,
+      point,
+      trunkPath: prefixToPoint(members[0]!.path, point),
+      branches: members.map(({ edge, path }) => ({
+        edgeId: edge.id,
+        paths: [suffixFromPoint(path, point)],
+        source,
+      })),
+    });
+  }
+  return junctions;
+}
+
 function resolveEdge(edge: LayoutEdge): ResolvedEdge | undefined {
   const nonempty = edge.paths.filter((path) => path.length >= 2);
   if (nonempty.length !== 1) return undefined;
@@ -91,13 +153,17 @@ function resolveEdge(edge: LayoutEdge): ResolvedEdge | undefined {
   return {
     edge,
     path,
+    source: path[0]!,
     target: path.at(-1)!,
   };
 }
 
 function commonSuffixStart(paths: readonly LayoutPoint[][]): LayoutPoint {
-  const reversed = paths.map((path) => [...path].reverse());
-  const positions = reversed.map((path) => ({
+  return commonPrefixEnd(paths.map((path) => [...path].reverse()));
+}
+
+function commonPrefixEnd(paths: readonly LayoutPoint[][]): LayoutPoint {
+  const positions = paths.map((path) => ({
     path,
     segment: 0,
     point: { ...path[0]! },

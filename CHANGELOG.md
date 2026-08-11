@@ -5,6 +5,10 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 1.1.3
+
+- Draw a marked fan-out junction when IRQ, conduit, or unresolved connections share one source endpoint; report Avalon-ST fan-out as a P2P error.
+
 ## 1.1.2
 
 - Create shared-input junctions for every directly rendered interface type, including unresolved static Tcl connections.

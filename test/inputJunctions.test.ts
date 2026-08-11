@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ConnectionKind } from '../parser/graph';
 import type { LayoutEdge } from '../layout/elk';
-import { createInputJunctions } from '../webview/inputJunctions';
+import { createInputJunctions, createOutputJunctions } from '../webview/inputJunctions';
 
 function edge(
   id: string,
@@ -28,6 +28,31 @@ function edge(
       { x: bendX, y: sourceY },
       { x: bendX, y: 180 },
       { x: 400, y: 180 },
+    ]],
+  };
+}
+
+function fanoutEdge(
+  id: string,
+  target: string,
+  targetY: number,
+  bendX: number,
+  kind: ConnectionKind = 'other',
+): LayoutEdge {
+  return {
+    id,
+    source: 'nios2',
+    sourcePort: 'cpu_receiver_irq',
+    target,
+    targetPort: 'irq',
+    kind,
+    rawKind: kind === 'other' ? 'unknown (static Tcl)' : kind,
+    parameters: {},
+    paths: [[
+      { x: 100, y: 180 },
+      { x: bendX, y: 180 },
+      { x: bendX, y: targetY },
+      { x: 400, y: targetY },
     ]],
   };
 }
@@ -123,5 +148,39 @@ describe('input junctions', () => {
       { x: 320, y: 180 },
       { x: 400, y: 180 },
     ]);
+  });
+});
+
+describe('output junctions', () => {
+  it.each<ConnectionKind>(['interrupt', 'conduit', 'other'])(
+    'marks one shared %s output before its branches diverge',
+    (kind) => {
+      const junction = createOutputJunctions([
+        fanoutEdge('i2c', 'i2c', 80, 280, kind),
+        fanoutEdge('pio', 'pio', 180, 300, kind),
+        fanoutEdge('spi', 'spi', 260, 320, kind),
+      ])[0]!;
+
+      expect(junction).toMatchObject({
+        kind,
+        source: 'nios2',
+        sourcePort: 'cpu_receiver_irq',
+        point: { x: 280, y: 180 },
+        trunkPath: [{ x: 100, y: 180 }, { x: 280, y: 180 }],
+      });
+      expect(junction.branches.map((branch) => branch.edgeId)).toEqual(['i2c', 'pio', 'spi']);
+      for (const branch of junction.branches) {
+        expect(branch.paths[0]![0]).toEqual(junction.point);
+      }
+    },
+  );
+
+  it('leaves Avalon-MM fan-out to its bus and rejects Avalon-ST junctions', () => {
+    for (const kind of ['avalon_memory_mapped', 'avalon_streaming'] as const) {
+      expect(createOutputJunctions([
+        fanoutEdge('first', 'first', 80, 280, kind),
+        fanoutEdge('second', 'second', 260, 320, kind),
+      ])).toEqual([]);
+    }
   });
 });

@@ -286,12 +286,13 @@ button:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .edge:hover .edge-line, .edge:focus .edge-line { stroke-width: 3; }
 .avmm-bus { pointer-events: none; cursor: default; }
 .avmm-bus-line { stroke-width: 4; }
-.input-junction { pointer-events: none; cursor: default; }
-.input-junction-dot {
+.endpoint-junction { pointer-events: none; cursor: default; }
+.endpoint-junction-dot {
   fill: var(--edge-color);
   stroke: var(--vscode-editor-background);
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
+  pointer-events: none;
 }
 .arrow path { fill: var(--edge-color); }
 .adapter-dot {

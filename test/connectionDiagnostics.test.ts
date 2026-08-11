@@ -39,4 +39,17 @@ describe('connection diagnostics', () => {
       connection('unknown-1', 'source_1', 'shared', 'other'),
     ])).toEqual([]);
   });
+
+  it('reports one Avalon-ST source connected to multiple sinks', () => {
+    const first = connection('first', 'source', 'din', 'avalon_streaming');
+    const second = {
+      ...connection('second', 'source', 'din', 'avalon_streaming'),
+      target: 'other_sink',
+    };
+
+    expect(connectionDiagnostics([first, second])).toEqual([{
+      severity: 'error',
+      message: 'Avalon-ST source source.dout has 2 outgoing connections (sink.din, other_sink.din). Avalon-ST must be point-to-point.',
+    }]);
+  });
 });

@@ -10,7 +10,7 @@ import { connectionDiagnostics } from './connectionDiagnostics';
 import { exportedInterfaceStubLength, layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, portAnchorY, projectVisibleLayout, separateHierarchyGroups, type LayoutExternalPort, type LayoutPoint, type LayoutResult, type StableLayoutCache } from '../layout/elk';
 import { composeHierarchy, hierarchyBounds, type HierarchyBounds } from './hierarchy';
 import { connectionAddress, createInterfaceHubs, type HubKind, type InterfaceHub } from './interfaceHubs';
-import { createInputJunctions } from './inputJunctions';
+import { createInputJunctions, createOutputJunctions } from './inputJunctions';
 import { availableConnectionKinds, canUsePipelineView, connectedModuleIds, inferClockResetConnections, isDirectKind, isHubKind, type GraphViewMode } from './viewMode';
 import { collectExportedInterfaces, type ExportedInterface } from './exportedInterfaces';
 import './styles.css';
@@ -454,10 +454,16 @@ function draw(result: LayoutResult): void {
   });
   for (const container of hierarchyContainers) drawHierarchyBackground(container.instanceId, container.bounds);
   const inputJunctions = createInputJunctions(result.edges);
-  const junctionBranches = new Map(inputJunctions.flatMap((junction) =>
+  const inputJunctionBranches = new Map(inputJunctions.flatMap((junction) =>
+    junction.branches.map((branch) => [branch.edgeId, branch] as const)));
+  const outputJunctions = createOutputJunctions(
+    result.edges.filter((edge) => !inputJunctionBranches.has(edge.id)),
+  );
+  const outputJunctionBranches = new Map(outputJunctions.flatMap((junction) =>
     junction.branches.map((branch) => [branch.edgeId, branch] as const)));
   const avalonMmBuses = state.viewMode === 'complete'
-    ? createAvalonMmBuses(result.edges.filter((edge) => !junctionBranches.has(edge.id)))
+    ? createAvalonMmBuses(result.edges.filter((edge) =>
+      !inputJunctionBranches.has(edge.id) && !outputJunctionBranches.has(edge.id)))
     : [];
   const busBranches = new Map(avalonMmBuses.flatMap((bus) =>
     bus.branches.map((branch) => [branch.edgeId, branch.paths] as const)));
@@ -475,7 +481,7 @@ function draw(result: LayoutResult): void {
     scene.append(group);
   }
   for (const junction of inputJunctions) {
-    const group = svg('g', { class: `edge edge-${junction.kind} input-junction` });
+    const group = svg('g', { class: `edge edge-${junction.kind} endpoint-junction` });
     group.append(svg('path', {
       d: pathData(junction.trunkPath),
       class: 'edge-line',
@@ -486,11 +492,25 @@ function draw(result: LayoutResult): void {
     group.append(title);
     scene.append(group);
   }
+  for (const junction of outputJunctions) {
+    const group = svg('g', { class: `edge edge-${junction.kind} endpoint-junction` });
+    group.append(svg('path', {
+      d: pathData(junction.trunkPath),
+      class: 'edge-line',
+    }));
+    const title = svg('title');
+    title.textContent = `${junction.source}.${junction.sourcePort} → ${junction.branches.length} targets`;
+    group.append(title);
+    scene.append(group);
+  }
   for (const edge of result.edges) {
-    const junctionBranch = junctionBranches.get(edge.id);
-    const displayedPaths = junctionBranch?.paths ?? busBranches.get(edge.id) ?? edge.paths;
+    const inputJunctionBranch = inputJunctionBranches.get(edge.id);
+    const outputJunctionBranch = outputJunctionBranches.get(edge.id);
+    const displayedPaths = inputJunctionBranch?.paths
+      ?? outputJunctionBranch?.paths
+      ?? busBranches.get(edge.id)
+      ?? edge.paths;
     const isBusBranch = busBranches.has(edge.id);
-    const isJunctionBranch = Boolean(junctionBranch);
     const group = svg('g', {
       class: `edge edge-${edge.kind}`,
       tabindex: '0',
@@ -505,13 +525,17 @@ function draw(result: LayoutResult): void {
         d: pathData(points),
         class: 'edge-line',
       };
-      if (!isJunctionBranch) lineAttributes['marker-end'] = `url(#arrow-${edge.kind})`;
+      if (!inputJunctionBranch) lineAttributes['marker-end'] = `url(#arrow-${edge.kind})`;
       group.append(svg('path', lineAttributes));
       if (points.length > 0) {
-        if (!isBusBranch) group.append(edgeLabel(edge.sourcePort, points[0]!, 'source-port'));
+        if (!isBusBranch) group.append(edgeLabel(
+          edge.sourcePort,
+          outputJunctionBranch?.source ?? points[0]!,
+          'source-port',
+        ));
         group.append(edgeLabel(
           edge.targetPort,
-          junctionBranch?.target ?? points.at(-1)!,
+          inputJunctionBranch?.target ?? points.at(-1)!,
           'target-port',
         ));
       }
@@ -550,7 +574,24 @@ function draw(result: LayoutResult): void {
       cx: junction.point.x,
       cy: junction.point.y,
       r: 4.5,
-      class: `input-junction-dot edge-${junction.kind}`,
+      class: `endpoint-junction-dot edge-${junction.kind}`,
+    }));
+  }
+  for (const junction of outputJunctions) {
+    scene.append(svg('circle', {
+      cx: junction.point.x,
+      cy: junction.point.y,
+      r: 4.5,
+      class: `endpoint-junction-dot edge-${junction.kind}`,
+    }));
+  }
+  for (const bus of avalonMmBuses) {
+    const point = bus.sourcePath.at(-1);
+    if (point) scene.append(svg('circle', {
+      cx: point.x,
+      cy: point.y,
+      r: 4.5,
+      class: 'endpoint-junction-dot edge-avalon_memory_mapped',
     }));
   }
   drawSystemExports(result);
