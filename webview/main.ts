@@ -7,6 +7,7 @@ import { createInterfaceWaveform } from '../parser/waveform';
 import { groupParameters } from './parameterGroups';
 import { connectionDiagnostics } from './connectionDiagnostics';
 import { createConnectionFabricGraph, isConnectionFabricModule, type ConnectionFabric, type ConnectionFabricEndpoint } from './connectionFabrics';
+import { activeConnections, disabledConnections, moduleConnections, visibleConnections } from './connectionVisibility';
 import { exportedInterfaceStubLength, layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, portAnchorY, projectVisibleLayout, separateHierarchyGroups, type LayoutExternalPort, type LayoutNode, type LayoutPoint, type LayoutResult, type StableLayoutCache } from '../layout/elk';
 import { composeHierarchy, hierarchyBounds, type HierarchyBounds } from './hierarchy';
 import { connectionAddress, createInterfaceHubs, type HubKind, type InterfaceHub } from './interfaceHubs';
@@ -65,6 +66,7 @@ interface NavigationFrame {
   transform: CanvasTransform;
   didInitialFit: boolean;
   activeHubId?: string;
+  disabledConnectionIds: Set<string>;
 }
 
 const saved = (vscode.getState() ?? {}) as SavedViewState;
@@ -95,6 +97,7 @@ let visibleHubs: InterfaceHub[] = [];
 let visibleSystemExports: ExportedInterface[] = [];
 let layoutExternalPorts: LayoutExternalPort[] = [];
 let layoutAnchorConnections: QsysConnection[] = [];
+let disabledConnectionIds = new Set<string>();
 let visibleConnectionFabrics = new Map<string, ConnectionFabric>();
 interface VisibleFabricSegment {
   fabric: ConnectionFabric;
@@ -137,7 +140,8 @@ app.innerHTML = `
       <button id="quartus-metadata" title="Read exact interface metadata with qsys-script">Read interfaces…</button>
       <button id="open-platform-designer" title="Open this design in Intel Platform Designer">Open in Platform Designer</button>
       <button id="reload-source" title="Reload Qsys/Tcl sources and sourced configuration">Reload source</button>
-      <button id="relayout" title="Recalculate the layout without discarding Quartus analysis">Relayout</button>
+      <button id="restore-connections" class="hidden" title="Restore connections hidden only in this Qsys View">Restore connections</button>
+      <button id="relayout" title="Recalculate the layout from currently visible connections without discarding Quartus analysis">Relayout</button>
       <button id="fit" title="Fit graph to view">Fit</button>
     </div>
   </header>
@@ -177,6 +181,7 @@ const diagnosticsToggle = required<HTMLButtonElement>('diagnostics-toggle');
 const diagnosticsPanel = required<HTMLElement>('diagnostics');
 const diagnosticsList = required<HTMLElement>('diagnostics-list');
 const componentToggle = required<HTMLButtonElement>('component-toggle');
+const restoreConnections = required<HTMLButtonElement>('restore-connections');
 
 const filterCheckboxes = new Map<ConnectionKind, { checkbox: HTMLInputElement; label: HTMLLabelElement }>();
 for (const kind of filterKinds) {
@@ -231,6 +236,13 @@ showDisabled.addEventListener('change', () => {
   void render();
 });
 required<HTMLButtonElement>('fit').addEventListener('click', fitView);
+restoreConnections.addEventListener('click', () => {
+  disabledConnectionIds.clear();
+  activeHubId = undefined;
+  details.classList.add('hidden');
+  updateConnectionVisibilityControl();
+  void render();
+});
 required<HTMLButtonElement>('subsystem-back').addEventListener('click', leaveSubsystem);
 diagnosticsToggle.addEventListener('click', () => diagnosticsPanel.classList.toggle('hidden'));
 required<HTMLButtonElement>('diagnostics-close').addEventListener('click', () => diagnosticsPanel.classList.add('hidden'));
@@ -378,8 +390,9 @@ async function render(): Promise<void> {
   const inferredConnections = inferSourceDomainConnectionKinds(
     inferClockResetConnections(graph.connections, state.inferClockResetNames),
   );
-  const renderedGraph = { ...graph, connections: inferredConnections };
-  const allowedConnections = inferredConnections.filter((connection) =>
+  const enabledConnections = visibleConnections(inferredConnections, disabledConnectionIds);
+  const renderedGraph = { ...graph, connections: enabledConnections };
+  const allowedConnections = enabledConnections.filter((connection) =>
     allowedIds.has(connection.source) && allowedIds.has(connection.target),
   );
   const enabledKinds = selectedKinds().filter((kind) => isDirectKind(kind, state.viewMode) || isHubKind(kind, state.viewMode));
@@ -446,7 +459,12 @@ async function render(): Promise<void> {
     const visibleConnectionCount = selectedConnections.length
       + selectedExports.filter((item) => visibleModuleIds.has(item.moduleId)).length;
     const availableInterfaceCount = allowedConnections.length + supportedExports.length;
-    required<HTMLElement>('summary').textContent = `${modules.length}/${graph.modules.length} IP · ${visibleConnectionCount}/${availableInterfaceCount} interfaces`;
+    required<HTMLElement>('summary').textContent = [
+      `${modules.length}/${graph.modules.length} IP`,
+      `${visibleConnectionCount}/${availableInterfaceCount} interfaces`,
+      disabledConnectionIds.size > 0 ? `${disabledConnectionIds.size} disabled in view` : '',
+    ].filter(Boolean).join(' · ');
+    updateConnectionVisibilityControl();
     if (modules.length === 0) {
       showStatus('No graph elements match these filters. Enable another connection type or “All IP”.');
     } else {
@@ -703,8 +721,64 @@ function showConnectionGroupDetails(
     button.addEventListener('click', () => showConnectionDetails(connection));
     list.append(button);
   }
-  details.append(detailsCloseButton(), heading, type, note, title, list);
+  details.append(detailsCloseButton(), heading, type, note);
+  const actions = connectionVisibilityActions(connections, 'Disable interconnect connections');
+  if (actions) details.append(actions);
+  details.append(title, list);
   details.classList.remove('hidden');
+}
+
+function connectionVisibilityActions(
+  connections: readonly QsysConnection[],
+  disableLabel = 'Disable connections',
+): HTMLElement | undefined {
+  const active = activeConnections(connections, disabledConnectionIds);
+  const disabled = disabledConnections(connections, disabledConnectionIds);
+  if (active.length === 0 && disabled.length === 0) return undefined;
+  const actions = document.createElement('div');
+  actions.className = 'details-actions connection-visibility-actions';
+  if (active.length > 0) {
+    const disable = document.createElement('button');
+    disable.textContent = `${disableLabel} (${active.length})`;
+    disable.title = 'Hide these connections only on this Qsys View canvas; the source file is not changed.';
+    disable.addEventListener('click', () => disableConnectionsInView(active));
+    actions.append(disable);
+  }
+  if (disabled.length > 0) {
+    const enable = document.createElement('button');
+    enable.textContent = `Enable hidden connections (${disabled.length})`;
+    enable.title = 'Show these view-only hidden connections again.';
+    enable.addEventListener('click', () => enableConnectionsInView(disabled));
+    actions.append(enable);
+  }
+  return actions;
+}
+
+function disableConnectionsInView(connections: readonly QsysConnection[]): void {
+  for (const connection of connections) disabledConnectionIds.add(connection.id);
+  connectionVisibilityChanged();
+}
+
+function enableConnectionsInView(connections: readonly QsysConnection[]): void {
+  for (const connection of connections) disabledConnectionIds.delete(connection.id);
+  connectionVisibilityChanged();
+}
+
+function connectionVisibilityChanged(): void {
+  activeHubId = undefined;
+  details.classList.add('hidden');
+  updateConnectionVisibilityControl();
+  void render();
+}
+
+function updateConnectionVisibilityControl(): void {
+  const existingIds = new Set(graph?.connections.map(({ id }) => id) ?? []);
+  for (const id of disabledConnectionIds) {
+    if (!existingIds.has(id)) disabledConnectionIds.delete(id);
+  }
+  const count = disabledConnectionIds.size;
+  restoreConnections.classList.toggle('hidden', count === 0);
+  restoreConnections.textContent = count === 0 ? 'Restore connections' : `Restore connections (${count})`;
 }
 
 function drawSystemExports(result: LayoutResult): void {
@@ -1175,6 +1249,10 @@ function showModuleDetails(module: QsysModule): void {
     actions.append(enter, expand, open);
     details.append(actions);
   }
+  if (graph) {
+    const actions = connectionVisibilityActions(moduleConnections(graph.connections, module.id));
+    if (actions) details.append(actions);
+  }
   details.append(parameterTable('Parameters', module.parameters, module.parameterMetadata));
   details.classList.remove('hidden');
 }
@@ -1572,6 +1650,7 @@ function enterSubsystem(child: QsysGraph, resource: string): void {
     transform: { ...transform },
     didInitialFit,
     activeHubId,
+    disabledConnectionIds,
   });
   sourceGraph = child;
   graph = child;
@@ -1579,6 +1658,7 @@ function enterSubsystem(child: QsysGraph, resource: string): void {
   expandedSubsystems = new Map();
   expandedSubsystemResources = new Map();
   stableLayoutCaches = {};
+  disabledConnectionIds = new Set();
   layout = undefined;
   transform = { x: 20, y: 20, scale: 1 };
   didInitialFit = false;
@@ -1606,6 +1686,7 @@ function leaveSubsystem(): void {
   transform = parent.transform;
   didInitialFit = parent.didInitialFit;
   activeHubId = parent.activeHubId;
+  disabledConnectionIds = parent.disabledConnectionIds;
   graph = composeHierarchy(sourceGraph, expandedSubsystems);
   layout = undefined;
   loadingSubsystems.clear();
