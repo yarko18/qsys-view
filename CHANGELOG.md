@@ -7,9 +7,10 @@ SPDX-License-Identifier: MIT
 
 ## 1.1.3
 
-- Draw a marked fan-out junction when IRQ, conduit, or unresolved connections share one source endpoint; report Avalon-ST fan-out as a P2P error.
-- Treat every source endpoint as an independent net tree: different masters no longer merge when they enter the same slave, and each domain receives its own input slot and route lane.
-- Keep all statically inferred branches of one source interface in the same domain and separate overlapping Avalon-MM master trunks.
+- Draw an explicit interconnect node for one-to-many, many-to-one, and many-to-many topologies across Avalon-MM, IRQ, conduit, and unresolved connections.
+- Give every source domain one independent interconnect input and every target endpoint one output, preventing unrelated buses from overlapping while keeping all logical connections inspectable.
+- Keep local self-loops outside shared interconnects and retain stable synthetic nodes as Tcl branches are added or removed.
+- Keep all statically inferred branches of one source interface in the same domain; report Avalon-ST fan-in and fan-out as P2P errors instead of creating an interconnect.
 
 ## 1.1.2
 

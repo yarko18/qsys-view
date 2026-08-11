@@ -26,7 +26,7 @@ and much more!
 - Shows IP and connection parameters on click.
 - Groups configured IP parameters by their Platform Designer sections after Quartus interface analysis.
 - Highlights clock, reset, Avalon-MM, and interrupt domains without filling the graph with their edges.
-- Draws multi-slave Avalon-MM masters as shared buses in Classic view while keeping each branch inspectable.
+- Draws explicit interconnect nodes for fan-out, fan-in, and many-to-many interfaces while keeping every logical connection inspectable.
 - Detects Avalon-ST adapters after Quartus analysis and marks them with a red dot.
 - Shows elaborated interface ports, parameters, and an illustrative Avalon-ST waveform.
 - Updates a Tcl graph without moving existing IP or rerouting unchanged connections.
@@ -42,12 +42,12 @@ Qsys View has two modes:
 | Interface | Pipeline | Classic |
 | --- | --- | --- |
 | Avalon-ST | Directed edge and layout anchor | Directed edge |
-| Conduit | Directed edge | Directed edge |
-| Avalon-MM | Highlight hub | Shared bus or directed edge |
-| Interrupt | Highlight hub | Directed edge |
+| Conduit | Directed edge or interconnect | Directed edge or interconnect |
+| Avalon-MM | Highlight hub | Directed edge or interconnect |
+| Interrupt | Highlight hub | Directed edge or interconnect |
 | Clock | Highlight hub | Highlight hub |
 | Reset | Highlight hub | Highlight hub |
-| Other or unknown | Hidden | Grey directed edge |
+| Other or unknown | Hidden | Grey directed edge or interconnect |
 
 Only interface filters present in the current system are shown. Pipeline layout is anchored exclusively by Avalon-ST when streaming connections exist. For exported system Tcl, Pipeline remains disabled until **Read interfaces…** resolves the real interface types for every visible hierarchy level. Safely elaborated `*_hw.tcl` compositions already provide their declared connection types and can use Pipeline view without Quartus.
 
@@ -117,7 +117,7 @@ code --install-extension YaroslavMariukha.qsys-view
 A local package can be installed with:
 
 ```bash
-code --install-extension qsys-view-1.1.0.vsix --force
+code --install-extension qsys-view-1.1.3.vsix --force
 ```
 
 ## Settings
