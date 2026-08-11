@@ -6,6 +6,7 @@ import { streamParameters } from '../parser/streamMetadata';
 import { createInterfaceWaveform } from '../parser/waveform';
 import { groupParameters } from './parameterGroups';
 import { createAvalonMmBuses } from './avalonMmBus';
+import { connectionDiagnostics } from './connectionDiagnostics';
 import { exportedInterfaceStubLength, layoutAnchoredGraph, layoutGraph, layoutStableGraph, pathMidpoint, portAnchorY, projectVisibleLayout, separateHierarchyGroups, type LayoutExternalPort, type LayoutPoint, type LayoutResult, type StableLayoutCache } from '../layout/elk';
 import { composeHierarchy, hierarchyBounds, type HierarchyBounds } from './hierarchy';
 import { connectionAddress, createInterfaceHubs, type HubKind, type InterfaceHub } from './interfaceHubs';
@@ -291,7 +292,7 @@ window.addEventListener('message', (event: MessageEvent) => {
     if (firstGraph && sourceGraph.component) componentPanelOpen = true;
     required<HTMLElement>('system-name').textContent = sourceGraph.name;
     updateAnalysisControls();
-    updateDiagnostics(graph.diagnostics ?? []);
+    updateCurrentDiagnostics();
     updateExpandedSubsystemControls();
     updateSubsystemNavigation();
     updateKindFilters();
@@ -1479,7 +1480,7 @@ function enterSubsystem(child: QsysGraph, resource: string): void {
   details.classList.add('hidden');
   required<HTMLElement>('system-name').textContent = sourceGraph.name;
   updateAnalysisControls();
-  updateDiagnostics(sourceGraph.diagnostics ?? []);
+  updateCurrentDiagnostics();
   updateExpandedSubsystemControls();
   updateSubsystemNavigation();
   updateKindFilters();
@@ -1504,7 +1505,7 @@ function leaveSubsystem(): void {
   details.classList.add('hidden');
   required<HTMLElement>('system-name').textContent = sourceGraph.name;
   updateAnalysisControls();
-  updateDiagnostics(sourceGraph.diagnostics ?? []);
+  updateCurrentDiagnostics();
   updateExpandedSubsystemControls();
   updateSubsystemNavigation();
   updateKindFilters();
@@ -1603,6 +1604,7 @@ function refreshComposedHierarchy(): void {
   activeHubId = undefined;
   didInitialFit = false;
   details.classList.add('hidden');
+  updateCurrentDiagnostics();
   updateExpandedSubsystemControls();
   updateAnalysisControls();
   updateKindFilters();
@@ -1653,6 +1655,13 @@ function updateDiagnostics(diagnostics: QsysDiagnostic[]): void {
     diagnosticsList.append(item);
   }
   diagnosticsPanel.classList.toggle('hidden', diagnostics.length === 0 || !wasOpen);
+}
+
+function updateCurrentDiagnostics(): void {
+  updateDiagnostics([
+    ...(graph?.diagnostics ?? []),
+    ...connectionDiagnostics(graph?.connections ?? []),
+  ]);
 }
 function clamp(value: number, min: number, max: number): number { return Math.min(max, Math.max(min, value)); }
 function truncate(value: string, length: number): string { return value.length > length ? `${value.slice(0, length - 1)}…` : value; }

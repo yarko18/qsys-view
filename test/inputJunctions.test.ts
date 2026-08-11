@@ -87,9 +87,10 @@ describe('input junctions', () => {
     expect(junction.branches).toHaveLength(2);
   });
 
-  it('leaves a valid point-to-point Avalon-ST connection unchanged', () => {
+  it('never presents Avalon-ST fan-in as a valid junction', () => {
     expect(createInputJunctions([
-      edge('stream', 'source', 80, 280, 'din', 'avalon_streaming'),
+      edge('stream-0', 'source_0', 80, 280, 'din', 'avalon_streaming'),
+      edge('stream-1', 'source_1', 240, 320, 'din', 'avalon_streaming'),
     ])).toEqual([]);
   });
 

@@ -36,6 +36,9 @@ interface ResolvedEdge {
 export function createInputJunctions(edges: readonly LayoutEdge[]): InputJunction[] {
   const groups = new Map<string, LayoutEdge[]>();
   for (const edge of edges) {
+    // Avalon-ST is P2P. Invalid fan-in is reported as an error instead of
+    // being made to look like a valid interconnect.
+    if (edge.kind === 'avalon_streaming') continue;
     // The endpoint defines the electrical/logical input. Do not make
     // junction detection depend on interface classification: before Quartus
     // analysis the same connection may still be `other` (unknown).

@@ -9,6 +9,7 @@ SPDX-License-Identifier: MIT
 
 - Create shared-input junctions for every directly rendered interface type, including unresolved static Tcl connections.
 - Detect junctions by their common input endpoint even when interface analysis changes a connection from unknown to a resolved type.
+- Report multiple Avalon-ST sources connected to one sink as an error instead of drawing a junction.
 
 ## 1.1.1
 
