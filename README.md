@@ -17,9 +17,11 @@ and much more!
 
 ## What it does
 
-- Opens `.qsys` directly, exported `.tcl` through **Reopen Editor With… → Qsys TCL Graph**, and `*_hw.tcl` through the default **Platform Designer IP** editor.
+- Opens `.qsys` directly. Exported `.tcl` and `*_hw.tcl` remain text by default and open through **Reopen Editor With…** or **Open Qsys Graph**.
 - Shows component parameters and external interfaces, including elaborated physical port names and widths.
 - Runs validation, elaboration, and composition callbacks locally so parameter-dependent instances and connections update immediately.
+- Keeps leaf hardware-Tcl components as one block and expands composition components into their internal graph on demand.
+- Lists leaf-component files registered locally or through sourced helper procedures as an expandable folder tree without running Quartus.
 - Keeps hierarchical subsystems collapsed as single IP blocks.
 - Expands a selected subsystem in place, enters it in the same canvas, or opens it in a new editor without automatically expanding deeper levels.
 - Draws a left-to-right graph with orthogonal connections.
@@ -56,9 +58,11 @@ The Tcl reader accepts Platform Designer declarations for `avalon`, `axi`, `tris
 
 ## Hardware Tcl components without Quartus
 
-Opening a `*_hw.tcl` file evaluates it with a local restricted `tclsh` interpreter. Qsys View emulates the component API needed for parameters, module properties, interfaces, instances, and connections, then invokes `VALIDATION_CALLBACK` and either `COMPOSITION_CALLBACK` or `ELABORATION_CALLBACK`.
+Open a `*_hw.tcl` file with **Reopen Editor With… → Platform Designer IP**. Qsys View evaluates it with a local restricted `tclsh` interpreter, emulates the component API needed for parameters, module properties, filesets, interfaces, instances, and connections, then invokes `VALIDATION_CALLBACK` and either `COMPOSITION_CALLBACK` or `ELABORATION_CALLBACK`.
 
-Use **IP definition** to inspect external interfaces and edit enabled parameters. **Apply & re-elaborate** runs the callbacks again and redraws conditional instances, connections, interface properties, and port widths. This workflow does not require Quartus.
+Every definition first appears as one component block. Leaf components stay as one block. A composition component has a **+** control that replaces the block with its internal instances and connections; **−** collapses it again. Click a one-line external interface such as `din` or `dout` directly on the canvas to expand it into physical signals such as `din.valid`, `din.data`, and `din.ready`; click any expanded signal to collapse the interface. Use **IP definition** to inspect parameters and the same signal metadata. **Apply & re-elaborate** runs the callbacks again and redraws parameter-dependent contents.
+
+For both leaf and composition components, **Files** lists effective `add_fileset_file` results and direct registrations made through sourced file helpers as a compact terminal-style `+`/`−` folder tree, for example `common/wip/common_hdl/packages` and `common/others/hdl/common_sc_fifo`. Click a filename to open that registered source beside the graph. Calls made through sourced helpers such as `add_wip_common_pkg_files` and `add_files_common_others_common_sc_fifo` are evaluated normally; the helper name remains available as file provenance rather than becoming a visual group. A file used by multiple filesets appears once with all purposes, such as `QUARTUS_SYNTH` and `SIM_VERILOG`. This workflow does not require Quartus.
 
 The interpreter supports normal Tcl control flow, procedures, substitutions, and workspace-local `source` files. It blocks external commands and unsafe filesystem operations, limits output, and stops slow evaluation. If a component depends on a vendor command that cannot be safely emulated, Qsys View falls back to a static preview and reports the reason.
 
@@ -119,7 +123,7 @@ code --install-extension YaroslavMariukha.qsys-view
 A local package can be installed with:
 
 ```bash
-code --install-extension qsys-view-1.1.3.vsix --force
+code --install-extension qsys-view-1.2.2.vsix --force
 ```
 
 ## Settings

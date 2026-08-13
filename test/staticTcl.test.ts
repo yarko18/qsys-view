@@ -91,9 +91,11 @@ describe.skipIf(!tclshAvailable)('traceQsysTcl', () => {
     const direct = parseEvaluatedHwTcl(await traceHwTcl(options), 'fallback');
     const bypass = parseEvaluatedHwTcl(await traceHwTcl({ ...options, parameters: { MODE: 'BYPASS' } }), 'fallback');
 
-    expect(direct.modules.map((module) => module.id)).toEqual(['source', 'sink']);
-    expect(bypass.modules.map((module) => module.id)).toEqual(['source', 'sink', 'bypass']);
-    expect(bypass.connections).toHaveLength(2);
+    expect(direct.modules.map((module) => module.id)).toEqual(['dynamic_component']);
+    expect(direct.component?.composition?.modules.map((module) => module.id)).toEqual(['source', 'sink']);
+    expect(bypass.component?.composition?.modules.map((module) => module.id)).toEqual(['source', 'sink', 'bypass']);
+    expect(bypass.component?.composition?.connections).toHaveLength(2);
+    expect(bypass.component?.mode).toBe('composition');
     expect(bypass.component?.parameters[0]?.value).toBe('BYPASS');
     expect(bypass.component?.externalInterfaces[0]).toMatchObject({
       name: 'din',

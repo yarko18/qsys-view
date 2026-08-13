@@ -5,6 +5,25 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 1.1.4
+
+- Allow nested IP workspaces to safely source sibling helpers under the same `quartus/platform/ip` tree, fixing empty files and interfaces for components such as Symbol Adapter.
+- Show the concrete safe-Tcl failure in the IP definition panel and Diagnostics instead of only displaying a generic partial-preview notice.
+- Search the shared Platform Designer IP tree when resolving exported interfaces to local child `*_hw.tcl` definitions.
+- Align all exported terminals and signal-label centres on each side of a component block.
+- Replace file cards with a compact terminal-style `+`/`−` tree and open registered sources by clicking their names.
+- Keep composition exports and registered source files visible when a component callback stops early, while reporting the Tcl error as a diagnostic.
+- Expand `din`/`dout` directly on the canvas into physical signals such as `din.valid`, with each signal's real direction and width.
+- Resolve exported composition ports from local child `*_hw.tcl` definitions without Quartus.
+- Show the folder-tree file list near the top of both leaf and composition IP definitions.
+- Keep component exports visible independently of the active system interface filters.
+- Display every Platform Designer `*_hw.tcl` definition as one collapsed component block.
+- Keep leaf components as a single block and allow composition components to expand into their internal IP instances and connections.
+- Show each external interface on one row and expand it on demand to inspect physical signal names, roles, directions, and widths.
+- Collect effective leaf-component files from workspace-local sourced Tcl helpers without running Quartus.
+- Show files as an expandable folder tree based on their effective paths while retaining helper provenance and merging synthesis and simulation registrations.
+- Leave `.tcl` and `*_hw.tcl` files in the text editor by default; only `.qsys` opens directly in Qsys View.
+
 ## 1.1.3
 
 - Draw an explicit interconnect node for one-to-many, many-to-one, and many-to-many topologies across Avalon-MM, IRQ, conduit, and unresolved connections.

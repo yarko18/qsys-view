@@ -1,7 +1,7 @@
 // Copyright 2026 Yaroslav Mariukha
 // SPDX-License-Identifier: MIT
 
-import { connectionKinds, type ConnectionKind, type QsysAdaptation, type QsysComponentInterface, type QsysComponentParameter, type QsysConnection, type QsysDiagnostic, type QsysGraph, type QsysInterface, type QsysModule } from '../parser/graph';
+import { connectionKinds, type ConnectionKind, type QsysAdaptation, type QsysComponentFile, type QsysComponentInterface, type QsysComponentParameter, type QsysConnection, type QsysDiagnostic, type QsysGraph, type QsysInterface, type QsysModule } from '../parser/graph';
 import { streamParameters } from '../parser/streamMetadata';
 import { createInterfaceWaveform } from '../parser/waveform';
 import { groupParameters } from './parameterGroups';
@@ -12,7 +12,8 @@ import { exportedInterfaceStubLength, layoutAnchoredGraph, layoutGraph, layoutSt
 import { composeHierarchy, hierarchyBounds, type HierarchyBounds } from './hierarchy';
 import { connectionAddress, createInterfaceHubs, type HubKind, type InterfaceHub } from './interfaceHubs';
 import { availableConnectionKinds, canUsePipelineView, connectedModuleIds, inferClockResetConnections, inferSourceDomainConnectionKinds, isDirectKind, isHubKind, type GraphViewMode } from './viewMode';
-import { collectExportedInterfaces, type ExportedInterface } from './exportedInterfaces';
+import { collectExportedInterfaces } from './exportedInterfaces';
+import { componentDefinitionExports, type VisibleSystemExport } from './componentInterfaces';
 import './styles.css';
 
 const vscode = acquireVsCodeApi();
@@ -94,7 +95,8 @@ const pendingSubsystemActions = new Map<string, 'expand' | 'enter'>();
 const navigationStack: NavigationFrame[] = [];
 let activeHubId: string | undefined;
 let visibleHubs: InterfaceHub[] = [];
-let visibleSystemExports: ExportedInterface[] = [];
+let visibleSystemExports: VisibleSystemExport[] = [];
+const expandedComponentInterfaces = new Set<string>();
 let layoutExternalPorts: LayoutExternalPort[] = [];
 let layoutAnchorConnections: QsysConnection[] = [];
 let disabledConnectionIds = new Set<string>();
@@ -305,7 +307,20 @@ window.addEventListener('message', (event: MessageEvent) => {
     receivedInitialState = true;
     if (message.resource) updateNavigationResourceGraph(message.resource, message.graph);
     activeResource = message.resource ?? activeResource;
+    const previousComponentId = sourceGraph?.component?.moduleId;
+    const componentWasExpanded = Boolean(previousComponentId && expandedSubsystems.has(previousComponentId));
+    if (previousComponentId) {
+      for (const id of [...expandedSubsystems.keys()]) {
+        if (id === previousComponentId || id.startsWith(`${previousComponentId}/`)) {
+          expandedSubsystems.delete(id);
+          expandedSubsystemResources.delete(id);
+        }
+      }
+    }
     sourceGraph = message.graph;
+    if (componentWasExpanded && sourceGraph.component?.composition) {
+      expandedSubsystems.set(sourceGraph.component.moduleId, sourceGraph.component.composition);
+    }
     graph = composeHierarchy(sourceGraph, expandedSubsystems);
     if (firstGraph) didInitialFit = false;
     if (firstGraph && sourceGraph.component) componentPanelOpen = true;
@@ -398,22 +413,39 @@ async function render(): Promise<void> {
   const enabledKinds = selectedKinds().filter((kind) => isDirectKind(kind, state.viewMode) || isHubKind(kind, state.viewMode));
   const selectedConnections = allowedConnections.filter((connection) => enabledKinds.includes(connection.kind));
   const connections = selectedConnections.filter((connection) => isDirectKind(connection.kind, state.viewMode));
+  const componentDefinition = Boolean(sourceGraph?.component);
   const supportedExports = collectExportedInterfaces(renderedGraph).filter((item) =>
     allowedIds.has(item.moduleId)
-    && (isDirectKind(item.kind, state.viewMode) || isHubKind(item.kind, state.viewMode)),
+    && (componentDefinition || isDirectKind(item.kind, state.viewMode) || isHubKind(item.kind, state.viewMode)),
   );
-  const selectedExports = supportedExports.filter((item) => enabledKinds.includes(item.kind));
-  const externalPorts = supportedExports.map((item) => ({
+  // An IP definition's pins are part of the block itself. Connection-kind
+  // filters are useful for systems, but must never make component pins vanish.
+  const selectedExports = componentDefinition
+    ? supportedExports
+    : supportedExports.filter((item) => enabledKinds.includes(item.kind));
+  const displayedExports = componentDefinitionExports(
+    selectedExports,
+    sourceGraph?.component,
+    expandedComponentInterfaces,
+  );
+  const layoutExports = componentDefinition
+    ? displayedExports
+    : componentDefinitionExports(supportedExports, undefined, expandedComponentInterfaces);
+  const externalPorts = layoutExports.map((item) => ({
     moduleId: item.moduleId,
-    interfaceName: item.port,
+    interfaceName: item.anchorPort,
     direction: item.side,
-    label: item.name,
+    label: item.displayName,
   } satisfies LayoutExternalPort));
   const selectedHubKinds = enabledKinds.filter((kind) => isHubKind(kind, state.viewMode));
   const hubs = createInterfaceHubs(renderedGraph, selectedHubKinds, allowedIds);
   const connectedIds = connectedModuleIds(connections, hubs);
   for (const item of supportedExports) connectedIds.add(item.moduleId);
-  const modules = state.showDisconnected
+  const componentCollapsed = Boolean(
+    sourceGraph?.component
+    && !expandedSubsystems.has(sourceGraph.component.moduleId),
+  );
+  const modules = state.showDisconnected || componentCollapsed
     ? allowedModules
     : allowedModules.filter((module) => connectedIds.has(module.id));
   try {
@@ -447,7 +479,7 @@ async function render(): Promise<void> {
       externalPorts,
     );
     layout = result;
-    visibleSystemExports = selectedExports;
+    visibleSystemExports = displayedExports;
     layoutExternalPorts = externalPorts;
     layoutAnchorConnections = structuralFabricGraph.connections;
     setVisibleConnectionFabrics(visibleFabricGraph.fabrics);
@@ -588,9 +620,15 @@ function draw(result: LayoutResult): void {
     kind.textContent = truncate(node.type, 34);
     group.append(name, kind);
     if (node.subsystem) group.append(subsystemExpandControl(node, node.width));
+    else if (componentComposition(node)) group.append(componentExpandControl(node, node.width));
     const openDetails = (event: Event) => {
       event.stopPropagation();
-      showModuleDetails(node);
+      if (sourceGraph?.component?.moduleId === node.id) {
+        componentPanelOpen = true;
+        showComponentDetails();
+      } else {
+        showModuleDetails(node);
+      }
     };
     group.addEventListener('click', openDetails);
     group.addEventListener('keydown', (event) => {
@@ -605,7 +643,9 @@ function draw(result: LayoutResult): void {
     scene.append(group);
   }
   for (const container of hierarchyContainers) {
-    drawHierarchyEnterControl(container.instanceId, container.bounds);
+    if (expandedSubsystemResources.has(container.instanceId)) {
+      drawHierarchyEnterControl(container.instanceId, container.bounds);
+    }
     drawHierarchyCollapseControl(container.instanceId, container.bounds);
   }
   createMarkers();
@@ -781,24 +821,69 @@ function updateConnectionVisibilityControl(): void {
   restoreConnections.textContent = count === 0 ? 'Restore connections' : `Restore connections (${count})`;
 }
 
+function toggleComponentInterface(name: string): void {
+  const iface = sourceGraph?.component?.externalInterfaces.find((candidate) => candidate.name === name);
+  if (!iface?.ports.length) {
+    componentPanelOpen = true;
+    showComponentDetails(name);
+    return;
+  }
+  if (expandedComponentInterfaces.has(name)) expandedComponentInterfaces.delete(name);
+  else expandedComponentInterfaces.add(name);
+  delete stableLayoutCaches.pipeline;
+  delete stableLayoutCaches.complete;
+  didInitialFit = false;
+  void render();
+}
+
 function drawSystemExports(result: LayoutResult): void {
   const nodes = new Map(result.nodes.map((node) => [node.id, node]));
+  const stubLengths = new Map<string, number>();
+  for (const item of visibleSystemExports) {
+    const key = `${item.moduleId}\u0000${item.side}`;
+    stubLengths.set(key, Math.max(
+      stubLengths.get(key) ?? 0,
+      exportedInterfaceStubLength(systemExportLabel(item)),
+    ));
+  }
   for (const item of visibleSystemExports) {
     const node = nodes.get(item.moduleId);
     if (!node) continue;
     const anchorY = portAnchorY(
       node,
       item.side,
-      item.port,
+      item.anchorPort,
       layoutAnchorConnections,
       layoutExternalPorts,
     );
-    const stubLength = exportedInterfaceStubLength(item.name);
+    const collapsedComponentInterface = Boolean(item.expandable && !item.signal);
+    const labelText = systemExportLabel(item);
+    // Align every terminal and label centre on the same side of one block.
+    // The longest label determines the shared export-stub length.
+    const stubLength = stubLengths.get(`${item.moduleId}\u0000${item.side}`)
+      ?? exportedInterfaceStubLength(labelText);
     const input = item.side === 'input';
     const internal = { x: input ? node.x : node.x + node.width, y: anchorY };
     const external = { x: internal.x + (input ? -stubLength : stubLength), y: anchorY };
-    const points = input ? [external, internal] : [internal, external];
-    const group = svg('g', { class: `edge edge-${item.kind} exported-interface` });
+    const signalDirection = item.signal?.direction.toLowerCase();
+    const flowsIntoBlock = signalDirection === 'input'
+      ? true
+      : signalDirection === 'output'
+        ? false
+        : input;
+    const points = flowsIntoBlock ? [external, internal] : [internal, external];
+    const componentInterface = Boolean(sourceGraph?.component);
+    const group = svg('g', {
+      class: `edge edge-${item.kind} exported-interface${componentInterface ? ' component-exported-interface' : ''}${collapsedComponentInterface ? ' collapsed-component-interface' : ''}`,
+      ...(componentInterface ? {
+        tabindex: '0',
+        role: 'button',
+        ...(item.expandable ? { 'aria-expanded': item.signal ? 'true' : 'false' } : {}),
+        'aria-label': item.expandable
+          ? `${item.signal ? 'Collapse' : 'Expand'} interface ${item.componentInterface}`
+          : `Open interface ${item.name} details`,
+      } : {}),
+    });
     group.append(svg('path', {
       d: pathData(points),
       class: 'edge-line exported-interface-line',
@@ -815,12 +900,31 @@ function drawSystemExports(result: LayoutResult): void {
       y: anchorY - 7,
       class: 'exported-interface-label',
     });
-    label.textContent = item.name;
+    label.textContent = labelText;
     const title = svg('title');
-    title.textContent = `${item.name} ↔ ${item.endpoint}\n${labels[item.kind]} (${item.rawKind})`;
+    title.textContent = item.signal
+      ? `${item.displayName}: ${item.signal.name}\n${item.signal.direction}, ${item.signal.width} bit${item.signal.width === 1 ? '' : 's'}\nClick to collapse ${item.componentInterface}`
+      : `${item.name} ↔ ${item.endpoint}\n${labels[item.kind]} (${item.rawKind})${item.expandable ? '\nClick to expand physical signals' : ''}`;
     group.append(label, title);
+    if (componentInterface) {
+      const open = (event: Event) => {
+        event.stopPropagation();
+        toggleComponentInterface(item.componentInterface ?? item.name);
+      };
+      group.addEventListener('click', open);
+      group.addEventListener('keydown', (event) => {
+        const key = (event as KeyboardEvent).key;
+        if (key === 'Enter' || key === ' ') open(event);
+      });
+    }
     scene.append(group);
   }
+}
+
+function systemExportLabel(item: VisibleSystemExport): string {
+  if (!item.componentInterface) return item.displayName;
+  if (item.signal) return `${item.firstSignal ? '▾ ' : ''}${item.displayName}`;
+  return `${item.expandable ? '▸ ' : ''}${item.displayName}`;
 }
 
 function drawHierarchyBackground(instanceId: string, bounds: HierarchyBounds): void {
@@ -1016,7 +1120,7 @@ function createMarkers(): void {
   }
 }
 
-function showComponentDetails(): void {
+function showComponentDetails(expandedInterface?: string): void {
   const component = sourceGraph?.component;
   if (!component) return;
   details.replaceChildren();
@@ -1024,14 +1128,49 @@ function showComponentDetails(): void {
   heading.textContent = sourceGraph?.name ?? component.kind ?? 'IP definition';
   const type = document.createElement('div');
   type.className = 'details-type';
-  type.textContent = [component.kind, component.version ? `v${component.version}` : undefined]
+  type.textContent = [
+    component.kind,
+    component.version ? `v${component.version}` : undefined,
+    component.mode === 'composition' ? 'composition' : 'leaf component',
+  ]
     .filter(Boolean).join(' · ');
   const note = document.createElement('p');
   note.className = 'details-note';
   note.textContent = component.exact
-    ? 'Parameters and callbacks are evaluated locally with the safe Tcl interpreter; Quartus is not required.'
-    : 'Static preview only. Trust the workspace and configure tclsh to evaluate callbacks.';
+    ? component.mode === 'composition'
+      ? 'Parameters and interfaces reflect the safely evaluated composition callback. Expand the block to inspect its internal IP and connections.'
+      : 'Parameters, interfaces, and physical signals reflect the safely evaluated component callbacks; Quartus is not required.'
+    : 'Static or partial callback preview. Tcl errors are shown in Diagnostics; successfully registered interfaces and files are still available.';
   details.append(detailsCloseButton(), heading, type, note);
+  if (!component.exact) {
+    const reason = sourceGraph?.diagnostics?.find((diagnostic) =>
+      diagnostic.message.includes('stopped early')
+      || diagnostic.message.includes('elaboration unavailable'));
+    if (reason) {
+      const warning = document.createElement('p');
+      warning.className = 'metadata-unavailable';
+      warning.textContent = reason.message;
+      details.append(warning);
+    }
+  }
+
+  if (component.composition) {
+    const compositionActions = document.createElement('div');
+    compositionActions.className = 'details-actions';
+    const toggleComposition = document.createElement('button');
+    const expanded = expandedSubsystems.has(component.moduleId);
+    toggleComposition.textContent = expanded ? 'Collapse internal graph' : 'Expand internal graph';
+    toggleComposition.addEventListener('click', () => {
+      if (expanded) collapseSubsystem(component.moduleId);
+      else expandComponentComposition();
+    });
+    compositionActions.append(toggleComposition);
+    details.append(compositionActions);
+  }
+
+  // Keep sources near the top of the definition panel for both leaf IP and
+  // compositions. Compositions can register shared package files too.
+  appendComponentFiles(component.files);
 
   const title = document.createElement('h3');
   title.textContent = `Parameters (${component.parameters.length})`;
@@ -1104,7 +1243,9 @@ function showComponentDetails(): void {
   const interfacesTitle = document.createElement('h3');
   interfacesTitle.textContent = `External interfaces (${component.externalInterfaces.length})`;
   details.append(interfacesTitle);
-  for (const iface of component.externalInterfaces) details.append(componentInterfaceDetails(iface));
+  for (const iface of component.externalInterfaces) {
+    details.append(componentInterfaceDetails(iface, iface.name === expandedInterface));
+  }
   if (component.externalInterfaces.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'details-note';
@@ -1112,6 +1253,121 @@ function showComponentDetails(): void {
     details.append(empty);
   }
   details.classList.remove('hidden');
+}
+
+function appendComponentFiles(files: NonNullable<QsysGraph['component']>['files']): void {
+  const title = document.createElement('h3');
+  title.textContent = `Files (${files.length})`;
+  details.append(title);
+  if (files.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'details-note';
+    empty.textContent = 'No fileset files were registered by the evaluated component.';
+    details.append(empty);
+    return;
+  }
+
+  const tree = componentFileTree(files);
+  const root = document.createElement('div');
+  root.className = 'component-file-tree';
+  appendFileTreeContents(root, tree);
+  details.append(root);
+}
+
+interface ComponentFileTreeNode {
+  folders: Map<string, ComponentFileTreeNode>;
+  files: QsysComponentFile[];
+}
+
+function componentFileTree(files: readonly QsysComponentFile[]): ComponentFileTreeNode {
+  const root: ComponentFileTreeNode = { folders: new Map(), files: [] };
+  for (const file of files) {
+    const pathParts = file.path.replaceAll('\\', '/').split('/').filter(Boolean);
+    pathParts.pop();
+    // Component file paths frequently start with several ../ segments. They
+    // are useful in the full path shown on the file row, but add no useful
+    // hierarchy. Begin the visual tree at the first named folder instead.
+    while (pathParts[0] === '.' || pathParts[0] === '..') pathParts.shift();
+    let node = root;
+    for (const folder of pathParts) {
+      const child = node.folders.get(folder) ?? { folders: new Map(), files: [] };
+      node.folders.set(folder, child);
+      node = child;
+    }
+    node.files.push(file);
+  }
+  return root;
+}
+
+function appendFileTreeContents(parent: HTMLElement, node: ComponentFileTreeNode): void {
+  const folders = [...node.folders].sort(([left], [right]) => naturalTextOrder(left, right));
+  const files = [...node.files].sort((left, right) => naturalTextOrder(left.path, right.path));
+  const entries: Array<
+    | { type: 'folder'; name: string; node: ComponentFileTreeNode }
+    | { type: 'file'; file: QsysComponentFile }
+  > = [
+    ...folders.map(([name, child]) => ({ type: 'folder' as const, name, node: child })),
+    ...files.map((file) => ({ type: 'file' as const, file })),
+  ];
+  entries.forEach((entry, index) => {
+    const last = index === entries.length - 1;
+    if (entry.type === 'file') {
+      parent.append(componentFileRow(entry.file, last));
+      return;
+    }
+    const folder = document.createElement('details');
+    folder.className = `component-file-folder${last ? ' is-last' : ''}`;
+    const summary = document.createElement('summary');
+    const branch = document.createElement('span');
+    branch.className = 'component-file-branch';
+    branch.textContent = last ? '└─' : '├─';
+    const toggle = document.createElement('span');
+    toggle.className = 'component-file-toggle';
+    const name = document.createElement('strong');
+    name.textContent = entry.name;
+    const syncToggle = () => { toggle.textContent = folder.open ? '−' : '+'; };
+    folder.addEventListener('toggle', syncToggle);
+    syncToggle();
+    summary.append(branch, toggle, name);
+    const contents = document.createElement('div');
+    contents.className = 'component-file-folder-contents';
+    appendFileTreeContents(contents, entry.node);
+    folder.append(summary, contents);
+    parent.append(folder);
+  });
+}
+
+function componentFileRow(file: QsysComponentFile, last: boolean): HTMLElement {
+  const row = document.createElement('article');
+  row.className = 'component-file';
+  row.title = [
+    file.path,
+    file.origin ? `Registered by ${file.origin}` : 'Registered directly by the component',
+  ].join('\n');
+  const branch = document.createElement('span');
+  branch.className = 'component-file-branch';
+  branch.textContent = last ? '└─' : '├─';
+  const fileName = document.createElement('button');
+  fileName.type = 'button';
+  fileName.className = 'component-file-link';
+  fileName.textContent = file.path.replaceAll('\\', '/').split('/').at(-1) || file.name;
+  fileName.addEventListener('click', () => {
+    vscode.postMessage({
+      type: 'openComponentFile',
+      resource: activeResource,
+      path: file.path,
+    });
+  });
+  const metadata = document.createElement('span');
+  metadata.className = 'component-file-metadata';
+  const values = [file.type, ...file.filesets, ...file.tags].filter(Boolean);
+  metadata.textContent = values.length > 0 ? `(${values.join(', ')})` : '';
+  row.append(branch, fileName, metadata);
+  return row;
+}
+
+function naturalTextOrder(left: string, right: string): number {
+  return left.localeCompare(right, 'en', { numeric: true, sensitivity: 'base' });
 }
 
 function componentParameterField(parameter: QsysComponentParameter): {
@@ -1184,35 +1440,52 @@ function componentParameterField(parameter: QsysComponentParameter): {
   return { element: field, control };
 }
 
-function componentInterfaceDetails(iface: QsysComponentInterface): HTMLElement {
-  const section = document.createElement('section');
+function componentInterfaceDetails(iface: QsysComponentInterface, expanded = false): HTMLElement {
+  const section = document.createElement('details');
   section.className = `component-interface kind-${iface.kind}`;
-  const heading = document.createElement('h4');
+  section.open = expanded;
+  const summary = document.createElement('summary');
+  const heading = document.createElement('strong');
   heading.textContent = iface.name;
   const kind = document.createElement('div');
   kind.className = 'interface-kind';
-  kind.textContent = `${iface.rawKind} · ${iface.direction || 'unspecified direction'}`;
-  section.append(heading, kind);
+  kind.textContent = [
+    iface.rawKind,
+    iface.direction || 'unspecified direction',
+    `${iface.ports.length} signal${iface.ports.length === 1 ? '' : 's'}`,
+  ].join(' · ');
+  summary.append(heading, kind);
+  section.append(summary);
+  const body = document.createElement('div');
+  body.className = 'component-interface-body';
   if (iface.exportOf) {
     const exported = document.createElement('p');
     exported.className = 'details-note';
     exported.textContent = `Exports ${iface.exportOf}`;
-    section.append(exported);
+    body.append(exported);
   }
   if (Object.keys(iface.parameters).length > 0) {
     const properties = document.createElement('dl');
     for (const [name, value] of Object.entries(iface.parameters)) appendDefinition(properties, name, value);
-    section.append(properties);
+    body.append(properties);
   }
   if (iface.ports.length > 0) {
     const portTitle = document.createElement('h4');
-    portTitle.textContent = 'Ports';
+    portTitle.textContent = 'Signals';
     const ports = document.createElement('dl');
     for (const port of iface.ports) {
       appendDefinition(ports, port.role || port.name, `${port.width} bit · ${port.direction} · ${port.name}`);
     }
-    section.append(portTitle, ports);
+    body.append(portTitle, ports);
+  } else {
+    const empty = document.createElement('p');
+    empty.className = 'details-note';
+    empty.textContent = iface.exportOf
+      ? 'Physical signals belong to the exported internal interface.'
+      : 'No physical signals were declared for this interface.';
+    body.append(empty);
   }
+  section.append(body);
   return section;
 }
 
@@ -1589,6 +1862,48 @@ function showStatus(message: string, error = false): void {
 }
 
 function hideStatus(): void { status.classList.add('hidden'); }
+
+function componentComposition(module: QsysModule): QsysGraph | undefined {
+  const component = sourceGraph?.component;
+  return component?.mode === 'composition' && component.moduleId === module.id
+    ? component.composition
+    : undefined;
+}
+
+function componentExpandControl(module: QsysModule, nodeWidth: number): SVGGElement {
+  const control = svg('g', {
+    class: 'node-subsystem-control node-component-control',
+    transform: `translate(${Math.max(0, nodeWidth - 32)} 0)`,
+    tabindex: '0',
+    role: 'button',
+    'aria-label': `Expand component ${module.name}`,
+  });
+  const symbol = svg('text', { x: 16, y: 20 });
+  symbol.textContent = '+';
+  control.append(svg('circle', { cx: 16, cy: 16, r: 10 }), symbol);
+  const title = svg('title');
+  title.textContent = `Expand the internal composition of ${module.name}`;
+  control.append(title);
+  const expand = (event: Event) => {
+    event.stopPropagation();
+    expandComponentComposition();
+  };
+  control.addEventListener('click', expand);
+  control.addEventListener('dblclick', (event) => event.stopPropagation());
+  control.addEventListener('keydown', (event) => {
+    const key = (event as KeyboardEvent).key;
+    if (key === 'Enter' || key === ' ') expand(event);
+  });
+  return control;
+}
+
+function expandComponentComposition(): void {
+  const component = sourceGraph?.component;
+  if (!component?.composition) return;
+  expandedSubsystems.set(component.moduleId, component.composition);
+  refreshComposedHierarchy();
+}
+
 function subsystemExpandControl(module: QsysModule, nodeWidth: number): SVGGElement {
   const control = svg('g', {
     class: 'node-subsystem-control',

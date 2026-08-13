@@ -16,6 +16,7 @@ import { parseQsysTcl } from '../parser/qsysTclParser';
 import { platformDesignerArguments, platformDesignerTemporaryPrefix, qsysAnalysisTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclInspectionWrapper, qsysTclScriptArguments, siblingQsysSearchPattern, type TclVariableValue } from './qsysScript';
 import { traceHwTcl, traceQsysTcl } from './staticTcl';
 import { subsystemCandidatePaths, tclSubsystemBuildOrder } from './subsystems';
+import { isPathWithin, tclAllowedRoot } from './tclRoot';
 
 const lastViewStateKey = 'qsysView.lastViewState';
 
@@ -68,6 +69,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       instanceId?: string;
       analyze?: boolean;
       parameters?: Record<string, unknown>;
+      path?: string;
     }) => {
       if (message.type === 'ready') {
         await sendGraph(false, true);
@@ -106,6 +108,11 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
         await panel.webview.postMessage({ type: 'platformDesignerFinished' });
       } else if (message.type === 'revealDiagnostic' && Number.isInteger(message.line)) {
         await this.revealSource(message.resource ? subsystemUri(message.resource) : document.uri, message.line!);
+      } else if (message.type === 'openComponentFile' && message.path) {
+        await this.openComponentFile(
+          message.resource ? subsystemUri(message.resource) : document.uri,
+          message.path,
+        );
       } else if (message.type === 'loadSubsystem' && message.resource && message.instanceId) {
         loadedResources.add(message.resource);
         await this.sendSubsystem(message.resource, message.instanceId, Boolean(message.analyze), panel.webview);
@@ -141,6 +148,33 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       selection: new vscode.Range(position, position),
     });
     editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+  }
+
+  private async openComponentFile(componentUri: vscode.Uri, registeredPath: string): Promise<void> {
+    if (componentUri.scheme !== 'file') return;
+    const filePath = path.isAbsolute(registeredPath)
+      ? path.normalize(registeredPath)
+      : path.resolve(path.dirname(componentUri.fsPath), registeredPath);
+    const allowedRoot = this.safeTclRoot(componentUri);
+    if (!isPathWithin(allowedRoot, filePath)) {
+      void vscode.window.showWarningMessage(
+        `Qsys View did not open “${registeredPath}” because it is outside the permitted Platform Designer source tree.`,
+      );
+      return;
+    }
+    try {
+      const stat = await vscode.workspace.fs.stat(vscode.Uri.file(filePath));
+      if ((stat.type & vscode.FileType.File) === 0) throw new Error('the registered path is not a file');
+      const document = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
+      await vscode.window.showTextDocument(document, {
+        viewColumn: vscode.ViewColumn.Beside,
+        preserveFocus: false,
+        preview: false,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      void vscode.window.showWarningMessage(`Qsys View could not open “${registeredPath}”: ${message}`);
+    }
   }
 
   private async confirmAndLoadQuartus(uri: vscode.Uri, webview: vscode.Webview): Promise<void> {
@@ -252,14 +286,16 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     source: string,
     fallbackName: string,
     parameters: Record<string, TclVariableValue>,
+    visited = new Set<string>([uri.fsPath]),
   ): Promise<QsysGraph> {
     const lexical = parseHwTclStatic(source, fallbackName);
     if (!vscode.workspace.isTrusted || uri.scheme !== 'file') return lexical;
     const configuration = vscode.workspace.getConfiguration('qsysView', uri);
     const executable = configuration.get<string>('tclshPath', '').trim()
       || (process.platform === 'win32' ? 'tclsh.exe' : 'tclsh');
-    const workspaceRoot = vscode.workspace.getWorkspaceFolder(uri)?.uri.fsPath ?? path.dirname(uri.fsPath);
+    const workspaceRoot = this.safeTclRoot(uri);
     const controller = path.join(this.context.extensionUri.fsPath, 'quartus', 'trace-component.tcl');
+    let parsed: QsysGraph;
     try {
       const trace = await traceHwTcl({
         executable,
@@ -269,14 +305,114 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
         source,
         parameters,
       });
-      return parseEvaluatedHwTcl(trace, fallbackName);
+      parsed = parseEvaluatedHwTcl(trace, fallbackName, lexical);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      return {
+      parsed = {
         ...lexical,
         warnings: [...lexical.warnings, `Safe component elaboration unavailable: ${message}`],
+        diagnostics: [...(lexical.diagnostics ?? []), {
+          severity: 'warning',
+          message: `Safe component elaboration unavailable: ${message}`,
+        }],
       };
     }
+    return this.withLocalExportedInterfacePorts(uri, parsed, visited);
+  }
+
+  private async withLocalExportedInterfacePorts(
+    uri: vscode.Uri,
+    graph: QsysGraph,
+    visited: Set<string>,
+  ): Promise<QsysGraph> {
+    const component = graph.component;
+    const composition = component?.composition;
+    if (!component || !composition) return graph;
+    const modules = new Map(composition.modules.map((module) => [module.id, module]));
+    const compositionInterfaces = { ...composition.interfaces };
+    const externalInterfaces = await Promise.all(component.externalInterfaces.map(async (iface) => {
+      if (iface.ports.length > 0 || !iface.exportOf) return iface;
+      const separator = iface.exportOf.lastIndexOf('.');
+      if (separator < 0) return iface;
+      const moduleId = iface.exportOf.slice(0, separator);
+      const interfaceName = iface.exportOf.slice(separator + 1);
+      const module = modules.get(moduleId);
+      if (!module) return iface;
+      const definition = await this.findHwTclDefinition(uri, module.type);
+      if (!definition || visited.has(definition.fsPath)) return iface;
+      try {
+        const source = Buffer.from(await vscode.workspace.fs.readFile(definition)).toString('utf8');
+        const nextVisited = new Set(visited).add(definition.fsPath);
+        const child = await this.parseHwTclGraph(
+          definition,
+          source,
+          module.type,
+          // A partial composition trace can fall back to lexical instance
+          // parameters such as $configuration(WIDTH). Passing those strings
+          // as real child overrides would break its callback. Defaults still
+          // provide the interface roles; retain only values that Tcl resolved.
+          Object.fromEntries(Object.entries(module.parameters).filter(([, value]) =>
+            !['$', '[', ']'].some((marker) => String(value).includes(marker)))),
+          nextVisited,
+        );
+        const childInterface = child.component?.externalInterfaces.find((candidate) =>
+          candidate.name === interfaceName);
+        if (!childInterface) return iface;
+        compositionInterfaces[iface.exportOf] = {
+          module: moduleId,
+          name: interfaceName,
+          kind: childInterface.rawKind,
+          parameters: childInterface.parameters,
+          ports: childInterface.ports,
+          source: 'tcl',
+        };
+        return {
+          ...iface,
+          parameters: { ...childInterface.parameters, ...iface.parameters },
+          ports: childInterface.ports,
+        };
+      } catch {
+        // A missing or unsupported local child must not hide the composition.
+        return iface;
+      }
+    }));
+    const rootInterfaces = { ...graph.interfaces };
+    for (const iface of externalInterfaces) {
+      const address = `${component.moduleId}.${iface.name}`;
+      const existing = rootInterfaces[address];
+      if (existing) rootInterfaces[address] = {
+        ...existing,
+        parameters: iface.parameters,
+        ports: iface.ports,
+      };
+    }
+    return {
+      ...graph,
+      interfaces: rootInterfaces,
+      component: {
+        ...component,
+        externalInterfaces,
+        composition: { ...composition, interfaces: compositionInterfaces },
+      },
+    };
+  }
+
+  private async findHwTclDefinition(parent: vscode.Uri, kind: string): Promise<vscode.Uri | undefined> {
+    if (!/^[A-Za-z0-9_.-]+$/.test(kind)) return undefined;
+    const searchRoot = vscode.Uri.file(this.safeTclRoot(parent));
+    const matches = await vscode.workspace.findFiles(
+      new vscode.RelativePattern(searchRoot, `**/${kind}_hw.tcl`),
+      '**/{node_modules,.git}/**',
+      4,
+    );
+    return matches.find((candidate) => candidate.fsPath !== parent.fsPath);
+  }
+
+  private safeTclRoot(uri: vscode.Uri): string {
+    return tclAllowedRoot(
+      uri.fsPath,
+      vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath) ?? [],
+    );
   }
 
   private async parseTclGraph(uri: vscode.Uri, source: string, fallbackName: string): Promise<QsysGraph> {
@@ -285,7 +421,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     const configuration = vscode.workspace.getConfiguration('qsysView', uri);
     const executable = configuration.get<string>('tclshPath', '').trim()
       || (process.platform === 'win32' ? 'tclsh.exe' : 'tclsh');
-    const workspaceRoot = vscode.workspace.getWorkspaceFolder(uri)?.uri.fsPath ?? path.dirname(uri.fsPath);
+    const workspaceRoot = this.safeTclRoot(uri);
     const controller = path.join(this.context.extensionUri.fsPath, 'quartus', 'trace-system.tcl');
     try {
       const trace = await traceQsysTcl({

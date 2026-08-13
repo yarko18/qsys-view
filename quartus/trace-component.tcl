@@ -49,7 +49,9 @@ proc qv_source {slave allowed_root current requested} {
     set previous [interp eval $slave {set ::qv_active_path}]
     interp eval $slave [list set ::qv_active_path $resolved]
     try {
-        return [interp eval $slave [list uplevel #0 $script]]
+        set result [interp eval $slave [list uplevel #0 $script]]
+        interp eval $slave [list qv_install_file_traces $resolved $script]
+        return $result
     } finally {
         interp eval $slave [list set ::qv_active_path $previous]
     }
@@ -164,6 +166,17 @@ proc qv_run_callback {slave property} {
     return 1
 }
 
+proc qv_run_callback_safe {slave property} {
+    global qv_module_properties
+    if {![info exists qv_module_properties($property)] || $qv_module_properties($property) eq ""} {
+        return 0
+    }
+    if {[catch {interp eval $slave [list $qv_module_properties($property)]} callback_error]} {
+        qv_record qsys_view_component_callback_error $property $callback_error
+    }
+    return 1
+}
+
 set qv_slave [interp create -safe]
 interp alias $qv_slave file {} qv_file
 interp alias $qv_slave qv_source {} qv_source $qv_slave $qv_allowed_root
@@ -179,6 +192,45 @@ interp alias $qv_slave set_module_property {} qv_set_module_property
 interp alias $qv_slave get_module_property {} qv_get_module_property
 interp alias $qv_slave add_display_item {} qv_add_display_item
 interp eval $qv_slave {
+    array set qv_file_trace_callbacks {}
+
+    proc qv_file_registration_trace {origin command operation} {
+        set stack {}
+        # Execution traces run immediately before the registered procedure.
+        # Levels 1..N-1 therefore contain the semantic helper chain, from the
+        # outer component call to the innermost wrapper.
+        for {set level 1} {$level < [qv_info_core level]} {incr level} {
+            set frame [qv_info_core level $level]
+            if {[llength $frame] > 0} {
+                lappend stack [lindex $frame 0]
+            }
+        }
+        qv_record qsys_view_component_file_registration $origin $command $stack
+    }
+
+    proc qv_install_file_traces {origin script} {
+        variable qv_file_trace_callbacks
+        foreach command [qv_info_core procs] {
+            set tail [namespace tail $command]
+            if {![regexp {^add_(?:static_[[:alnum:]_]+_file|(?:c|cpp|h|hpp)_file)$} $tail]} {
+                continue
+            }
+            # Do not attribute an older primitive to every subsequently
+            # sourced helper file. Only the Tcl file that defines/redefines
+            # this procedure owns its registration trace.
+            set definition_pattern [format {^[ \t]*proc[ \t]+(?:::)?%s[ \t]} $tail]
+            if {![regexp -line -- $definition_pattern $script]} {
+                continue
+            }
+            if {[qv_info_core exists qv_file_trace_callbacks($command)]} {
+                catch {trace remove execution $command enter $qv_file_trace_callbacks($command)}
+            }
+            set callback [list qv_file_registration_trace $origin]
+            trace add execution $command enter $callback
+            set qv_file_trace_callbacks($command) $callback
+        }
+    }
+
     rename info qv_info_core
     proc info {subcommand args} {
         if {$subcommand eq "script" && [qv_info_core script] eq ""} {
@@ -206,11 +258,11 @@ interp eval $qv_slave [list set ::qv_active_path $qv_source_path]
 set qv_script [read stdin]
 if {[catch {
     interp eval $qv_slave $qv_script
-    qv_run_callback $qv_slave VALIDATION_CALLBACK
+    qv_run_callback_safe $qv_slave VALIDATION_CALLBACK
     qv_emit_parameter_values
-    if {[qv_run_callback $qv_slave COMPOSITION_CALLBACK]} {
+    if {[qv_run_callback_safe $qv_slave COMPOSITION_CALLBACK]} {
         qv_record qsys_view_component_mode composition
-    } elseif {[qv_run_callback $qv_slave ELABORATION_CALLBACK]} {
+    } elseif {[qv_run_callback_safe $qv_slave ELABORATION_CALLBACK]} {
         qv_record qsys_view_component_mode leaf
     } else {
         qv_record qsys_view_component_mode leaf

@@ -89,13 +89,33 @@ export interface QsysComponentInterface {
   exportOf?: string;
 }
 
+export interface QsysComponentFile {
+  /** Logical name registered in the Platform Designer fileset. */
+  name: string;
+  /** Component-relative or helper-provided source path. */
+  path: string;
+  type: string;
+  /** Semantic Tcl helper that registered the file. Empty for local declarations. */
+  origin?: string;
+  /** Platform Designer fileset purposes such as QUARTUS_SYNTH and SIM_VERILOG. */
+  filesets: string[];
+  tags: string[];
+  attributes: Record<string, string>;
+}
+
 export interface QsysComponentMetadata {
   source: 'hw-tcl';
   exact: boolean;
+  mode: 'composition' | 'leaf';
+  /** ID of the single component block shown while the definition is collapsed. */
+  moduleId: string;
   kind?: string;
   version?: string;
   parameters: QsysComponentParameter[];
   externalInterfaces: QsysComponentInterface[];
+  files: QsysComponentFile[];
+  /** Elaborated internal system, present only for a composition component. */
+  composition?: QsysGraph;
 }
 
 export interface QsysModule {
