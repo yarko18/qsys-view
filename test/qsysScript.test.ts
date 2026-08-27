@@ -2,7 +2,23 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, expect, it } from 'vitest';
-import { platformDesignerArguments, platformDesignerTemporaryPrefix, qsysAnalysisTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclInspectionWrapper, qsysTclScriptArguments, siblingQsysSearchPattern } from '../src/qsysScript';
+import { automaticQsysSearchPaths, platformDesignerArguments, platformDesignerScratchPrefix, platformDesignerTemporaryPrefix, preparedSubsystemSearchPath, qsysAnalysisTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclInspectionWrapper, qsysTclScriptArguments, quartusTemporaryEnvironment, siblingQsysSearchPattern } from '../src/qsysScript';
+
+describe('quartusTemporaryEnvironment', () => {
+  it('keeps the inherited environment while redirecting every Quartus temporary variable', () => {
+    expect(quartusTemporaryEnvironment('/tmp/qsys_view_pd_AbCd12', {
+      PATH: '/usr/bin',
+      TMP: '/old/tmp',
+      Temp: '/old/temp',
+      tmpdir: '/old/tmpdir',
+    })).toEqual({
+      PATH: '/usr/bin',
+      TMP: '/tmp/qsys_view_pd_AbCd12',
+      TEMP: '/tmp/qsys_view_pd_AbCd12',
+      TMPDIR: '/tmp/qsys_view_pd_AbCd12',
+    });
+  });
+});
 
 describe('platformDesignerArguments', () => {
   it('keeps the original IP search path when opening a disposable Qsys file', () => {
@@ -43,6 +59,12 @@ describe('qsysAnalysisTemporaryPrefix', () => {
     expect(qsysAnalysisTemporaryPrefix('/tmp', 'qsys')).toBe('/tmp/qsys_view_');
     expect(qsysAnalysisTemporaryPrefix('/tmp', 'tcl')).toBe('/tmp/qsys_view_tcl_');
     expect(qsysAnalysisTemporaryPrefix('/tmp', 'tcl')).not.toContain('-');
+  });
+});
+
+describe('platformDesignerScratchPrefix', () => {
+  it('keeps direct Qsys scratch data in the system temporary directory', () => {
+    expect(platformDesignerScratchPrefix('/tmp')).toBe('/tmp/qsys_view_pd_');
   });
 });
 
@@ -134,5 +156,35 @@ describe('platformDesignerTemporaryPrefix', () => {
 describe('siblingQsysSearchPattern', () => {
   it('lets qsys-script resolve nested systems beside the parent design', () => {
     expect(siblingQsysSearchPattern('/work/quartus')).toBe('/work/quartus/*.qsys');
+  });
+});
+
+describe('automaticQsysSearchPaths', () => {
+  it('can exclude stale sibling Qsys systems from a prepared dependency catalog', () => {
+    const paths = automaticQsysSearchPaths('/work/quartus', false);
+
+    expect(paths).not.toContain('/work/quartus/*.qsys');
+    expect(paths).toContain('/work/quartus/ip/*/component.ipx');
+    expect(paths).toContain('$');
+  });
+});
+
+describe('preparedSubsystemSearchPath', () => {
+  it('uses generated Tcl systems and exact Qsys-only dependencies without a stale sibling wildcard', () => {
+    const searchPath = preparedSubsystemSearchPath(
+      '/tmp/qsys_view_main_AbCd12',
+      ['/work/quartus/legacy.qsys'],
+      automaticQsysSearchPaths('/work/quartus', false).join(','),
+    );
+
+    expect(searchPath.split(',')).toEqual([
+      '/tmp/qsys_view_main_AbCd12/*.qsys',
+      '/work/quartus/legacy.qsys',
+      '/work/quartus/ip/*/component.ipx',
+      '/work/quartus/ip/common/**/*_hw.tcl',
+      '/work/quartus/*/component.ipx',
+      '$',
+    ]);
+    expect(searchPath).not.toContain('/work/quartus/*.qsys');
   });
 });

@@ -11,24 +11,38 @@ export function subsystemCandidatePaths(parentFilePath: string, moduleType: stri
   return extensions.map((extension) => path.join(path.dirname(parentFilePath), `${moduleType}${extension}`));
 }
 
+export interface SubsystemBuildPlan {
+  tcl: string[];
+  qsys: string[];
+}
+
+/** Returns all subsystem resources in dependency-first order, grouped by source format. */
+export async function subsystemBuildPlan(
+  rootResource: string,
+  rootGraph: QsysGraph,
+  loadGraph: (resource: string) => Promise<QsysGraph>,
+): Promise<SubsystemBuildPlan> {
+  const visited = new Set([rootResource]);
+  const plan: SubsystemBuildPlan = { tcl: [], qsys: [] };
+  const visit = async (graph: QsysGraph): Promise<void> => {
+    for (const module of graph.modules) {
+      const reference = module.subsystem;
+      if (!reference || visited.has(reference.resource)) continue;
+      visited.add(reference.resource);
+      const child = await loadGraph(reference.resource);
+      await visit(child);
+      plan[reference.format].push(reference.resource);
+    }
+  };
+  await visit(rootGraph);
+  return plan;
+}
+
 /** Returns Tcl subsystem resources in dependency-first build order. */
 export async function tclSubsystemBuildOrder(
   rootResource: string,
   rootGraph: QsysGraph,
   loadGraph: (resource: string) => Promise<QsysGraph>,
 ): Promise<string[]> {
-  const visited = new Set([rootResource]);
-  const order: string[] = [];
-  const visit = async (graph: QsysGraph): Promise<void> => {
-    for (const module of graph.modules) {
-      const reference = module.subsystem;
-      if (!reference || reference.format !== 'tcl' || visited.has(reference.resource)) continue;
-      visited.add(reference.resource);
-      const child = await loadGraph(reference.resource);
-      await visit(child);
-      order.push(reference.resource);
-    }
-  };
-  await visit(rootGraph);
-  return order;
+  return (await subsystemBuildPlan(rootResource, rootGraph, loadGraph)).tcl;
 }

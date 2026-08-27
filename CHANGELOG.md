@@ -5,6 +5,12 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 1.1.5
+
+- Build a single temporary subsystem catalog for exported Tcl hierarchies so stale sibling `.qsys` files cannot override freshly generated Tcl dependencies.
+- Add recursive Qsys-only dependencies by exact path while preserving their original relative resources.
+- Redirect Quartus scratch files into Qsys View's disposable directories so `altera_pll` no longer leaves `sopc_altera_pll*` folders in the user's home directory.
+
 ## 1.1.4
 
 - Allow nested IP workspaces to safely source sibling helpers under the same `quartus/platform/ip` tree, fixing empty files and interfaces for components such as Symbol Adapter.

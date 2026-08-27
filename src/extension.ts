@@ -13,9 +13,22 @@ import { applyQuartusMetadata } from '../parser/quartusMetadataParser';
 import { parseQsys } from '../parser/qsysParser';
 import { parseEvaluatedQsysTcl } from '../parser/qsysTclEvaluation';
 import { parseQsysTcl } from '../parser/qsysTclParser';
-import { platformDesignerArguments, platformDesignerTemporaryPrefix, qsysAnalysisTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclInspectionWrapper, qsysTclScriptArguments, siblingQsysSearchPattern, type TclVariableValue } from './qsysScript';
+import {
+  automaticQsysSearchPaths,
+  platformDesignerArguments,
+  platformDesignerScratchPrefix,
+  platformDesignerTemporaryPrefix,
+  preparedSubsystemSearchPath,
+  qsysAnalysisTemporaryPrefix,
+  qsysScriptArguments,
+  qsysTclExportWrapper,
+  qsysTclInspectionWrapper,
+  qsysTclScriptArguments,
+  quartusTemporaryEnvironment,
+  type TclVariableValue,
+} from './qsysScript';
 import { traceHwTcl, traceQsysTcl } from './staticTcl';
-import { subsystemCandidatePaths, tclSubsystemBuildOrder } from './subsystems';
+import { subsystemBuildPlan, subsystemCandidatePaths } from './subsystems';
 import { isPathWithin, tclAllowedRoot } from './tclRoot';
 
 const lastViewStateKey = 'qsysView.lastViewState';
@@ -549,7 +562,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     if (uri.scheme !== 'file') throw new Error('qsys-script metadata is available only for local files.');
     const executable = await this.findQsysScript(uri);
     const projectDirectory = path.dirname(uri.fsPath);
-    const searchPath = this.ipSearchPath(uri, projectDirectory);
+    const searchPath = this.ipSearchPath(uri, projectDirectory, false);
     const temporaryDirectory = await fs.mkdtemp(qsysAnalysisTemporaryPrefix(os.tmpdir(), 'tcl'));
     const wrapper = path.join(temporaryDirectory, 'inspect_exported_system.tcl');
     const evaluatedSystem = path.join(temporaryDirectory, 'evaluated.qsys');
@@ -595,13 +608,28 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     searchPath: string,
     progress?: vscode.Progress<{ message?: string }>,
   ): Promise<string> {
-    const dependencyOrder = await tclSubsystemBuildOrder(
+    const dependencyPlan = await subsystemBuildPlan(
       rootUri.toString(),
       rootGraph,
       async (resource) => (await this.readGraph(subsystemUri(resource))).graph,
     );
-    const temporarySearchPath = `${path.join(temporaryDirectory, '*.qsys')},${searchPath}`;
-    for (const [index, resource] of dependencyOrder.entries()) {
+    const temporarySearchPath = preparedSubsystemSearchPath(
+      temporaryDirectory,
+      dependencyPlan.qsys.map((resource) => subsystemUri(resource).fsPath),
+      searchPath,
+    );
+    const stagedSystems = new Map<string, string>();
+    for (const resource of [...dependencyPlan.qsys, ...dependencyPlan.tcl]) {
+      const dependencyUri = subsystemUri(resource);
+      const systemName = path.basename(dependencyUri.fsPath, path.extname(dependencyUri.fsPath));
+      const catalogName = process.platform === 'win32' ? systemName.toLowerCase() : systemName;
+      const existing = stagedSystems.get(catalogName);
+      if (existing && existing !== resource) {
+        throw new Error(`Subsystems ${existing} and ${resource} share the catalog name ${systemName}.`);
+      }
+      stagedSystems.set(catalogName, resource);
+    }
+    for (const [index, resource] of dependencyPlan.tcl.entries()) {
       const dependencyUri = subsystemUri(resource);
       const systemName = path.basename(dependencyUri.fsPath, path.extname(dependencyUri.fsPath));
       const generatedSystemPath = path.join(temporaryDirectory, `${systemName}.qsys`);
@@ -627,7 +655,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     return temporarySearchPath;
   }
 
-  private ipSearchPath(uri: vscode.Uri, projectDirectory: string): string {
+  private ipSearchPath(uri: vscode.Uri, projectDirectory: string, includeSiblingQsys = true): string {
     const configuration = vscode.workspace.getConfiguration('qsysView', uri);
     const configured = configuration.get<string[]>('ipSearchPaths', []);
     const workspaceDirectory = vscode.workspace.getWorkspaceFolder(uri)?.uri.fsPath ?? projectDirectory;
@@ -639,11 +667,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     };
     return [...new Set([
       ...configured.map(expand),
-      siblingQsysSearchPattern(projectDirectory),
-      path.join(projectDirectory, 'ip', '*', 'component.ipx'),
-      path.join(projectDirectory, 'ip', 'common', '**', '*_hw.tcl'),
-      path.join(projectDirectory, '*', 'component.ipx'),
-      '$',
+      ...automaticQsysSearchPaths(projectDirectory, includeSiblingQsys),
     ].filter(Boolean))].join(',');
   }
 
@@ -716,18 +740,26 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
           title: 'Qsys View: opening Platform Designer…',
         },
         async (progress) => {
-          const launchTarget = isQsysTcl(uri)
-            ? await this.prepareTemporaryQsys(uri, await this.findQsysScript(uri), progress)
-            : {
+          let launchTarget;
+          if (isQsysTcl(uri)) {
+            launchTarget = await this.prepareTemporaryQsys(uri, await this.findQsysScript(uri), progress);
+          } else {
+            const temporaryDirectory = await fs.mkdtemp(platformDesignerScratchPrefix(os.tmpdir()));
+            launchTarget = {
               filePath: uri.fsPath,
               searchPath,
-              cleanup: undefined as (() => Promise<void>) | undefined,
+              temporaryDirectory,
+              cleanup: async () => {
+                await fs.rm(temporaryDirectory, { recursive: true, force: true });
+              },
             };
+          }
           progress.report({ message: 'Launching Platform Designer…' });
           await this.launchPlatformDesigner(
             platformDesignerExecutable,
             launchTarget.filePath,
             launchTarget.searchPath,
+            launchTarget.temporaryDirectory,
             launchTarget.cleanup,
           );
         },
@@ -743,7 +775,12 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     uri: vscode.Uri,
     executable: string,
     progress?: vscode.Progress<{ message?: string }>,
-  ): Promise<{ filePath: string; searchPath: string; cleanup?: () => Promise<void> }> {
+  ): Promise<{
+    filePath: string;
+    searchPath: string;
+    temporaryDirectory: string;
+    cleanup: () => Promise<void>;
+  }> {
     const temporaryDirectory = await fs.mkdtemp(platformDesignerTemporaryPrefix(uri.fsPath));
     const temporaryQsys = path.join(temporaryDirectory, `${path.basename(uri.fsPath, path.extname(uri.fsPath))}.qsys`);
     const wrapper = path.join(temporaryDirectory, 'export_system.tcl');
@@ -754,7 +791,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
         graph,
         executable,
         temporaryDirectory,
-        this.ipSearchPath(uri, path.dirname(uri.fsPath)),
+        this.ipSearchPath(uri, path.dirname(uri.fsPath), false),
         progress,
       );
       progress?.report({ message: 'Converting Tcl to temporary Qsys…' });
@@ -771,6 +808,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
       return {
         filePath: temporaryQsys,
         searchPath,
+        temporaryDirectory,
         cleanup: async () => {
           await fs.rm(temporaryDirectory, { recursive: true, force: true });
         },
@@ -785,11 +823,13 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     executable: string,
     filePath: string,
     searchPath: string,
+    temporaryDirectory: string,
     cleanup?: () => Promise<void>,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const child = spawn(executable, platformDesignerArguments(filePath, searchPath), {
         cwd: path.dirname(filePath),
+        env: quartusTemporaryEnvironment(temporaryDirectory),
         detached: true,
         stdio: 'ignore',
         windowsHide: true,
@@ -910,7 +950,11 @@ function runQsysScript(executable: string, args: string[], cwd: string): Promise
     // the inspector starts. Keep a guard for genuinely stuck Quartus runs,
     // but do not abort normal camera-sized systems at the old two-minute mark.
     const timeoutMs = 30 * 60_000;
-    const child = spawn(executable, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(executable, args, {
+      cwd,
+      env: quartusTemporaryEnvironment(cwd),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
     const metadataLines: string[] = [];
     const diagnostics: string[] = [];
     const tail: string[] = [];

@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { QsysGraph, QsysModule } from '../parser/graph';
-import { subsystemCandidatePaths, tclSubsystemBuildOrder } from '../src/subsystems';
+import { subsystemBuildPlan, subsystemCandidatePaths, tclSubsystemBuildOrder } from '../src/subsystems';
 
 describe('subsystemCandidatePaths', () => {
   it('prefers the same source format as the parent system', () => {
@@ -33,7 +33,7 @@ function graph(name: string, modules: QsysModule[] = []): QsysGraph {
   };
 }
 
-function subsystem(id: string, resource: string): QsysModule {
+function subsystem(id: string, resource: string, format: 'tcl' | 'qsys' = 'tcl'): QsysModule {
   return {
     id,
     name: id,
@@ -41,7 +41,7 @@ function subsystem(id: string, resource: string): QsysModule {
     disabled: false,
     parameters: {},
     ports: [],
-    subsystem: { resource, format: 'tcl' },
+    subsystem: { resource, format },
   };
 }
 
@@ -60,5 +60,28 @@ describe('tclSubsystemBuildOrder', () => {
     );
 
     expect(order).toEqual(['file:///b.tcl', 'file:///a.tcl']);
+  });
+
+  it('plans Tcl builds and Qsys-only staging recursively without duplicates', async () => {
+    const root = graph('root', [
+      subsystem('a', 'file:///a.tcl'),
+      subsystem('c', 'file:///c.qsys', 'qsys'),
+    ]);
+    const children = new Map([
+      ['file:///a.tcl', graph('a', [subsystem('b', 'file:///b.qsys', 'qsys')])],
+      ['file:///b.qsys', graph('b')],
+      ['file:///c.qsys', graph('c', [subsystem('b', 'file:///b.qsys', 'qsys')])],
+    ]);
+
+    const plan = await subsystemBuildPlan(
+      'file:///root.tcl',
+      root,
+      async (resource) => children.get(resource)!,
+    );
+
+    expect(plan).toEqual({
+      tcl: ['file:///a.tcl'],
+      qsys: ['file:///b.qsys', 'file:///c.qsys'],
+    });
   });
 });

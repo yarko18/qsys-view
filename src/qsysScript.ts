@@ -5,6 +5,22 @@ import * as path from 'node:path';
 
 export type TclVariableValue = string | number | boolean;
 
+export function quartusTemporaryEnvironment(
+  temporaryDirectory: string,
+  inheritedEnvironment: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  const environment = { ...inheritedEnvironment };
+  for (const name of Object.keys(environment)) {
+    if (['TMP', 'TEMP', 'TMPDIR'].includes(name.toUpperCase())) delete environment[name];
+  }
+  return {
+    ...environment,
+    TMP: temporaryDirectory,
+    TEMP: temporaryDirectory,
+    TMPDIR: temporaryDirectory,
+  };
+}
+
 export function platformDesignerArguments(systemFilePath: string, searchPath: string): string[] {
   return [
     systemFilePath,
@@ -49,6 +65,10 @@ export function qsysAnalysisTemporaryPrefix(
   return path.join(temporaryRoot, format === 'tcl' ? 'qsys_view_tcl_' : 'qsys_view_');
 }
 
+export function platformDesignerScratchPrefix(temporaryRoot: string): string {
+  return path.join(temporaryRoot, 'qsys_view_pd_');
+}
+
 export function qsysTclExportWrapper(
   sourcePath: string,
   generatedSystemPath: string,
@@ -85,6 +105,31 @@ export function platformDesignerTemporaryPrefix(sourcePath: string): string {
 
 export function siblingQsysSearchPattern(projectDirectory: string): string {
   return path.join(projectDirectory, '*.qsys');
+}
+
+export function automaticQsysSearchPaths(
+  projectDirectory: string,
+  includeSiblingQsys = true,
+): string[] {
+  return [
+    ...(includeSiblingQsys ? [siblingQsysSearchPattern(projectDirectory)] : []),
+    path.join(projectDirectory, 'ip', '*', 'component.ipx'),
+    path.join(projectDirectory, 'ip', 'common', '**', '*_hw.tcl'),
+    path.join(projectDirectory, '*', 'component.ipx'),
+    '$',
+  ];
+}
+
+export function preparedSubsystemSearchPath(
+  temporaryDirectory: string,
+  qsysDependencies: string[],
+  searchPath: string,
+): string {
+  return [
+    path.join(temporaryDirectory, '*.qsys'),
+    ...qsysDependencies,
+    searchPath,
+  ].filter(Boolean).join(',');
 }
 
 function normalizeTclPath(value: string): string {
