@@ -90,15 +90,15 @@ export function pathMidpoint(paths: LayoutPoint[][]): LayoutPoint | undefined {
 }
 
 /**
- * Keeps an expanded subsystem in the pipeline band chosen by ELK. If its
- * visual container would cover unrelated modules, those overlapping modules
- * are moved below the container instead of pushing the subsystem itself to a
- * separate row.
+ * Preserves the flat ELK topology when subsystem decorations are added. Only
+ * real overlaps between visible nodes are separated; hidden descendants and
+ * empty space inside a hierarchy frame must not move the visible pipeline.
  */
 export function separateHierarchyGroups(
   layout: LayoutResult,
   expandedInstanceIds: readonly string[],
   externalPorts: readonly LayoutExternalPort[] = [],
+  visibleNodeIds?: ReadonlySet<string>,
 ): LayoutResult {
   const roots = expandedInstanceIds.filter((instanceId) =>
     !expandedInstanceIds.some((candidate) => candidate !== instanceId && instanceId.startsWith(`${candidate}/`)),
@@ -108,19 +108,14 @@ export function separateHierarchyGroups(
   let nodes = layout.nodes.map((node) => ({ ...node }));
   const offsets = new Map(nodes.map((node) => [node.id, { x: 0, y: 0 } satisfies NodeOffset]));
   for (const instanceId of roots) {
-    const descendants = nodes.filter((node) => node.id.startsWith(`${instanceId}/`));
+    const descendants = nodes.filter((node) => node.id.startsWith(`${instanceId}/`)
+      && (!visibleNodeIds || visibleNodeIds.has(node.id)));
     if (descendants.length === 0) continue;
     const descendantIds = new Set(descendants.map((node) => node.id));
-    const outsiders = nodes.filter((node) => !descendantIds.has(node.id));
-    const bounds = nodeBounds(descendants);
-    const frame = {
-      x: bounds.x - 18,
-      y: bounds.y - 42,
-      width: bounds.width + 36,
-      height: bounds.height + 60,
-    };
+    const outsiders = nodes.filter((node) => !descendantIds.has(node.id)
+      && (!visibleNodeIds || visibleNodeIds.has(node.id)));
     const overlappingIds = new Set(outsiders
-      .filter((node) => rectanglesOverlap(frame, node))
+      .filter((node) => descendants.some((descendant) => rectanglesOverlap(descendant, node)))
       .map((node) => node.id));
     if (overlappingIds.size === 0) continue;
 
@@ -130,14 +125,18 @@ export function separateHierarchyGroups(
       if (root === instanceId) continue;
       if (nodes.some((node) => overlappingIds.has(node.id) && node.id.startsWith(`${root}/`))) {
         for (const node of nodes) {
-          if (node.id.startsWith(`${root}/`)) overlappingIds.add(node.id);
+          if (node.id.startsWith(`${root}/`) && (!visibleNodeIds || visibleNodeIds.has(node.id))) {
+            overlappingIds.add(node.id);
+          }
         }
       }
     }
     const overlapping = nodes.filter((node) => overlappingIds.has(node.id));
     const overlapBounds = nodeBounds(overlapping);
-    let dy = frame.y + frame.height + 60 - overlapBounds.y;
-    const stationary = nodes.filter((node) => !overlappingIds.has(node.id));
+    const bounds = nodeBounds(descendants);
+    let dy = bounds.y + bounds.height + 60 - overlapBounds.y;
+    const stationary = nodes.filter((node) => !overlappingIds.has(node.id)
+      && (!visibleNodeIds || visibleNodeIds.has(node.id)));
     for (;;) {
       const translated = overlapping.map((node) => ({ ...node, y: node.y + dy }));
       const collisions = stationary.filter((node) => translated.some((candidate) => rectanglesOverlap(candidate, node)));

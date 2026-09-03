@@ -5,6 +5,10 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 1.1.6
+
+- Preserve the flat ELK topology when a subsystem is expanded, so hidden IP and empty space inside the dashed hierarchy frame no longer push visible Avalon-ST blocks up or down.
+
 ## 1.1.5
 
 - Build a single temporary subsystem catalog for exported Tcl hierarchies so stale sibling `.qsys` files cannot override freshly generated Tcl dependencies.

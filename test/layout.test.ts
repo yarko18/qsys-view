@@ -66,7 +66,7 @@ describe('pathMidpoint', () => {
 });
 
 describe('expanded hierarchy layout', () => {
-  it('keeps a subsystem inline and moves a covered top-level node away', () => {
+  it('does not move flat topology merely covered by an expanded hierarchy frame', () => {
     const top = { ...module('top'), x: 200, y: 50, width: 100, height: 70 };
     const first = { ...module('nested/first'), x: 100, y: 40, width: 100, height: 70 };
     const second = { ...module('nested/second'), x: 350, y: 40, width: 100, height: 70 };
@@ -78,14 +78,30 @@ describe('expanded hierarchy layout', () => {
       edges: [{ ...link, paths: [[{ x: 300, y: 85 }, { x: 100, y: 75 }]] }],
     }, ['nested']);
 
-    expect(separated.nodes.find((node) => node.id === 'top')?.y).toBeGreaterThan(160);
+    expect(separated.nodes.find((node) => node.id === 'top')?.y).toBe(50);
     expect(separated.nodes.find((node) => node.id === 'nested/first')?.y).toBe(40);
     expect(separated.nodes.find((node) => node.id === 'nested/second')?.y)
       .toBe(separated.nodes.find((node) => node.id === 'nested/first')?.y);
     const targetPoint = separated.edges[0]!.paths[0]!.at(-1)!;
     expect(targetPoint.x).toBe(first.x);
-    expect(targetPoint.y).toBeGreaterThanOrEqual(first.y);
-    expect(targetPoint.y).toBeLessThanOrEqual(first.y + first.height);
+    expect(targetPoint.y).toBe(75);
+  });
+
+  it('ignores hidden descendants when protecting visible nodes from real overlaps', () => {
+    const top = { ...module('top'), x: 200, y: 50, width: 100, height: 70 };
+    const visible = { ...module('nested/coloring'), x: 350, y: 50, width: 100, height: 70 };
+    const hidden = { ...module('nested/mm_control'), x: 200, y: 50, width: 100, height: 70 };
+    const link = connection('into-child', 'top', 'nested/coloring', 'avalon_streaming');
+    const separated = separateHierarchyGroups({
+      width: 500,
+      height: 160,
+      nodes: [top, visible, hidden],
+      edges: [{ ...link, paths: [[{ x: 300, y: 85 }, { x: 350, y: 85 }]] }],
+    }, ['nested'], [], new Set(['top', 'nested/coloring']));
+
+    expect(separated.nodes.find((node) => node.id === 'top')?.y).toBe(50);
+    expect(separated.nodes.find((node) => node.id === 'nested/coloring')?.y).toBe(50);
+    expect(separated.nodes.find((node) => node.id === 'nested/mm_control')?.y).toBe(50);
   });
 });
 

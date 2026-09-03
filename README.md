@@ -88,7 +88,7 @@ Quartus analysis is user-triggered and runs on a disposable copy. It supplies ex
 
 ## Hierarchical systems
 
-When an IP type matches a sibling `.qsys` or `.tcl` file, its block has a **+** control. Expanding replaces only that instance with its internal graph, reconnects parent links through exported interfaces, and surrounds the child with a dashed container kept clear of top-level IP. Use **−** to collapse the container or **↘** to enter it as the full canvas.
+When an IP type matches a sibling `.qsys` or `.tcl` file, its block has a **+** control. Expanding replaces only that instance with its internal graph, reconnects parent links through exported interfaces, and surrounds the child with a dashed container without changing the flat IP topology chosen by the layout engine. Use **−** to collapse the container or **↘** to enter it as the full canvas.
 
 If the parent was read with **Read interfaces…**, expanded children are analyzed too. Nested Tcl connections therefore keep their exact interface types in Pipeline view, while exported clock and reset bridges remain part of the parent domain.
 

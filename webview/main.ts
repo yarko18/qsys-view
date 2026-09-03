@@ -467,6 +467,7 @@ async function render(): Promise<void> {
         await baseLayout(layoutModules, layoutConnections, externalPorts),
         [...expandedSubsystems.keys()],
         externalPorts,
+        new Set(visibleFabricGraph.modules.map((module) => module.id)),
       ),
       externalPorts,
     );
