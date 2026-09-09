@@ -30,6 +30,7 @@ import {
 import { traceHwTcl, traceQsysTcl } from './staticTcl';
 import { subsystemBuildPlan, subsystemCandidatePaths } from './subsystems';
 import { isPathWithin, tclAllowedRoot } from './tclRoot';
+import { LatestTaskScheduler } from './latestTaskScheduler';
 
 const lastViewStateKey = 'qsysView.lastViewState';
 
@@ -74,6 +75,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
         includeViewState,
         componentParameters.get(document.uri.toString()),
       );
+    const refreshes = new LatestTaskScheduler(250);
     panel.webview.onDidReceiveMessage(async (message: {
       type?: string;
       state?: unknown;
@@ -138,16 +140,21 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
 
     const watcher = vscode.workspace.onDidChangeTextDocument((event) => {
       if (loadedResources.has(event.document.uri.toString())) {
-        void this.sendGraph(
+        const resourceKey = event.document.uri.toString();
+        refreshes.schedule(resourceKey, (signal) => this.sendGraph(
           event.document.uri,
           panel.webview,
           false,
           false,
-          componentParameters.get(event.document.uri.toString()),
-        );
+          componentParameters.get(resourceKey),
+          signal,
+        ));
       }
     });
-    panel.onDidDispose(() => watcher.dispose());
+    panel.onDidDispose(() => {
+      watcher.dispose();
+      refreshes.dispose();
+    });
   }
 
   private async revealSource(uri: vscode.Uri, oneBasedLine: number): Promise<void> {
@@ -233,9 +240,11 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     loadQuartus = false,
     includeViewState = false,
     componentParameters: Record<string, TclVariableValue> = {},
+    signal?: AbortSignal,
   ): Promise<void> {
     try {
-      const source = await this.readGraph(uri, componentParameters);
+      const source = await this.readGraph(uri, componentParameters, signal);
+      if (signal?.aborted) return;
       const { bytes, fileName } = source;
       let { graph } = source;
       if (loadQuartus) {
@@ -260,6 +269,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
         : undefined;
       await webview.postMessage({ type: 'graph', graph, resource: uri.toString(), rememberedViewState });
     } catch (error) {
+      if (signal?.aborted) return;
       const message = error instanceof Error ? error.message : String(error);
       const line = /\bline\s+(\d+)\b/i.exec(message)?.[1];
       await webview.postMessage({
@@ -273,6 +283,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
   private async readGraph(
     uri: vscode.Uri,
     componentParameters: Record<string, TclVariableValue> = {},
+    signal?: AbortSignal,
   ): Promise<{ bytes: Uint8Array; fileName: string; graph: QsysGraph }> {
     const openDocument = vscode.workspace.textDocuments.find(
       (document) => document.uri.toString() === uri.toString(),
@@ -283,9 +294,9 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     const fileName = uri.path.split('/').pop()?.replace(/\.(?:qsys|tcl)$/i, '') || 'Qsys system';
     const source = bytes.toString('utf8');
     const parsed = isHwTcl(uri)
-      ? await this.parseHwTclGraph(uri, source, fileName, componentParameters)
+      ? await this.parseHwTclGraph(uri, source, fileName, componentParameters, undefined, signal)
       : isQsysTcl(uri)
-        ? await this.parseTclGraph(uri, source, fileName)
+        ? await this.parseTclGraph(uri, source, fileName, signal)
       : parseQsys(source, fileName);
     const modules = await Promise.all(parsed.modules.map(async (module) => {
       const subsystem = await this.findSubsystem(uri, module.type);
@@ -300,6 +311,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     fallbackName: string,
     parameters: Record<string, TclVariableValue>,
     visited = new Set<string>([uri.fsPath]),
+    signal?: AbortSignal,
   ): Promise<QsysGraph> {
     const lexical = parseHwTclStatic(source, fallbackName);
     if (!vscode.workspace.isTrusted || uri.scheme !== 'file') return lexical;
@@ -317,9 +329,11 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
         allowedRoot: workspaceRoot,
         source,
         parameters,
+        signal,
       });
       parsed = parseEvaluatedHwTcl(trace, fallbackName, lexical);
     } catch (error) {
+      if (signal?.aborted) throw error;
       const message = error instanceof Error ? error.message : String(error);
       parsed = {
         ...lexical,
@@ -330,13 +344,14 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
         }],
       };
     }
-    return this.withLocalExportedInterfacePorts(uri, parsed, visited);
+    return this.withLocalExportedInterfacePorts(uri, parsed, visited, signal);
   }
 
   private async withLocalExportedInterfacePorts(
     uri: vscode.Uri,
     graph: QsysGraph,
     visited: Set<string>,
+    signal?: AbortSignal,
   ): Promise<QsysGraph> {
     const component = graph.component;
     const composition = component?.composition;
@@ -367,6 +382,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
           Object.fromEntries(Object.entries(module.parameters).filter(([, value]) =>
             !['$', '[', ']'].some((marker) => String(value).includes(marker)))),
           nextVisited,
+          signal,
         );
         const childInterface = child.component?.externalInterfaces.find((candidate) =>
           candidate.name === interfaceName);
@@ -385,6 +401,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
           ports: childInterface.ports,
         };
       } catch {
+        if (signal?.aborted) throw new DOMException('Qsys graph refresh was cancelled.', 'AbortError');
         // A missing or unsupported local child must not hide the composition.
         return iface;
       }
@@ -428,7 +445,12 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     );
   }
 
-  private async parseTclGraph(uri: vscode.Uri, source: string, fallbackName: string): Promise<QsysGraph> {
+  private async parseTclGraph(
+    uri: vscode.Uri,
+    source: string,
+    fallbackName: string,
+    signal?: AbortSignal,
+  ): Promise<QsysGraph> {
     const lexical = parseQsysTcl(source, fallbackName);
     if (!vscode.workspace.isTrusted || uri.scheme !== 'file') return lexical;
     const configuration = vscode.workspace.getConfiguration('qsysView', uri);
@@ -444,6 +466,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
         allowedRoot: workspaceRoot,
         source,
         variables: this.tclVariables(uri),
+        signal,
       });
       const resolved = parseQsysTcl(trace, fallbackName);
       return {
@@ -454,6 +477,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
         },
       };
     } catch (error) {
+      if (signal?.aborted) throw error;
       const message = error instanceof Error ? error.message : String(error);
       return {
         ...lexical,

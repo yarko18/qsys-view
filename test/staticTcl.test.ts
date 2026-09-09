@@ -18,6 +18,19 @@ describe('extractStaticTclTrace', () => {
       'set_instance_parameter_value cvi MAX_WIDTH 1280',
     );
   });
+
+  it('does not start Tcl work when the request is already cancelled', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await expect(traceQsysTcl({
+      executable: 'an-executable-that-must-not-be-started',
+      controllerPath: 'controller.tcl',
+      sourcePath: 'source.tcl',
+      allowedRoot: '.',
+      source: '',
+      signal: controller.signal,
+    })).rejects.toMatchObject({ name: 'AbortError' });
+  });
 });
 
 describe.skipIf(!tclshAvailable)('traceQsysTcl', () => {

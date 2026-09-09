@@ -5,6 +5,11 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## 1.1.7
+
+- Debounce live Qsys and Tcl graph refreshes, keep only the latest edit, and serialize refresh work per source file.
+- Cancel superseded safe-Tcl analysis and force unresponsive `tclsh` subprocesses to exit after a bounded grace period.
+
 ## 1.1.6
 
 - Preserve the flat ELK topology when a subsystem is expanded, so hidden IP and empty space inside the dashed hierarchy frame no longer push visible Avalon-ST blocks up or down.

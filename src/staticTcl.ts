@@ -14,6 +14,7 @@ interface StaticTclTraceOptions {
   source: string;
   variables?: Record<string, TclVariableValue>;
   timeoutMs?: number;
+  signal?: AbortSignal;
 }
 
 export interface HwTclTraceOptions extends Omit<StaticTclTraceOptions, 'variables'> {
@@ -35,9 +36,14 @@ export function traceQsysTcl({
   source,
   variables = {},
   timeoutMs = 3_000,
+  signal,
 }: StaticTclTraceOptions): Promise<string> {
   const variableArguments = tclVariableEntries(variables).flatMap(([name, value]) => [name, value]);
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Safe Tcl resolution was cancelled.', 'AbortError'));
+      return;
+    }
     const child = spawn(executable, [controllerPath, sourcePath, allowedRoot, ...variableArguments], {
       cwd: allowedRoot,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -49,17 +55,27 @@ export function traceQsysTcl({
     let settled = false;
     let oversized = false;
     let timedOut = false;
+    let killTimeout: NodeJS.Timeout | undefined;
+    const terminate = () => {
+      if (child.exitCode !== null || child.signalCode !== null) return;
+      child.kill('SIGTERM');
+      killTimeout ??= setTimeout(() => child.kill('SIGKILL'), 500);
+    };
+    const abort = () => terminate();
+    signal?.addEventListener('abort', abort, { once: true });
     const finish = (action: () => void) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
+      if (killTimeout) clearTimeout(killTimeout);
+      signal?.removeEventListener('abort', abort);
       action();
     };
     const append = (current: string, chunk: Buffer): string => {
       const next = current + chunk.toString('utf8');
       if (Buffer.byteLength(next) <= maxOutputBytes) return next;
       oversized = true;
-      child.kill('SIGTERM');
+      terminate();
       return next.slice(-maxOutputBytes);
     };
     child.stdout.on('data', (chunk: Buffer) => { stdout = append(stdout, chunk); });
@@ -73,6 +89,10 @@ export function traceQsysTcl({
         : `Unable to start the Tcl interpreter: ${error.message}`,
     ))));
     child.on('close', (code) => finish(() => {
+      if (signal?.aborted) {
+        reject(new DOMException('Safe Tcl resolution was cancelled.', 'AbortError'));
+        return;
+      }
       if (code === 0 && !oversized && !timedOut) {
         resolve(extractStaticTclTrace(stdout));
         return;
@@ -87,7 +107,7 @@ export function traceQsysTcl({
     }));
     const timeout = setTimeout(() => {
       timedOut = true;
-      child.kill('SIGTERM');
+      terminate();
     }, timeoutMs);
     child.stdin.end(source);
   });
