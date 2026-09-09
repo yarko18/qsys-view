@@ -2,7 +2,6 @@
 Copyright 2026 Yaroslav Mariukha
 SPDX-License-Identifier: MIT
 -->
-
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
   <defs>
     <linearGradient id="bg" x1="24" y1="20" x2="232" y2="236" gradientUnits="userSpaceOnUse">
