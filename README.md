@@ -77,7 +77,7 @@ Use `qsysView.tclVariables` to select a configuration before evaluation or befor
 ```json
 {
   "qsysView.tclVariables": {
-    "PLATFORM_CONFIG": "WHC"
+    "PLATFORM_CONFIG": "target_1"
   }
 }
 ```

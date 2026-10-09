@@ -5,6 +5,10 @@ SPDX-License-Identifier: MIT
 
 # Change Log
 
+## Unreleased
+
+- Replace project-specific configuration and path names in documentation and tests with neutral targets.
+
 ## 1.1.7
 
 - Debounce live Qsys and Tcl graph refreshes, keep only the latest edit, and serialize refresh work per source file.

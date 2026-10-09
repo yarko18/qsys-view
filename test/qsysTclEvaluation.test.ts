@@ -9,7 +9,7 @@ describe('parseEvaluatedQsysTcl', () => {
     const graph = parseEvaluatedQsysTcl(`
       <system name="video">
         <module name="cvi" kind="LynredCVI" enabled="1">
-          <parameter name="CORE_TYPE" value="WHC" />
+          <parameter name="CORE_TYPE" value="target_1" />
           <parameter name="MAX_WIDTH" value="1280" />
         </module>
         <module name="sink" kind="video_sink" enabled="1" />
@@ -21,7 +21,7 @@ describe('parseEvaluatedQsysTcl', () => {
     ].join('\n'), '/quartus/qsys-script');
 
     expect(graph.modules.find((module) => module.id === 'cvi')?.parameters).toMatchObject({
-      CORE_TYPE: 'WHC',
+      CORE_TYPE: 'target_1',
       MAX_WIDTH: '1280',
     });
     expect(graph.connections).toContainEqual(expect.objectContaining({

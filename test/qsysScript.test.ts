@@ -108,10 +108,10 @@ describe('qsysTclExportWrapper', () => {
     expect(qsysTclExportWrapper(
       '/work/quartus/video.tcl',
       '/tmp/video.qsys',
-      { PLATFORM_CONFIG: 'WTC', FEATURE_DEBUG: false },
+      { PLATFORM_CONFIG: 'target_2', FEATURE_DEBUG: false },
     )).toEqual([
       'set ::FEATURE_DEBUG "false"',
-      'set ::PLATFORM_CONFIG "WTC"',
+      'set ::PLATFORM_CONFIG "target_2"',
       'source "/work/quartus/video.tcl"',
       'save_system "/tmp/video.qsys"',
       '',
@@ -120,7 +120,7 @@ describe('qsysTclExportWrapper', () => {
 
   it('rejects Tcl variable names that could inject commands', () => {
     expect(() => qsysTclExportWrapper('/work/video.tcl', '/tmp/video.qsys', {
-      'PLATFORM_CONFIG;error': 'WTC',
+      'PLATFORM_CONFIG;error': 'target_2',
     })).toThrow(/invalid global Tcl variable name/i);
   });
 });
@@ -131,9 +131,9 @@ describe('qsysTclInspectionWrapper', () => {
       '/work/quartus/video.tcl',
       '/tmp/evaluated.qsys',
       '/extension/inspect-interfaces.tcl',
-      { PLATFORM_CONFIG: 'WHC' },
+      { PLATFORM_CONFIG: 'target_1' },
     )).toEqual([
-      'set ::PLATFORM_CONFIG "WHC"',
+      'set ::PLATFORM_CONFIG "target_1"',
       'source "/work/quartus/video.tcl"',
       'save_system "/tmp/evaluated.qsys"',
       'source "/extension/inspect-interfaces.tcl"',

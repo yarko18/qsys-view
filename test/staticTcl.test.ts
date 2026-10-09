@@ -51,23 +51,23 @@ describe.skipIf(!tclshAvailable)('traceQsysTcl', () => {
         foreach {parameter value} [::testcfg::cvi_params] {
           set_instance_parameter_value cvi $parameter $value
         }
-        add_instance whc_sink sink 1.0
-        add_instance wtc_sink sink 1.0
+        add_instance target_1_sink sink 1.0
+        add_instance target_2_sink sink 1.0
         switch -- $::testcfg::PRODUCT {
-          WHC { add_connection cvi.dout whc_sink.din }
-          WTC { add_connection cvi.dout wtc_sink.din }
+          target_1 { add_connection cvi.dout target_1_sink.din }
+          target_2 { add_connection cvi.dout target_2_sink.din }
         }
       `,
-      variables: { PLATFORM_CONFIG: 'WTC' },
+      variables: { PLATFORM_CONFIG: 'target_2' },
     });
     expect(testDirectory).toBeTruthy();
     const graph = parseQsysTcl(trace);
     expect(graph.modules.find((module) => module.id === 'cvi')?.parameters).toMatchObject({
-      CORE_TYPE: 'WTC',
+      CORE_TYPE: 'target_2',
       MAX_WIDTH: '640',
     });
     expect(graph.connections).toHaveLength(1);
-    expect(graph.connections[0]).toMatchObject({ source: 'cvi', target: 'wtc_sink' });
+    expect(graph.connections[0]).toMatchObject({ source: 'cvi', target: 'target_2_sink' });
   });
 
   it('elaborates a hardware component again with parameter overrides', async () => {

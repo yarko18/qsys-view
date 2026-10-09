@@ -2,15 +2,15 @@
 # SPDX-License-Identifier: MIT
 
 namespace eval ::testcfg {
-    variable PRODUCT WHC
+    variable PRODUCT target_1
     if {[info exists ::PLATFORM_CONFIG]} {
-        set PRODUCT [string toupper $::PLATFORM_CONFIG]
+        set PRODUCT [string tolower $::PLATFORM_CONFIG]
     }
 }
 
 proc ::testcfg::width {} {
     variable PRODUCT
-    if {[string equal $PRODUCT "WTC"]} {
+    if {[string equal $PRODUCT "target_2"]} {
         return 640
     }
     return 1280

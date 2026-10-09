@@ -78,7 +78,7 @@
           "additionalProperties": {
             "type": ["string", "number", "boolean"]
           },
-          "description": "Global Tcl variables to set before evaluating or opening a Platform Designer Tcl system, for example {\"PLATFORM_CONFIG\": \"WHC\"}."
+          "description": "Global Tcl variables to set before evaluating or opening a Platform Designer Tcl system, for example {\"PLATFORM_CONFIG\": \"target_1\"}."
         },
         "qsysView.tclshPath": {
           "type": "string",
