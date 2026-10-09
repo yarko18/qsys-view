@@ -6,12 +6,15 @@ import type { ConnectionKind, QsysConnection, QsysExportedInterfaceMetadata, Qsy
 
 type XmlNode = Record<string, unknown>;
 
+const maxQsysXmlNesting = 4096;
+
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '',
   parseAttributeValue: false,
   parseTagValue: false,
   trimValues: true,
+  maxNestedTags: maxQsysXmlNesting,
 });
 
 function arrayOf(value: unknown): XmlNode[] {
@@ -151,7 +154,11 @@ export function parseQsys(xml: string, fallbackName = 'Qsys system'): QsysGraph 
   try {
     document = xmlParser.parse(xml) as XmlNode;
   } catch (error) {
-    throw new Error(`Invalid Qsys XML: ${error instanceof Error ? error.message : String(error)}`);
+    const detail = error instanceof Error ? error.message : String(error);
+    const nestingHint = /Maximum nested tags exceeded/i.test(detail)
+      ? ` (XML nesting exceeds ${maxQsysXmlNesting} tags; re-export the system from Platform Designer if the file is valid)`
+      : '';
+    throw new Error(`Invalid Qsys XML in ${fallbackName}: ${detail}${nestingHint}`);
   }
 
   const system = findSystem(document);

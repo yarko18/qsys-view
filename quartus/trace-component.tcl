@@ -5,6 +5,8 @@ set qv_source_path [file normalize [lindex $argv 0]]
 set qv_allowed_root [file normalize [lindex $argv 1]]
 set qv_override_args [lrange $argv 2 end]
 
+source [file join [file dirname [info script]] safe-common.tcl]
+
 array set qv_overrides {}
 foreach {name value} $qv_override_args {
     set qv_overrides([string trimleft $name :]) $value
@@ -16,22 +18,9 @@ array set qv_parameter_properties {}
 array set qv_module_properties {}
 
 proc qv_record {command args} {
-    set encoded [binary encode base64 -maxlen 0 [encoding convertto utf-8 [list $command {*}$args]]]
+    set encoded [qv_base64_encode [encoding convertto utf-8 [list $command {*}$args]]]
     puts "QSYS_VIEW_TRACE\t$encoded"
     return ""
-}
-
-proc qv_file {subcommand args} {
-    set allowed {dirname extension join normalize pathtype rootname separator split tail}
-    if {[lsearch -exact $allowed $subcommand] < 0} {
-        error "unsafe file subcommand '$subcommand' is not available"
-    }
-    return [file $subcommand {*}$args]
-}
-
-proc qv_is_within {path root} {
-    set prefix "${root}[file separator]"
-    return [expr {$path eq $root || [string first $prefix $path] == 0}]
 }
 
 proc qv_source {slave allowed_root current requested} {
@@ -48,13 +37,21 @@ proc qv_source {slave allowed_root current requested} {
     close $channel
     set previous [interp eval $slave {set ::qv_active_path}]
     interp eval $slave [list set ::qv_active_path $resolved]
-    try {
-        set result [interp eval $slave [list uplevel #0 $script]]
+    set code [catch {
+        set source_result [interp eval $slave [list uplevel #0 $script]]
         interp eval $slave [list qv_install_file_traces $resolved $script]
-        return $result
-    } finally {
+        set source_result
+    } result options]
+    set restore_code [catch {
         interp eval $slave [list set ::qv_active_path $previous]
+    } restore_result restore_options]
+    if {$code} {
+        return -options $options $result
     }
+    if {$restore_code} {
+        return -options $restore_options $restore_result
+    }
+    return $result
 }
 
 proc qv_package {subcommand args} {

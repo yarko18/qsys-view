@@ -8,6 +8,8 @@ SPDX-License-Identifier: MIT
 ## Unreleased
 
 - Replace project-specific configuration and path names in documentation and tests with neutral targets.
+- Run restricted system and component tracing on Tcl 8.5, and share Windows-safe path containment between both interpreters.
+- Accept valid Qsys XML nested up to 4,096 tags and report that limit when malformed input exceeds it.
 
 ## 1.1.7
 

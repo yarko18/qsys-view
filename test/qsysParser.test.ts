@@ -77,6 +77,27 @@ describe('parseQsys', () => {
   it('rejects malformed XML without a usable graph', () => {
     expect(() => parseQsys('<system><module', 'broken')).toThrow('Invalid Qsys XML');
   });
+
+  it('accepts valid Qsys XML nested beyond the parser default', () => {
+    const depth = 256;
+    const nested = `${'<group>'.repeat(depth)}value${'</group>'.repeat(depth)}`;
+    const graph = parseQsys(`
+      <system name="deep-system">
+        <module name="ip" kind="demo" />
+        ${nested}
+      </system>
+    `);
+
+    expect(graph.modules).toHaveLength(1);
+  });
+
+  it('reports the configured Qsys nesting limit', () => {
+    const depth = 4097;
+    const nested = `${'<group>'.repeat(depth)}value${'</group>'.repeat(depth)}`;
+
+    expect(() => parseQsys(`<system>${nested}</system>`, 'too-deep.qsys'))
+      .toThrow(/Invalid Qsys XML in too-deep\.qsys:.*4096/);
+  });
 });
 
 describe('classifyConnection', () => {
