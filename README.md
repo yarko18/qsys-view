@@ -31,6 +31,7 @@ and much more!
 - Draws explicit interconnect nodes for fan-out, fan-in, and many-to-many interfaces while keeping every logical connection inspectable.
 - Temporarily hides all connections of a selected IP or interconnect so **Relayout** can rebuild a simpler canvas without editing the source system.
 - Detects Avalon-ST adapters after Quartus analysis and marks them with a red dot.
+- Warns when one Avalon-MM master maps different slaves to the same base address.
 - Shows elaborated interface ports, parameters, and an illustrative Avalon-ST waveform.
 - Updates a Tcl graph without moving existing IP or rerouting unchanged connections.
 - Adds new IP below the frozen graph; **Relayout** recalculates positions without discarding Quartus analysis.

@@ -5,7 +5,13 @@ import { describe, expect, it } from 'vitest';
 import type { ConnectionKind, QsysConnection } from '../parser/graph';
 import { connectionDiagnostics } from '../webview/connectionDiagnostics';
 
-function connection(id: string, source: string, targetPort: string, kind: ConnectionKind): QsysConnection {
+function connection(
+  id: string,
+  source: string,
+  targetPort: string,
+  kind: ConnectionKind,
+  parameters: Record<string, string> = {},
+): QsysConnection {
   return {
     id,
     source,
@@ -14,7 +20,7 @@ function connection(id: string, source: string, targetPort: string, kind: Connec
     targetPort,
     kind,
     rawKind: kind,
-    parameters: {},
+    parameters,
   };
 }
 
@@ -51,5 +57,65 @@ describe('connection diagnostics', () => {
       severity: 'error',
       message: 'Avalon-ST source source.dout has 2 outgoing connections (sink.din, other_sink.din). Avalon-ST must be point-to-point.',
     }]);
+  });
+
+  it('reports Avalon-MM slaves with equivalent base addresses on one master', () => {
+    const first = {
+      ...connection('first', 'cpu', 'control', 'avalon_memory_mapped', { baseAddress: '0x00000100' }),
+      sourcePort: 'data_master',
+      target: 'timer_2',
+    };
+    const second = {
+      ...connection('second', 'cpu', 'control', 'avalon_memory_mapped', { BASE_ADDRESS: '256' }),
+      sourcePort: 'data_master',
+      target: 'timer_10',
+    };
+
+    expect(connectionDiagnostics([second, first])).toEqual([{
+      severity: 'warning',
+      message: 'Avalon-MM master cpu.data_master maps timer_2.control and timer_10.control to the same base address 0x100.',
+    }]);
+  });
+
+  it('keeps Avalon-MM address spaces independent per master', () => {
+    const first = {
+      ...connection('first', 'cpu_0', 'control', 'avalon_memory_mapped', { baseAddress: '0x100' }),
+      sourcePort: 'data_master',
+      target: 'timer_0',
+    };
+    const second = {
+      ...first,
+      id: 'second',
+      source: 'cpu_1',
+      target: 'timer_1',
+    };
+
+    expect(connectionDiagnostics([first, second])).toEqual([]);
+  });
+
+  it('ignores dynamic addresses and non-Avalon-MM connections', () => {
+    const dynamic = connection(
+      'dynamic',
+      'cpu',
+      'control_0',
+      'avalon_memory_mapped',
+      { baseAddress: '$timer_base' },
+    );
+    const unrelated = connection(
+      'unrelated',
+      'cpu',
+      'control_1',
+      'other',
+      { baseAddress: '0x100' },
+    );
+    const valid = connection(
+      'valid',
+      'cpu',
+      'control_2',
+      'avalon_memory_mapped',
+      { baseAddress: '0x100' },
+    );
+
+    expect(connectionDiagnostics([dynamic, unrelated, valid])).toEqual([]);
   });
 });
