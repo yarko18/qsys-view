@@ -48,7 +48,7 @@ proc qv_package {subcommand args} {
 }
 
 set qv_slave [interp create -safe]
-interp alias $qv_slave file {} qv_file
+interp alias $qv_slave file {} qv_file $qv_allowed_root
 interp alias $qv_slave qv_source {} qv_source $qv_slave $qv_allowed_root
 interp alias $qv_slave package {} qv_package
 interp alias $qv_slave qv_record {} qv_record

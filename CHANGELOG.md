@@ -7,6 +7,10 @@ SPDX-License-Identifier: MIT
 
 ## Unreleased
 
+## 1.1.9
+
+- Resolve profile-selected Tcl connections automatically when a workspace-local configuration checks its profile with `file exists`; keep paths outside the workspace blocked.
+
 ## 1.1.8
 
 - Replace project-specific configuration and path names in documentation and tests with neutral targets.

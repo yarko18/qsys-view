@@ -3,12 +3,27 @@
 
 # Shared helpers for the restricted system and component Tcl interpreters.
 
-proc qv_file {subcommand args} {
-    set allowed {dirname extension join normalize pathtype rootname separator split tail}
-    if {[lsearch -exact $allowed $subcommand] < 0} {
+proc qv_file {allowed_root subcommand args} {
+    set structural {dirname extension join normalize pathtype rootname separator split tail}
+    if {[lsearch -exact $structural $subcommand] >= 0} {
+        return [file $subcommand {*}$args]
+    }
+    if {$subcommand ne "exists"} {
         error "unsafe file subcommand '$subcommand' is not available"
     }
-    return [file $subcommand {*}$args]
+    if {[llength $args] != 1} {
+        error "file exists requires exactly one path"
+    }
+
+    set requested [lindex $args 0]
+    if {[file pathtype $requested] eq "relative"} {
+        set requested [file join $allowed_root $requested]
+    }
+    set resolved [file normalize $requested]
+    if {![qv_is_within $resolved $allowed_root]} {
+        error "file exists outside the workspace is not allowed: $resolved"
+    }
+    return [file exists $resolved]
 }
 
 # Compares paths that have already been normalized by Tcl. Keeping the string

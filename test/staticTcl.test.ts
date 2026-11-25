@@ -34,7 +34,7 @@ describe('extractStaticTclTrace', () => {
 });
 
 describe.skipIf(!tclshAvailable)('traceQsysTcl', () => {
-  it('safely resolves source, namespaces, procedures, foreach, substitutions, and switch', async () => {
+  it('safely resolves workspace-local file checks, source, namespaces, procedures, foreach, substitutions, and switch', async () => {
     const testDirectory = fileURLToPath(new URL('.', import.meta.url));
     const controllerPath = fileURLToPath(new URL('../quartus/trace-system.tcl', import.meta.url));
     const sourcePath = fileURLToPath(new URL('./static-entry.tcl', import.meta.url));
@@ -44,7 +44,11 @@ describe.skipIf(!tclshAvailable)('traceQsysTcl', () => {
       sourcePath,
       allowedRoot: fileURLToPath(new URL('..', import.meta.url)),
       source: `
-        source [file join [file dirname [info script]] fixtures static-config.tcl]
+        set configuration [file join [file dirname [info script]] fixtures static-config.tcl]
+        if {![file exists $configuration]} {
+          error "Missing test configuration: $configuration"
+        }
+        source $configuration
         package require -exact qsys 16.0
         create_system video
         add_instance cvi LynredCVI 1.0
@@ -68,6 +72,18 @@ describe.skipIf(!tclshAvailable)('traceQsysTcl', () => {
     });
     expect(graph.connections).toHaveLength(1);
     expect(graph.connections[0]).toMatchObject({ source: 'cvi', target: 'target_2_sink' });
+  });
+
+  it('rejects file existence probes outside the workspace', async () => {
+    const controllerPath = fileURLToPath(new URL('../quartus/trace-system.tcl', import.meta.url));
+    const sourcePath = fileURLToPath(new URL('./static-entry.tcl', import.meta.url));
+    await expect(traceQsysTcl({
+      executable: tclsh,
+      controllerPath,
+      sourcePath,
+      allowedRoot: fileURLToPath(new URL('..', import.meta.url)),
+      source: 'file exists [file join [file dirname [info script]] .. ..]',
+    })).rejects.toThrow(/file exists outside the workspace is not allowed/i);
   });
 
   it('elaborates a hardware component again with parameter overrides', async () => {
