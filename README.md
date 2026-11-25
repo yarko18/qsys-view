@@ -132,7 +132,7 @@ code --install-extension qsys-view-1.2.2.vsix --force
 | Setting | Purpose |
 | --- | --- |
 | `qsysView.quartusPath` | Quartus directory or direct path to `qsys-script` |
-| `qsysView.platformDesignerPath` | Direct path to `qsys-edit` or `qsys.exe` |
+| `qsysView.platformDesignerPath` | Direct path to `qsys-edit`/`qsys` on Linux or `qsys-edit.exe`/`qsys.exe` on Windows |
 | `qsysView.ipSearchPaths` | Additional Platform Designer IP search paths |
 | `qsysView.tclVariables` | Global variables set before evaluating a Tcl system |
 | `qsysView.tclshPath` | Tcl interpreter used for automatic safe control-flow resolution |

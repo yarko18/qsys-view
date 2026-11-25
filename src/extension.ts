@@ -16,10 +16,14 @@ import { parseQsysTcl } from '../parser/qsysTclParser';
 import {
   automaticQsysSearchPaths,
   platformDesignerArguments,
+  platformDesignerCandidates,
+  platformDesignerExecutableNames,
   platformDesignerScratchPrefix,
   platformDesignerTemporaryPrefix,
   preparedSubsystemSearchPath,
   qsysAnalysisTemporaryPrefix,
+  qsysScriptCandidates,
+  qsysScriptExecutableName,
   qsysScriptArguments,
   qsysTclExportWrapper,
   qsysTclInspectionWrapper,
@@ -719,14 +723,14 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     const candidates: string[] = [];
     for (const root of roots) candidates.push(...qsysScriptCandidates(root));
     for (const directory of (process.env.PATH ?? '').split(path.delimiter).filter(Boolean)) {
-      candidates.push(path.join(directory, executableName()));
+      candidates.push(path.join(directory, qsysScriptExecutableName()));
     }
     const homeDirectory = process.env.HOME || os.homedir();
     for (const installationRoot of [path.join(homeDirectory, 'intelFPGA'), path.join(homeDirectory, 'intelFPGA_lite')]) {
       try {
         const versions = await fs.readdir(installationRoot, { withFileTypes: true });
         for (const version of versions.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort().reverse()) {
-          candidates.push(path.join(installationRoot, version, 'quartus', 'sopc_builder', 'bin', executableName()));
+          candidates.push(path.join(installationRoot, version, 'quartus', 'sopc_builder', 'bin', qsysScriptExecutableName()));
         }
       } catch {
         // The conventional installation directory is optional.
@@ -740,7 +744,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
         // Try the next configured or conventional location.
       }
     }
-    return executableName();
+    return qsysScriptExecutableName();
   }
 
   private async openPlatformDesigner(uri: vscode.Uri): Promise<void> {
@@ -888,14 +892,15 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
     const candidates: string[] = [];
     for (const root of roots) candidates.push(...platformDesignerCandidates(root));
     for (const directory of (process.env.PATH ?? '').split(path.delimiter).filter(Boolean)) {
-      candidates.push(path.join(directory, platformDesignerExecutableName()));
+      candidates.push(...platformDesignerExecutableNames().map((name) => path.join(directory, name)));
     }
     const homeDirectory = process.env.HOME || os.homedir();
     for (const installationRoot of [path.join(homeDirectory, 'intelFPGA'), path.join(homeDirectory, 'intelFPGA_lite')]) {
       try {
         const versions = await fs.readdir(installationRoot, { withFileTypes: true });
         for (const version of versions.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort().reverse()) {
-          candidates.push(path.join(installationRoot, version, 'quartus', 'sopc_builder', 'bin', platformDesignerExecutableName()));
+          const binDirectory = path.join(installationRoot, version, 'quartus', 'sopc_builder', 'bin');
+          candidates.push(...platformDesignerExecutableNames().map((name) => path.join(binDirectory, name)));
         }
       } catch {
         // The conventional installation directory is optional.
@@ -909,7 +914,7 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
         // Try the next configured or conventional location.
       }
     }
-    return platformDesignerExecutableName();
+    return platformDesignerExecutableNames()[0]!;
   }
 
   private getHtml(webview: vscode.Webview): string {
@@ -931,41 +936,6 @@ class QsysEditorProvider implements vscode.CustomReadonlyEditorProvider<QsysDocu
 </body>
 </html>`;
   }
-}
-
-function executableName(): string {
-  return process.platform === 'win32' ? 'qsys-script.exe' : 'qsys-script';
-}
-
-function qsysScriptCandidates(location: string): string[] {
-  const basename = path.basename(location).toLowerCase();
-  if (basename === 'qsys-script' || basename === 'qsys-script.exe') return [location];
-  if (basename === 'bin') return [path.join(location, executableName())];
-  if (basename === 'sopc_builder') return [path.join(location, 'bin', executableName())];
-  if (basename === 'quartus') return [path.join(location, 'sopc_builder', 'bin', executableName())];
-  return [
-    path.join(location, 'sopc_builder', 'bin', executableName()),
-    path.join(location, 'quartus', 'sopc_builder', 'bin', executableName()),
-  ];
-}
-
-function platformDesignerExecutableName(): string {
-  return process.platform === 'win32' ? 'qsys.exe' : 'qsys-edit';
-}
-
-function platformDesignerCandidates(location: string): string[] {
-  const basename = path.basename(location).toLowerCase();
-  if (basename === 'qsys' || basename === 'qsys.exe' || basename === 'qsys-edit') return [location];
-  if (basename === 'qsys-script' || basename === 'qsys-script.exe') {
-    return [path.join(path.dirname(location), platformDesignerExecutableName())];
-  }
-  if (basename === 'bin') return [path.join(location, platformDesignerExecutableName())];
-  if (basename === 'sopc_builder') return [path.join(location, 'bin', platformDesignerExecutableName())];
-  if (basename === 'quartus') return [path.join(location, 'sopc_builder', 'bin', platformDesignerExecutableName())];
-  return [
-    path.join(location, 'sopc_builder', 'bin', platformDesignerExecutableName()),
-    path.join(location, 'quartus', 'sopc_builder', 'bin', platformDesignerExecutableName()),
-  ];
 }
 
 function runQsysScript(executable: string, args: string[], cwd: string): Promise<string> {

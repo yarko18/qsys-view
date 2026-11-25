@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { describe, expect, it } from 'vitest';
-import { automaticQsysSearchPaths, platformDesignerArguments, platformDesignerScratchPrefix, platformDesignerTemporaryPrefix, preparedSubsystemSearchPath, qsysAnalysisTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclInspectionWrapper, qsysTclScriptArguments, quartusTemporaryEnvironment, siblingQsysSearchPattern } from '../src/qsysScript';
+import { automaticQsysSearchPaths, platformDesignerArguments, platformDesignerCandidates, platformDesignerExecutableNames, platformDesignerScratchPrefix, platformDesignerTemporaryPrefix, preparedSubsystemSearchPath, qsysAnalysisTemporaryPrefix, qsysScriptArguments, qsysTclExportWrapper, qsysTclInspectionWrapper, qsysTclScriptArguments, quartusTemporaryEnvironment, siblingQsysSearchPattern } from '../src/qsysScript';
 
 describe('quartusTemporaryEnvironment', () => {
   it('keeps the inherited environment while redirecting every Quartus temporary variable', () => {
@@ -28,6 +28,23 @@ describe('platformDesignerArguments', () => {
     )).toEqual([
       '/work/quartus/.qsys-view-video-AbCd12/video.qsys',
       '--search-path=/work/quartus/ip/*/component.ipx,$',
+    ]);
+  });
+});
+
+describe('platformDesignerCandidates', () => {
+  it('prefers qsys-edit.exe and accepts it as a direct Windows setting', () => {
+    const executable = String.raw`C:\intelFPGA\23.1std\quartus\sopc_builder\bin\qsys-edit.exe`;
+    expect(platformDesignerExecutableNames('win32')).toEqual(['qsys-edit.exe', 'qsys.exe']);
+    expect(platformDesignerCandidates(executable, 'win32')).toEqual([executable]);
+  });
+
+  it('finds both supported Windows executable names from a Quartus installation root', () => {
+    expect(platformDesignerCandidates(String.raw`C:\intelFPGA\23.1std`, 'win32')).toEqual([
+      String.raw`C:\intelFPGA\23.1std\sopc_builder\bin\qsys-edit.exe`,
+      String.raw`C:\intelFPGA\23.1std\sopc_builder\bin\qsys.exe`,
+      String.raw`C:\intelFPGA\23.1std\quartus\sopc_builder\bin\qsys-edit.exe`,
+      String.raw`C:\intelFPGA\23.1std\quartus\sopc_builder\bin\qsys.exe`,
     ]);
   });
 });

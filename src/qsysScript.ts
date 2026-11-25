@@ -5,6 +5,60 @@ import * as path from 'node:path';
 
 export type TclVariableValue = string | number | boolean;
 
+type HostPlatform = NodeJS.Platform;
+
+function hostPath(platform: HostPlatform): typeof path.posix {
+  return platform === 'win32' ? path.win32 : path.posix;
+}
+
+export function qsysScriptExecutableName(platform: HostPlatform = process.platform): string {
+  return platform === 'win32' ? 'qsys-script.exe' : 'qsys-script';
+}
+
+export function qsysScriptCandidates(
+  location: string,
+  platform: HostPlatform = process.platform,
+): string[] {
+  const pathApi = hostPath(platform);
+  const executable = qsysScriptExecutableName(platform);
+  const basename = pathApi.basename(location).toLowerCase();
+  if (basename === 'qsys-script' || basename === 'qsys-script.exe') return [location];
+  if (basename === 'bin') return [pathApi.join(location, executable)];
+  if (basename === 'sopc_builder') return [pathApi.join(location, 'bin', executable)];
+  if (basename === 'quartus') return [pathApi.join(location, 'sopc_builder', 'bin', executable)];
+  return [
+    pathApi.join(location, 'sopc_builder', 'bin', executable),
+    pathApi.join(location, 'quartus', 'sopc_builder', 'bin', executable),
+  ];
+}
+
+export function platformDesignerExecutableNames(platform: HostPlatform = process.platform): string[] {
+  return platform === 'win32'
+    ? ['qsys-edit.exe', 'qsys.exe']
+    : ['qsys-edit', 'qsys'];
+}
+
+export function platformDesignerCandidates(
+  location: string,
+  platform: HostPlatform = process.platform,
+): string[] {
+  const pathApi = hostPath(platform);
+  const names = platformDesignerExecutableNames(platform);
+  const basename = pathApi.basename(location).toLowerCase();
+  if (names.includes(basename)) return [location];
+  const inDirectory = (directory: string) => names.map((name) => pathApi.join(directory, name));
+  if (basename === 'qsys-script' || basename === 'qsys-script.exe') {
+    return inDirectory(pathApi.dirname(location));
+  }
+  if (basename === 'bin') return inDirectory(location);
+  if (basename === 'sopc_builder') return inDirectory(pathApi.join(location, 'bin'));
+  if (basename === 'quartus') return inDirectory(pathApi.join(location, 'sopc_builder', 'bin'));
+  return [
+    ...inDirectory(pathApi.join(location, 'sopc_builder', 'bin')),
+    ...inDirectory(pathApi.join(location, 'quartus', 'sopc_builder', 'bin')),
+  ];
+}
+
 export function quartusTemporaryEnvironment(
   temporaryDirectory: string,
   inheritedEnvironment: NodeJS.ProcessEnv = process.env,

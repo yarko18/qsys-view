@@ -7,6 +7,9 @@ SPDX-License-Identifier: MIT
 
 ## Unreleased
 
+## 1.1.10
+- Find Windows Platform Designer installations that provide `qsys-edit.exe`, while retaining `qsys.exe` as a fallback for older installations.
+
 ## 1.1.9
 
 - Resolve profile-selected Tcl connections automatically when a workspace-local configuration checks its profile with `file exists`; keep paths outside the workspace blocked.
